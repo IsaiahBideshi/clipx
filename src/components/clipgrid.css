@@ -1,0 +1,180 @@
+.clip-editor-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  background: rgba(0,0,0,0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  gap: 1rem;
+  padding: 20px;
+}
+.clip-editor{
+  background: #1e1f22;
+  padding: 2em 2.5em;
+  border-radius: 12px;
+  box-shadow: 0 4px 32px rgba(0,0,0,0.2);
+  min-width: 320px;
+  max-width: calc(90vw - 80px);
+  text-align: center;
+}
+
+.clip-grid{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  max-width: 100vw;
+  align-content: flex-start;
+  margin: 0 auto;
+  width: 1300px;
+}
+
+.clip-card{
+  margin-top: 10px;
+  margin-bottom: 10px;
+  margin-left: 10px;
+  flex: 0 0 auto;
+  width: 270px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  padding: 10px;
+  box-shadow: 2px 2px 5px rgb(30, 31, 34);
+}
+.clip-card:hover {
+  transform: scale(1.03);
+  transition: transform 0.2s;
+  cursor: pointer;
+}
+
+
+.upload-container{
+  margin-top: 15px;
+  /*display: flex;*/
+  flex-direction: row;
+  justify-content: center;
+  gap: 10px;
+  background: #1e1f22;
+  width: 40%;
+  height: auto;
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.hide-upload-menu-btn{
+  width: 50px;
+  height: 50px;
+  background-color: transparent;
+  cursor: pointer;
+  align-content: center;
+}
+
+.hidden-btn{
+  position: absolute;
+  right: 80px;
+}
+
+.hidden{
+  width: 80px;
+  background: none !important;
+}
+
+
+upload-menu{
+}
+
+
+.clip-name{
+  font-size: 13px;
+  font-weight: bold;
+  margin-bottom: 5px;
+}
+
+.clip-thumb{
+  width: 100%;
+  height: auto;
+  border-radius: 3px;
+  margin-bottom: 5px;
+}
+
+.clip-thumbnail-img{
+  width: 100%;
+  height: auto;
+  border-radius: 3px;
+}
+
+.thumb-placeholder {
+  width: 100%;
+  height: 151.8px;
+  background: linear-gradient(
+    90deg,
+    #1a1a1a 25%,
+    #2a2a2a 37%,
+    #1a1a1a 63%
+  );
+  background-size: 400% 100%;
+  animation: shimmer 1.4s ease infinite;
+}
+
+.no-thumb{
+  /*background-color: #d82929 !important;*/
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: 0 0;
+  }
+}
+
+
+.play-button{
+  background-color: transparent;
+  border: none;
+  transition: none
+}
+.play-button:focus{
+  border: none !important;
+}
+.play-button:hover{
+  border: none;
+  cursor: pointer;
+}
+
+.mute-button{
+  background-color: transparent;
+  border: none;
+  transition: none
+}
+.mute-button:focus{
+  border: none !important;
+}
+.mute-button:hover{
+  border: none;
+  cursor: pointer;
+}
+.mute-button:active{
+  border: none;
+}
+.MuiChip-label{
+  color: white;
+}
+.search-game-button{
+  align-self: center;
+  margin-left: 0;
+  margin-right: 10px;
+}
+.search-game-button:hover{
+  cursor: pointer;
+}
+
+.app{
+  margin-top: 10px;
+  padding-bottom: 100px;
+  overflow-y: scroll;
+  height: calc(100vh - 100px);
+  max-height: 80vh
+}
