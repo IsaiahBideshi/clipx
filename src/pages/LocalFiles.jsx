@@ -5,12 +5,14 @@ import Settings from './Settings.jsx';
 import {useState, useEffect} from 'react';
 import Button from '@mui/material/Button';
 import SettingsIcon from '@mui/icons-material/Settings';
+import RefreshIcon from '@mui/icons-material/Refresh';
 
 
 
 export default function LocalFiles() {
   const [folderPath, setFolderPath] = useState("D:\\Clips");
   const [files, setFiles] = useState([]);
+  const [refreshTick, setRefreshTick] = useState(0);
 
   const [clip, setClip] = useState(null);
 
@@ -42,7 +44,7 @@ export default function LocalFiles() {
     return () => {
       cancelled = true;
     };
-  }, [folderPath]);
+  }, [folderPath, refreshTick]);
 
   // Keyboard controls
   useEffect(() => {
@@ -73,11 +75,20 @@ export default function LocalFiles() {
     }
   };
 
+  const refreshFiles = () => {
+    setRefreshTick((tick) => tick + 1);
+  };
+
   return (
     <div className={"app"}>
       {/*<Button variant={"contained"} onClick={pickFolder}>Pick Folder</Button>*/}
 
       {folderPath && <pre>Folder: {folderPath}</pre>}
+      <RefreshIcon
+        fontSize={"large"}
+        sx={{ cursor: "pointer" }}
+        onClick={refreshFiles}
+      />
 
       {clip && (<ClipEditor clip={clip}/>)}
       {!!files.length && (

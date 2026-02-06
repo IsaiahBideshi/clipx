@@ -252,3 +252,39 @@ ipcMain.handle("get-thumbnail", async (_e, clipPath, baseFolder) => {
   const thumbPath = await generateThumbnail(clipPath, thumbsDir);
   return thumbPath;
 });
+
+ipcMain.handle("get-taglist", async () => {
+  const taglistPath = path.join(app.getPath("appData"), "clipx", "taglist.json");
+
+  try {
+    const data = await fs.promises.readFile(taglistPath, "utf-8");
+    console.log(data);
+    return JSON.parse(data);
+  } catch (e) {
+    if (e && e.code === "ENOENT") { // File does not exist so create it with default taglist
+      const appDataDir = path.dirname(taglistPath);
+      await fs.promises.mkdir(appDataDir, { recursive: true });
+      await fs.promises.writeFile(taglistPath, "", "utf-8");
+
+      console.log("ClipX: Created new taglist.json at", taglistPath);
+      return [];
+    }
+    console.error("ClipX: Failed to read taglist.json:", e);
+    return [];
+  }
+});
+
+ipcMain.handle("save-taglist", async (_e, taglist) => {
+  const taglistPath = path.join(app.getPath("appData"), "clipx", "taglist.json");
+  console.log(taglist);
+
+  try {
+    const appDataDir = path.dirname(taglistPath);
+    await fs.promises.mkdir(appDataDir, { recursive: true });
+    await fs.promises.writeFile(taglistPath, JSON.stringify(taglist, null, 2), "utf-8");
+    console.log("ClipX: Saved taglist.json at", taglistPath);
+  } catch (e) {
+    console.error("ClipX: Failed to save taglist.json:", e);
+    throw e;
+  }
+});

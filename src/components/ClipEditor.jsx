@@ -15,6 +15,7 @@ import FormGroup from '@mui/material/FormGroup';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import Checkbox from '@mui/material/Checkbox';
 import SearchIcon from '@mui/icons-material/Search';
+import {getTaglist} from "../pages/Settings";
 
 const GAMES_API_KEY = '93dc6283e654485db211470c64885d60'
 
@@ -328,7 +329,8 @@ function searchGames(gameName) {
 
 
 function UploadMenu() {
-  const friends = ['Shack', 'ipvg', 'ColdRulez', 'fella_guy', 'Bradley', 'Blackmannn'];
+  const [tagOptions, setTagOptions] = useState([]);
+  const [tags, setTags] = useState([]);
   const [friendsInClip, setFriendsInClip] = useState([]);
   const [peopleInput, setPeopleInput] = useState('');
   const [game, setGame] = useState(null);
@@ -345,6 +347,30 @@ function UploadMenu() {
     textColor: 'white',
     width: "100%",
   };
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadTagOptions() {
+      try {
+        const taglist = await getTaglist();
+        if (!Array.isArray(taglist)) return;
+
+        const options = taglist
+          .map((tag) => Array.isArray(tag?.aliases) ? tag.aliases.filter(Boolean).join(" /  ") : "")
+          .filter(Boolean);
+
+        if (!cancelled) setTagOptions(options);
+      } catch (err) {
+        console.error("Failed to load tag options:", err);
+      }
+    }
+
+    loadTagOptions();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleSearchGame = async () => {
     const games = searchGames(gameInput);
@@ -394,7 +420,9 @@ function UploadMenu() {
           sx={tfSx}
           multiple
           id="tags-outlined"
-          options={friends}
+          options={tagOptions}
+          value={tags}
+          onChange={(_e, newValue) => setTags(newValue)}
           filterSelectedOptions
           renderInput={(params) => (
             <TextField

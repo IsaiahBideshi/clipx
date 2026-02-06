@@ -7,4 +7,6 @@ contextBridge.exposeInMainWorld("clipx", {
   pickVideoFile: () => ipcRenderer.invoke("pick-video-file"),
   scanFolder: (folderPath) => ipcRenderer.invoke("scan-folder", folderPath),
   getThumbnail: (videoPath, thumbsDir) => ipcRenderer.invoke("get-thumbnail", videoPath, thumbsDir),
+  getTaglist: () => ipcRenderer.invoke("get-taglist"),
+  saveTaglist: (taglist) => ipcRenderer.invoke("save-taglist", taglist),
 });
