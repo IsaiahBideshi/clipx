@@ -319,3 +319,37 @@ ipcMain.handle("search-games", async (_e, query) => {
 
   return data;
 });
+
+ipcMain.handle("get-options", async () => {
+  const optionsPath = path.join(app.getPath("appData"), "clipx", "options.json");
+
+  try {
+    const data = await fs.promises.readFile(optionsPath, "utf-8");
+    console.log(data);
+    return JSON.parse(data);
+  } catch (e) {
+    if (e && e.code === "ENOENT") { // File does not exist so create it with default options
+      const appDataDir = path.dirname(optionsPath);
+      await fs.promises.mkdir(appDataDir, {recursive: true});
+      await fs.promises.writeFile(optionsPath, "", "utf-8");
+      console.log("ClipX: Created options for query:", optionsPath);
+      return {};
+    }
+    console.error("ClipX: Failed to read options.json:", e);
+    return {};
+  }
+});
+
+ipcMain.handle("save-options", async (_e, options) => {
+  const optionsPath = path.join(app.getPath("appData"), "clipx", "options.json");
+
+  try {
+    const appDataDir = path.dirname(optionsPath);
+    await fs.promises.mkdir(appDataDir, {recursive: true});
+    await fs.promises.writeFile(optionsPath, JSON.stringify(options, null, 2), "utf-8");
+    console.log("ClipX: Saved options.json at", optionsPath);
+  } catch (e) {
+    console.error("ClipX: Failed to save options.json:", e);
+    throw e;
+  }
+});

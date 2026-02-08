@@ -9,6 +9,9 @@ import Button from '@mui/material/Button';
 import CircularProgress from '@mui/material/CircularProgress';
 import CheckIcon from '@mui/icons-material/Check';
 import CloseIcon from '@mui/icons-material/Close';
+import FormGroup from "@mui/material/FormGroup";
+import FormControlLabel from "@mui/material/FormControlLabel";
+import {Switch} from "@mui/material";
 
 const tfSx = {
   "& .MuiInputLabel-root": { color: "#e5e7eb" }, // label
@@ -42,13 +45,30 @@ export async function getTaglist() {
   }
 }
 
+export async function getOptions() {
+  if (!window.clipx?.getOptions) {
+    console.log("no getOptions function");
+    return {};
+  }
+
+  try {
+    const storedOptions = await window.clipx.getOptions();
+    console.log(storedOptions);
+    return storedOptions || {};
+  } catch (err) {
+    console.error("Failed to load options:", err);
+    return {};
+  }
+}
+
 export default function Settings() {
-  const [taglist, setTaglist] = useState(getTaglist());
+  const [taglist, setTaglist] = useState();
   const [aliases, setAliases] = useState([""]);
   const aliasCount = aliases.length;
   const [pendingDeleteIndex, setPendingDeleteIndex] = useState(null);
-
-  console.log(taglist);
+  const [options, setOptions] = useState();
+  const [defaultOptions, setDefaultOptions] = useState();
+  console.log(options);
 
   useEffect(() => {
     let cancelled = false;
@@ -57,13 +77,23 @@ export default function Settings() {
       try {
         const loadedFriends = await getTaglist();
         setTaglist(loadedFriends);
-        if (!cancelled) getTaglist(loadedFriends);
       } catch (err) {
         console.error("Failed to load friends:", err);
         if (!cancelled) setTaglist(DEFAULT_FRIENDS);
       }
     }
+    async function loadOptions() {
+      try {
+        const loadedOptions = await getOptions();
+        setDefaultOptions(loadedOptions);
+        setOptions(loadedOptions);
+      } catch (err) {
+        console.error("Failed to load options:", err);
+        if (!cancelled) setOptions({});
+      }
+    }
 
+    loadOptions();
     loadTaglist();
     return () => {
       cancelled = true;
@@ -77,18 +107,36 @@ export default function Settings() {
     }
 
     async function saveTaglist() {
-      if (!taglist === []) return;
-      console.log("saveTaglist function");
+      if (taglist === []) return;
+      if (!Array.isArray(taglist)) return;
+
+      if (!window.clipx?.saveTaglist) {
+        console.log("no saveTaglist function");
+        return;
+      }
       try {
         await window.clipx.saveTaglist(taglist);
       } catch (err) {
         console.error("Failed to save Taglist:", err);
       }
     }
-    saveTaglist();
-  }, [taglist]);
+    async function saveOptions() {
+      if (options === {}) return;
+      if (typeof options !== "object") return;
+      if (!window.clipx?.saveOptions) {
+        console.log("no saveOptions function");
+        return;
+      }
+      try {
+        await window.clipx.saveOptions(options);
+      } catch (err) {
+        console.error("Failed to save options:", err);
+      }
+    }
 
-  console.log(taglist);
+    saveOptions();
+    saveTaglist();
+  }, [taglist, options]);
 
   return (
     <>
@@ -189,6 +237,20 @@ export default function Settings() {
               <div className="loading"><CircularProgress/></div>
             )}
           </div>
+        </div>
+        <div className={"options"}>
+          <h4 style={{marginBottom: 0}}>Options</h4>
+          {options ? null : <div className="loading"><CircularProgress/></div>}
+          {options && defaultOptions && (
+            <FormGroup className={"options-form"}>
+              <FormControlLabel control={<Switch defaultChecked={defaultOptions?.deleteClipAfterCut} onChange={(e) => {
+                setOptions({
+                  ...options,
+                  deleteClipAfterCut: e.target.checked,
+                })
+              }}/>} label="Delete Clip After Cut?"/>
+            </FormGroup>
+          )}
         </div>
       </div>
     </>

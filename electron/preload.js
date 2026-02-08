@@ -10,4 +10,6 @@ contextBridge.exposeInMainWorld("clipx", {
   getTaglist: () => ipcRenderer.invoke("get-taglist"),
   saveTaglist: (taglist) => ipcRenderer.invoke("save-taglist", taglist),
   searchGames: (query) => ipcRenderer.invoke("search-games", query),
+  getOptions: () => ipcRenderer.invoke("get-options"),
+  saveOptions: (options) => ipcRenderer.invoke("save-options", options),
 });
