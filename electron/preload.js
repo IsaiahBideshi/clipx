@@ -9,4 +9,5 @@ contextBridge.exposeInMainWorld("clipx", {
   getThumbnail: (videoPath, thumbsDir) => ipcRenderer.invoke("get-thumbnail", videoPath, thumbsDir),
   getTaglist: () => ipcRenderer.invoke("get-taglist"),
   saveTaglist: (taglist) => ipcRenderer.invoke("save-taglist", taglist),
+  searchGames: (query) => ipcRenderer.invoke("search-games", query),
 });

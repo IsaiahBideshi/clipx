@@ -15,9 +15,16 @@ import FormGroup from '@mui/material/FormGroup';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import Checkbox from '@mui/material/Checkbox';
 import SearchIcon from '@mui/icons-material/Search';
+
 import {getTaglist} from "../pages/Settings";
 
-const GAMES_API_KEY = '93dc6283e654485db211470c64885d60'
+// RAWG Key: 93dc6283e654485db211470c64885d60
+const GAMES_API_KEY = '93dc6283e654485db211470c64885d60';
+
+// IGDB Key: 1b8c8d9e311a4c8d71c3c732fbbaccc
+// Client ID: 31woiu66m2oeotccavjhhgaeg26jdg
+// Secret: lk8frdqd9wqa687gmsx5lz0g7d0yfa
+// Access Token: vkibr6jlgoaw8uh9bk9dgacdx14gjv
 
 export default function ClipEditor({clip}) {
   const videoRef = useRef(null);
@@ -312,19 +319,19 @@ export default function ClipEditor({clip}) {
   );
 }
 
-function searchGames(gameName) {
-//   Get list of games from local files first then fetch from api:
-  console.log(gameName);
-  return;
-  const games = [];
+async function searchGames(gameName) {
+  if (!gameName) return [];
 
-//   TBD: Fetch from local files
+  const api = window?.clipx?.searchGames;
+  if (typeof api !== "function") return [];
 
-  // Fetch from API
-  const url = `https://api.rawg.io/api/games?key=${GAMES_API_KEY}&search=${encodeURIComponent(gameName)}&page_size=5`;
-  fetch(url).then(res => res.json()).then(games => {
-    console.log("Fetched games from API:", games);
-  })
+  try {
+    const games = await api(gameName);
+    return Array.isArray(games) ? games : [];
+  } catch (e) {
+    console.error("searchGames failed:", e);
+    return [];
+  }
 }
 
 
@@ -335,7 +342,8 @@ function UploadMenu() {
   const [peopleInput, setPeopleInput] = useState('');
   const [game, setGame] = useState(null);
   const [gameInput, setGameInput] = useState("");
-  const [gameOptions, setGameOptions] = useState([{ id: "testgame", label: "Test Game", img: "/vite.svg" },]);
+  const [gameOptions, setGameOptions] = useState([{ id: "testgame", label: "Test Game"},]);
+  const [storedGamesLabels, setStoredGamesLabels] = useState([]);
   const tfSx = {
     "& .MuiInputLabel-root": { color: "#e5e7eb" }, // label
     "& .MuiInputBase-input": { color: "#ffffff" }, // typed text
@@ -347,6 +355,10 @@ function UploadMenu() {
     textColor: 'white',
     width: "100%",
   };
+  useEffect(() => {
+    console.log("Searching games for input:", gameInput);
+    handleSearchGame();
+  }, [gameInput]);
 
   useEffect(() => {
     let cancelled = false;
@@ -373,8 +385,15 @@ function UploadMenu() {
   }, []);
 
   const handleSearchGame = async () => {
-    const games = searchGames(gameInput);
-    setGame(games);
+    const games = await searchGames(gameInput);
+    console.log(games);
+    const options = games.map(game => ({
+      id: game.id,
+      label: game.name + (game.first_release_date ? ` (${new Date(game.first_release_date * 1000).getFullYear()})` : ''),
+      image: game?.cover?.url,
+    }));
+
+    setGameOptions(options);
   }
 
   return (
@@ -383,8 +402,9 @@ function UploadMenu() {
         <TextField fullWidth label={"Title"} sx={tfSx} />
         <div style={{display: "flex", justifyContent: "space-between"}} >
           <AutoComplete
-            sx={{width: "100%", marginRight: '10px'}}
+            fullWidth
             options={gameOptions}
+            freeSolo
             value={game}
             inputValue={gameInput}
             onInputChange={(_e, newInputValue) => setGameInput(newInputValue)}
@@ -396,13 +416,13 @@ function UploadMenu() {
             getOptionLabel={(opt) => opt?.label ?? ""}
             renderOption={(props, opt) => (
               <li {...props} style={{display: "flex", alignItems: "center", gap: 10}}>
-                <img
-                  src={opt.img}
-                  alt=""
-                  width={20}
-                  height={20}
-                  style={{objectFit: "contain"}}
-                />
+                {opt.image && (
+                  <img
+                    src={opt.image}
+                    alt={opt.label}
+                    style={{width: 32, height: 45, objectFit: "cover", borderRadius: 2}}
+                  />
+                )}
                 <span>{opt.label}</span>
               </li>
             )}
@@ -414,7 +434,6 @@ function UploadMenu() {
               />
             )}
           />
-          <SearchIcon fontSize={"large"} className={"search-game-button"} onClick={handleSearchGame} />
         </div>
         <AutoComplete
           sx={tfSx}

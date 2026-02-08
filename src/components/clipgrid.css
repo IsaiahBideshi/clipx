@@ -81,10 +81,6 @@
 }
 
 
-upload-menu{
-}
-
-
 .clip-name{
   font-size: 13px;
   font-weight: bold;
@@ -165,7 +161,7 @@ upload-menu{
 .search-game-button{
   align-self: center;
   margin-left: 0;
-  margin-right: 10px;
+  margin-right: 0 !important;
 }
 .search-game-button:hover{
   cursor: pointer;

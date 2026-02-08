@@ -276,7 +276,6 @@ ipcMain.handle("get-taglist", async () => {
 
 ipcMain.handle("save-taglist", async (_e, taglist) => {
   const taglistPath = path.join(app.getPath("appData"), "clipx", "taglist.json");
-  console.log(taglist);
 
   try {
     const appDataDir = path.dirname(taglistPath);
@@ -287,4 +286,36 @@ ipcMain.handle("save-taglist", async (_e, taglist) => {
     console.error("ClipX: Failed to save taglist.json:", e);
     throw e;
   }
+});
+
+ipcMain.handle("search-games", async (_e, query) => {
+  if (typeof query !== "string") {
+    return [];
+  }
+
+  const headers = {
+    "Client-ID": "31woiu66m2oeotccavjhhgaeg26jdg",
+    "Authorization": "Bearer vkibr6jlgoaw8uh9bk9dgacdx14gjv",
+    "Content-Type": "text/plain",
+    "Accept": "application/json",
+  };
+
+  console.log("Searching games for query:", query);
+
+  let response = await fetch("https://api.igdb.com/v4/games", {
+    method: "POST",
+    headers: headers,
+    body: `
+      fields name,cover.url, cover.image_id, total_rating_count, first_release_date;
+      search "${query}";
+      where game_type = 0;
+      limit 100;
+    `
+  });
+  const data = await response.json();
+  // filter out any game that does have a game_type of 0
+  data.sort((a, b) => (b.total_rating_count || 0) - (a.total_rating_count || 0));
+  console.log(data);
+
+  return data;
 });
