@@ -1,4 +1,6 @@
 import { useRef, useState, useEffect } from "react";
+import Fuse from "fuse.js";
+import STOREDGAMES from "../data/games.json"
 import Timeline from "./Timeline";
 import VideoPreview from "./VideoPreview";
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
@@ -319,15 +321,36 @@ export default function ClipEditor({clip}) {
   );
 }
 
+async function checkStoredGames(query) {
+  const fuseOptions ={
+    threshold: 0.3,
+    keys: ["name"]
+  }
+
+  const fuse = new Fuse(STOREDGAMES, fuseOptions);
+  const results = fuse.search(query);
+  console.log(results);
+  const resultItems = results.map(result => result.item);
+  console.log(resultItems);
+  return resultItems;
+}
+
 async function searchGames(gameName) {
   if (!gameName) return [];
+  if (gameName.length < 3) return [];
+
+
+  const localGames = await checkStoredGames(gameName);
+  console.log(localGames.length);
+  if (localGames.length > 5) return localGames;
 
   const api = window?.clipx?.searchGames;
   if (typeof api !== "function") return [];
 
   try {
-    const games = await api(gameName);
-    return Array.isArray(games) ? games : [];
+    const fetchedGames = await api(gameName);
+    const allGames = [...localGames, ...fetchedGames];
+    return allGames;
   } catch (e) {
     console.error("searchGames failed:", e);
     return [];
@@ -386,15 +409,17 @@ function UploadMenu() {
 
   const handleSearchGame = async () => {
     const games = await searchGames(gameInput);
-    console.log(games);
     const options = games.map(game => ({
       id: game.id,
       label: game.name + (game.first_release_date ? ` (${new Date(game.first_release_date * 1000).getFullYear()})` : ''),
       image: game?.cover?.url,
     }));
+    console.log(options);
 
     setGameOptions(options);
   }
+
+  console.log(gameOptions);
 
   return (
     <div className="upload-menu">
@@ -404,6 +429,7 @@ function UploadMenu() {
           <AutoComplete
             fullWidth
             options={gameOptions}
+            filterOptions={(options) => options}
             freeSolo
             value={game}
             inputValue={gameInput}
@@ -412,8 +438,6 @@ function UploadMenu() {
               setGame(newValue);
               setGameInput(newValue?.label ?? "");
             }}
-            isOptionEqualToValue={(opt, val) => opt.id === val.id}
-            getOptionLabel={(opt) => opt?.label ?? ""}
             renderOption={(props, opt) => (
               <li {...props} style={{display: "flex", alignItems: "center", gap: 10}}>
                 {opt.image && (

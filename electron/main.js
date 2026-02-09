@@ -309,7 +309,7 @@ ipcMain.handle("search-games", async (_e, query) => {
       fields name,cover.url, cover.image_id, total_rating_count, first_release_date;
       search "${query}";
       where game_type = 0;
-      limit 100;
+      limit 5;
     `
   });
   const data = await response.json();
