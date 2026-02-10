@@ -281,7 +281,6 @@ ipcMain.handle("save-taglist", async (_e, taglist) => {
     const appDataDir = path.dirname(taglistPath);
     await fs.promises.mkdir(appDataDir, { recursive: true });
     await fs.promises.writeFile(taglistPath, JSON.stringify(taglist, null, 2), "utf-8");
-    console.log("ClipX: Saved taglist.json at", taglistPath);
   } catch (e) {
     console.error("ClipX: Failed to save taglist.json:", e);
     throw e;

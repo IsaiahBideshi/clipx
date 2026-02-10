@@ -1,6 +1,7 @@
 import { useRef, useState, useEffect } from "react";
 import Fuse from "fuse.js";
 import STOREDGAMES from "../data/games.json"
+
 import Timeline from "./Timeline";
 import VideoPreview from "./VideoPreview";
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
@@ -13,12 +14,6 @@ import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 import TextField from '@mui/material/TextField';
 import Button from '@mui/material/Button';
 import AutoComplete from '@mui/material/AutoComplete';
-import FormGroup from '@mui/material/FormGroup';
-import FormControlLabel from '@mui/material/FormControlLabel';
-import Checkbox from '@mui/material/Checkbox';
-import SearchIcon from '@mui/icons-material/Search';
-
-import {getTaglist} from "../pages/Settings";
 
 // RAWG Key: 93dc6283e654485db211470c64885d60
 const GAMES_API_KEY = '93dc6283e654485db211470c64885d60';
@@ -359,7 +354,6 @@ async function searchGames(gameName) {
 
 
 function UploadMenu() {
-  const [tagOptions, setTagOptions] = useState([]);
   const [tags, setTags] = useState([]);
   const [friendsInClip, setFriendsInClip] = useState([]);
   const [peopleInput, setPeopleInput] = useState('');
@@ -383,30 +377,6 @@ function UploadMenu() {
     handleSearchGame();
   }, [gameInput]);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadTagOptions() {
-      try {
-        const taglist = await getTaglist();
-        if (!Array.isArray(taglist)) return;
-
-        const options = taglist
-          .map((tag) => Array.isArray(tag?.aliases) ? tag.aliases.filter(Boolean).join(" /  ") : "")
-          .filter(Boolean);
-
-        if (!cancelled) setTagOptions(options);
-      } catch (err) {
-        console.error("Failed to load tag options:", err);
-      }
-    }
-
-    loadTagOptions();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
   const handleSearchGame = async () => {
     const games = await searchGames(gameInput);
     const options = games.map(game => ({
@@ -418,8 +388,6 @@ function UploadMenu() {
 
     setGameOptions(options);
   }
-
-  console.log(gameOptions);
 
   return (
     <div className="upload-menu">
@@ -463,10 +431,11 @@ function UploadMenu() {
           sx={tfSx}
           multiple
           id="tags-outlined"
-          options={tagOptions}
+          options={[]}
           value={tags}
           onChange={(_e, newValue) => setTags(newValue)}
           filterSelectedOptions
+          freeSolo
           renderInput={(params) => (
             <TextField
               {...params}

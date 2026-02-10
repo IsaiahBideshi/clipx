@@ -12,6 +12,7 @@ import {ErrorBoundary} from "react-error-boundary";
 import Button from '@mui/material/Button';
 import SettingsIcon from '@mui/icons-material/Settings';
 import Library from "./pages/Library.jsx";
+import Profile from "./pages/Profile.jsx";
 
 export default function App() {
   return (
@@ -31,6 +32,11 @@ export default function App() {
             <Library/>
           </ErrorBoundary>
         }/>
+        <Route path="/profile" element={
+          <ErrorBoundary FallbackComponent={ErrorFallback}>
+            <Profile/>
+          </ErrorBoundary>
+        } />
       </Routes>
   );
 }

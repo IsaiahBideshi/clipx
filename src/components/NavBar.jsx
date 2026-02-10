@@ -26,9 +26,9 @@ export default function NavBar({ openSettings }) {
       <h2>ClipX</h2>
 
       <div className="right-nav-bar">
-        <button type="button" className="nav-icon" aria-label="Account">
+        <Link to={"/profile"} className="nav-icon" aria-label="Account">
           <AccountCircleIcon fontSize="medium" />
-        </button>
+        </Link>
 
         <Link to="/settings" className="nav-icon" aria-label="Settings">
           <SettingsIcon fontSize="medium" />

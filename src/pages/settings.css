@@ -1,29 +1,3 @@
-.friend-inputs{
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  width: 50%;
-  margin-left: auto;
-  margin-right: auto;
-}
-.friends-list{
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-top: 20px;
-  align-items: center;
-}
-
-.friend-item{
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.taglist{
-  margin-bottom: 30px;
-}
-
 .options-form{
   display: flex;
   flex-direction: column;
