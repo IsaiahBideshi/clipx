@@ -352,3 +352,40 @@ ipcMain.handle("save-options", async (_e, options) => {
     throw e;
   }
 });
+
+ipcMain.handle("save-clip", async (_e, options) => {
+  const clip = options.clip;
+
+  let videoPath = clip.path;
+  let startTime = options.start;
+  let endTime = options.end;
+  let clipTitle = options.title || "Untitled Clip " + Date.now();
+
+  if (!videoPath || typeof videoPath !== "string") {
+    throw new TypeError("save-clip: videoPath must be a non-empty string");
+  }
+  if (typeof startTime !== "number" || typeof endTime !== "number" || startTime < 0 || endTime <= startTime) {
+    throw new TypeError("save-clip: Invalid startTime or endTime");
+  }
+
+  const sourceDir = path.dirname(videoPath);
+  const outputDir = path.join(sourceDir, "ClipX Videos");
+  await fs.promises.mkdir(outputDir, { recursive: true });
+  const outputPath = path.join(outputDir, `${clipTitle}.mp4`);
+
+  await new Promise((resolve, reject) => {
+    ffmpeg(videoPath)
+      .setStartTime(startTime)
+      .setDuration(endTime - startTime)
+      .output(outputPath)
+      .on("end", resolve)
+      .on("error", reject)
+      .run();
+  });
+
+  // Optional extra safety check:
+    const stat = await fs.promises.stat(outputPath);
+    if (!stat.size) throw new Error("Output file is empty");
+
+  return 200;
+});

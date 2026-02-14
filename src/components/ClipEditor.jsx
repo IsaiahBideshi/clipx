@@ -1,6 +1,7 @@
 import { useRef, useState, useEffect } from "react";
 import Fuse from "fuse.js";
 import STOREDGAMES from "../data/games.json"
+import Popup from "./Popup.jsx";
 
 import Timeline from "./Timeline";
 import VideoPreview from "./VideoPreview";
@@ -62,7 +63,6 @@ export default function ClipEditor({clip}) {
 
   // Seek video
   function seek(time) {
-    console.log(time);
     if (!videoRef.current) return;
     videoRef.current.currentTime = time;
     setCurrentTime(time);
@@ -309,7 +309,7 @@ export default function ClipEditor({clip}) {
 
       <div className={`upload-container ${hideUploadMenu ? 'hidden' : ''}`}>
         {!hideUploadMenu && (
-          <UploadMenu />
+          <UploadMenu clip={clip} start={inPoint} end={outPoint} />
         )}
       </div>
     </div>
@@ -353,18 +353,37 @@ async function searchGames(gameName) {
 }
 
 
-function UploadMenu() {
+function UploadMenu({clip, start, end}) {
   const [tags, setTags] = useState([]);
   const [friendsInClip, setFriendsInClip] = useState([]);
   const [peopleInput, setPeopleInput] = useState('');
   const [game, setGame] = useState(null);
+  const [clipTitle, setClipTitle] = useState("");
   const [gameInput, setGameInput] = useState("");
   const [gameOptions, setGameOptions] = useState([{ id: "testgame", label: "Test Game"},]);
   const [storedGamesLabels, setStoredGamesLabels] = useState([]);
+  const [popup, setPopup] = useState({visible: false, title: "", message: "", loading: false, buttonText: ""});
   useEffect(() => {
     console.log("Searching games for input:", gameInput);
     handleSearchGame();
   }, [gameInput]);
+
+  async function saveClip(clip, start, end, title, game, tags) {
+    if (!window?.clipx?.saveClip) {
+      console.error("window.clipx.saveClip is not available (preload not wired?)");
+      return;
+    }
+
+    try {
+      setPopup({visible: true, title: "Saving Clip", message: "Please wait while your clip is being saved.", loading: true, buttonText: "Cancel"});
+      const response = await window.clipx.saveClip({clip, start, end, title, game, tags});
+      if (response === 200){
+        setPopup({visible: true, title: "Saved!", message: "Successfully Saved", loading: false, buttonText: "Close"});
+      }
+    } catch (err) {
+      console.error("Failed to save clip:", err);
+    }
+  }
 
   const handleSearchGame = async () => {
     const games = await searchGames(gameInput);
@@ -380,8 +399,9 @@ function UploadMenu() {
 
   return (
     <div className="upload-menu">
+      {popup.visible && (<Popup title={popup.title} message={popup.message} loading={popup.loading} buttonText={popup.buttonText} onClose={() => setPopup({visible: false})} />)}
       <form>
-        <TextField fullWidth label={"Title"} className={"tf-sx"} />
+        <TextField fullWidth label={"Title"} className={"tf-sx"} value={clipTitle} onChange={(e) => setClipTitle(e.target.value)} />
         <div style={{display: "flex", justifyContent: "space-between"}} >
           <AutoComplete
             fullWidth
@@ -435,7 +455,7 @@ function UploadMenu() {
         />
       </form>
       <Button sx={{marginRight: "10px"}} variant={"contained"}>Upload Clip</Button>
-      <Button variant={"outlined"}>Save Clip</Button>
+      <Button variant={"outlined"} onClick={() => {saveClip(clip, start, end, clipTitle, game, tags)}} >Save Clip</Button>
     </div>
   );
 }

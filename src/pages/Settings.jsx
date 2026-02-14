@@ -5,6 +5,7 @@ import CircularProgress from '@mui/material/CircularProgress';
 import FormGroup from "@mui/material/FormGroup";
 import FormControlLabel from "@mui/material/FormControlLabel";
 import {Switch} from "@mui/material";
+import Button from "@mui/material/Button";
 
 const tfSx = {
   "& .MuiInputLabel-root": { color: "#e5e7eb" }, // label
@@ -39,6 +40,24 @@ export default function Settings() {
   const [options, setOptions] = useState();
   const [defaultOptions, setDefaultOptions] = useState();
   console.log(options);
+
+  function pickFolder() {
+    if (!window.clipx?.pickFolder) {
+      console.log("no pickFolder function");
+      return;
+    }
+
+    window.clipx.pickFolder().then((folderPath) => {
+      if (folderPath) {
+        setOptions((prevOptions) => ({
+          ...prevOptions,
+          clipsFolder: folderPath,
+        }));
+      }
+    }).catch((err) => {
+      console.error("Failed to pick folder:", err);
+    });
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -93,6 +112,8 @@ export default function Settings() {
                   deleteClipAfterCut: e.target.checked,
                 })
               }}/>} label="Delete Clip After Cut?"/>
+              <span style={{fontWeight: "bold", color: "#90caf9"}}>{options.clipsFolder || "Not Set"}</span>
+              <Button id={"pick-folder"} variant={"contained"} onClick={pickFolder}>Choose Folder</Button>
             </FormGroup>
           )}
         </div>
