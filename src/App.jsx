@@ -13,6 +13,9 @@ import Button from '@mui/material/Button';
 import SettingsIcon from '@mui/icons-material/Settings';
 import Library from "./pages/Library.jsx";
 import Profile from "./pages/Profile.jsx";
+import Signup from "./pages/signup.jsx";
+import Login from "./pages/Login.jsx";
+
 
 export default function App() {
   return (
@@ -35,6 +38,16 @@ export default function App() {
         <Route path="/profile" element={
           <ErrorBoundary FallbackComponent={ErrorFallback}>
             <Profile/>
+          </ErrorBoundary>
+        } />
+        <Route path="/signup" element={
+          <ErrorBoundary FallbackComponent={ErrorFallback}>
+            <Signup/>
+          </ErrorBoundary>
+        } />
+        <Route path="/login" element={
+          <ErrorBoundary FallbackComponent={ErrorFallback}>
+            <Login/>
           </ErrorBoundary>
         } />
       </Routes>

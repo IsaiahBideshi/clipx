@@ -21,8 +21,6 @@ export default function NavBar({ openSettings }) {
         </Link>
       </div>
 
-
-
       <h2>ClipX</h2>
 
       <div className="right-nav-bar">

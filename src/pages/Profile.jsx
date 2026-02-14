@@ -3,14 +3,15 @@ import "./profile.css";
 import Button from "@mui/material/Button";
 import TextField from "@mui/material/TextField";
 import {useState, useEffect} from "react";
+import {useNavigate} from "react-router-dom";
 
+import {auth, logout} from '../lib/auth.js';
 import SearchIcon from '@mui/icons-material/Search';
 import {FormControl, FormHelperText, Input, InputLabel} from "@mui/material";
 
 function addFriend(name) {
   if (!name) return;
   console.log(name);
-
 }
 
 export default function Profile() {
@@ -27,6 +28,27 @@ export default function Profile() {
     textColor: 'white',
     width: "90%",
   }
+  const navigate = useNavigate();
+
+  console.log(auth.currentUser);
+
+  if (!auth.currentUser) {
+    return (
+      <div className={"settings-container"}>
+        <h2>Profile</h2>
+        <p>Please log in or sign up to view your profile.</p>
+        <div style={{ display: "flex", justifyContent: "center", gap: "20px", marginTop: "20px" }}>
+          <Button variant="contained" onClick={() => navigate("/login")}>
+            Log In
+          </Button>
+          <Button variant="outlined" onClick={() => navigate("/signup")}>
+            Sign Up
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
 
     return (
       <div className={"settings-container"}>
@@ -60,6 +82,7 @@ export default function Profile() {
           <div className={"requests"}>
             Outgoing requests:
           </div>
+          <Button sx={{marginTop: "20px"}} onClick={async () => {await logout();navigate("/")}} variant={"contained"} >Log Out</Button>
         </div>
       </div>
     );

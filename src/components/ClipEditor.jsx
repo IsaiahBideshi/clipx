@@ -361,17 +361,6 @@ function UploadMenu() {
   const [gameInput, setGameInput] = useState("");
   const [gameOptions, setGameOptions] = useState([{ id: "testgame", label: "Test Game"},]);
   const [storedGamesLabels, setStoredGamesLabels] = useState([]);
-  const tfSx = {
-    "& .MuiInputLabel-root": { color: "#e5e7eb" }, // label
-    "& .MuiInputBase-input": { color: "#ffffff" }, // typed text
-    "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.35)" },
-    "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.6)" },
-    "& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: "#90caf9" },
-    "& .MuiInputLabel-root.Mui-focused": { color: "#90caf9" },
-    marginBottom: '10px',
-    textColor: 'white',
-    width: "100%",
-  };
   useEffect(() => {
     console.log("Searching games for input:", gameInput);
     handleSearchGame();
@@ -392,7 +381,7 @@ function UploadMenu() {
   return (
     <div className="upload-menu">
       <form>
-        <TextField fullWidth label={"Title"} sx={tfSx} />
+        <TextField fullWidth label={"Title"} className={"tf-sx"} />
         <div style={{display: "flex", justifyContent: "space-between"}} >
           <AutoComplete
             fullWidth
@@ -421,14 +410,14 @@ function UploadMenu() {
             renderInput={(params) => (
               <TextField
                 {...params}
-                sx={tfSx}
+                className={"tf-sx"}
                 label="Game"
               />
             )}
           />
         </div>
         <AutoComplete
-          sx={tfSx}
+          className={"tf-sx"}
           multiple
           id="tags-outlined"
           options={[]}
@@ -445,7 +434,8 @@ function UploadMenu() {
           )}
         />
       </form>
-      <Button variant={"outlined"}>Upload Clip</Button>
+      <Button sx={{marginRight: "10px"}} variant={"contained"}>Upload Clip</Button>
+      <Button variant={"outlined"}>Save Clip</Button>
     </div>
   );
 }

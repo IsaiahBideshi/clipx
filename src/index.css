@@ -72,3 +72,28 @@ h1 {
     background-color: #f9f9f9;
   }
 }
+
+
+/* For the TextField root element */
+.tf-sx {
+  margin-bottom: 10px !important;
+  color: white; /* replaces textColor */
+}
+.tf-sx .MuiInputLabel-root {
+  color: #e5e7eb;
+}
+.tf-sx .MuiInputBase-input {
+  color: #ffffff;
+}
+.tf-sx .MuiOutlinedInput-notchedOutline {
+  border-color: rgba(255, 255, 255, 0.35);
+}
+.tf-sx:hover .MuiOutlinedInput-notchedOutline {
+  border-color: rgba(255, 255, 255, 0.6);
+}
+.tf-sx .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline {
+  border-color: #90caf9;
+}
+.tf-sx .MuiInputLabel-root.Mui-focused {
+  color: #90caf9;
+}

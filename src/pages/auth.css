@@ -1,0 +1,41 @@
+.login-form{
+  display: flex;
+  flex-direction: column;
+  width: 300px;
+  margin: 0 auto;
+  padding: 20px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+}
+
+.auth-separator {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  color: #6b7280;
+  margin: 16px 0 12px;
+}
+
+.auth-separator::before,
+.auth-separator::after {
+  content: "";
+  flex: 1;
+  border-bottom: 1px solid #d1d5db;
+}
+
+.auth-separator span {
+  padding: 0 10px;
+  text-transform: uppercase;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+}
+
+.google-login-btn {
+  margin-bottom: 4px;
+}
+
+.auth-error {
+  margin: 12px 0 0;
+  color: #dc2626;
+  font-size: 14px;
+}
