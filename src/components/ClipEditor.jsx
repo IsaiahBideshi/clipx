@@ -1,9 +1,8 @@
 import { useRef, useState, useEffect } from "react";
 import Fuse from "fuse.js";
 import STOREDGAMES from "../data/games.json"
-import Popup from "./Popup.jsx";
 
-import Timeline from "./Timeline";
+import EditorTimeline from "./EditorTimeline.jsx";
 import VideoPreview from "./VideoPreview";
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import PauseIcon from '@mui/icons-material/Pause';
@@ -24,7 +23,7 @@ const GAMES_API_KEY = '93dc6283e654485db211470c64885d60';
 // Secret: lk8frdqd9wqa687gmsx5lz0g7d0yfa
 // Access Token: vkibr6jlgoaw8uh9bk9dgacdx14gjv
 
-export default function ClipEditor({clip}) {
+export default function ClipEditor({clip, onSaveQueueEvent, isSavedClipsView = false}) {
   const videoRef = useRef(null);
 
   const [duration, setDuration] = useState(0);
@@ -43,7 +42,7 @@ export default function ClipEditor({clip}) {
   const currentMinutes = currentTime / 60;
   const currentSeconds = currentTime % 60;
 
-  const [hideUploadMenu, setHideUploadMenu] = useState(false);
+  const [hideUploadMenu, setHideUploadMenu] = useState(true);
 
   // When video loads
   function handleLoadedMetadata(e) {
@@ -288,7 +287,7 @@ export default function ClipEditor({clip}) {
           </div>
         </div>
 
-        <Timeline
+        <EditorTimeline
           duration={duration}
           currentTime={currentTime}
           inPoint={inPoint}
@@ -299,19 +298,24 @@ export default function ClipEditor({clip}) {
         />
       </div>
 
-      <div className={`hide-upload-menu-btn ${hideUploadMenu ? 'hidden-btn' : ''}`}>
-        { !hideUploadMenu ? (
-          <div onClick={() => setHideUploadMenu(true)}  className={"hide-upload-menu-btn"}> <ArrowForwardIosIcon style={{marginTop: "auto", marginBottom: "auto"}} /></div>
-        ) : (
-          <div onClick={() => setHideUploadMenu(false)} className={"hide-upload-menu-btn"}> <ArrowBackIosNewIcon/></div>
-        )}
-      </div>
+      {!isSavedClipsView && (
+        <>
+          <div className={`hide-upload-menu-btn ${hideUploadMenu ? 'hidden-btn' : ''}`}>
+            {!hideUploadMenu ? (
+              <div onClick={() => setHideUploadMenu(true)} className={"hide-upload-menu-btn"}><ArrowForwardIosIcon
+                style={{marginTop: "auto", marginBottom: "auto"}}/></div>
+            ) : (
+              <div onClick={() => setHideUploadMenu(false)} className={"hide-upload-menu-btn"}><ArrowBackIosNewIcon/></div>
+            )}
+          </div>
 
-      <div className={`upload-container ${hideUploadMenu ? 'hidden' : ''}`}>
-        {!hideUploadMenu && (
-          <UploadMenu clip={clip} start={inPoint} end={outPoint} />
-        )}
-      </div>
+          <div className={`upload-container ${hideUploadMenu ? 'hidden' : ''}`}>
+            {!hideUploadMenu && (
+              <UploadMenu clip={clip} start={inPoint} end={outPoint} onSaveQueueEvent={onSaveQueueEvent}/>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -353,7 +357,7 @@ async function searchGames(gameName) {
 }
 
 
-function UploadMenu({clip, start, end}) {
+function UploadMenu({clip, start, end, onSaveQueueEvent}) {
   const [tags, setTags] = useState([]);
   const [friendsInClip, setFriendsInClip] = useState([]);
   const [peopleInput, setPeopleInput] = useState('');
@@ -362,7 +366,6 @@ function UploadMenu({clip, start, end}) {
   const [gameInput, setGameInput] = useState("");
   const [gameOptions, setGameOptions] = useState([{ id: "testgame", label: "Test Game"},]);
   const [storedGamesLabels, setStoredGamesLabels] = useState([]);
-  const [popup, setPopup] = useState({visible: false, title: "", message: "", loading: false, buttonText: ""});
   useEffect(() => {
     console.log("Searching games for input:", gameInput);
     handleSearchGame();
@@ -374,14 +377,20 @@ function UploadMenu({clip, start, end}) {
       return;
     }
 
+    const saveId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const displayName = title?.trim() || clip?.name || "Untitled Clip";
+    onSaveQueueEvent?.({ type: "started", id: saveId, name: displayName });
+
     try {
-      setPopup({visible: true, title: "Saving Clip", message: "Please wait while your clip is being saved.", loading: true, buttonText: "Cancel"});
       const response = await window.clipx.saveClip({clip, start, end, title, game, tags});
       if (response === 200){
-        setPopup({visible: true, title: "Saved!", message: "Successfully Saved", loading: false, buttonText: "Close"});
+        onSaveQueueEvent?.({ type: "success", id: saveId });
+        return;
       }
+      onSaveQueueEvent?.({ type: "failed", id: saveId });
     } catch (err) {
       console.error("Failed to save clip:", err);
+      onSaveQueueEvent?.({ type: "failed", id: saveId });
     }
   }
 
@@ -399,7 +408,6 @@ function UploadMenu({clip, start, end}) {
 
   return (
     <div className="upload-menu">
-      {popup.visible && (<Popup title={popup.title} message={popup.message} loading={popup.loading} buttonText={popup.buttonText} onClose={() => setPopup({visible: false})} />)}
       <form>
         <TextField fullWidth label={"Title"} className={"tf-sx"} value={clipTitle} onChange={(e) => setClipTitle(e.target.value)} />
         <div style={{display: "flex", justifyContent: "space-between"}} >

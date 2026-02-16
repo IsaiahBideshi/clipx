@@ -1,6 +1,7 @@
 import '../App.css';
 import ClipGrid from '../components/ClipGrid.jsx';
 import ClipEditor from '../components/ClipEditor.jsx';
+import SavingClipsWidget from "../components/SavingClipsWidget.jsx";
 import Settings from './Settings.jsx';
 import {useState, useEffect} from 'react';
 import Button from '@mui/material/Button';
@@ -16,9 +17,10 @@ export default function LocalFiles() {
   const [files, setFiles] = useState([]);
   const [refreshTick, setRefreshTick] = useState(0);
   const [options, setOptions] = useState(null);
-  const [savedClipsFolder, setSavedClipsFolder] = useState(null);
 
   const [clip, setClip] = useState(null);
+  const [savingClips, setSavingClips] = useState([]);
+  const [showSavingList, setShowSavingList] = useState(true);
 
   console.log(files);
 
@@ -84,6 +86,35 @@ export default function LocalFiles() {
     setRefreshTick((tick) => tick + 1);
   };
 
+  function upsertSavingClip(id, nextValues) {
+    setSavingClips((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, ...nextValues } : item))
+    );
+  }
+
+  function removeSavingClip(id) {
+    setSavingClips((prev) => prev.filter((item) => item.id !== id));
+  }
+
+  function handleSaveQueueEvent(event) {
+    if (!event?.id) return;
+
+    if (event.type === "started") {
+      setSavingClips((prev) => [...prev, { id: event.id, name: event.name || "Untitled Clip", status: "saving" }]);
+      return;
+    }
+
+    if (event.type === "success") {
+      removeSavingClip(event.id);
+      return;
+    }
+
+    if (event.type === "failed") {
+      upsertSavingClip(event.id, { status: "failed" });
+      setTimeout(() => removeSavingClip(event.id), 5000);
+    }
+  }
+
   return (
     <div className={"app"}>
       {options && (<> <span>Saved Clips</span> <Switch defaultChecked={false} onChange={(e) => setShowSavedFiles(e.target.checked)}/></>)}
@@ -95,13 +126,24 @@ export default function LocalFiles() {
         onClick={refreshFiles}
       />
 
-      {clip && (<ClipEditor clip={clip}/>)}
+      {clip && (
+        <ClipEditor
+          clip={clip}
+          onSaveQueueEvent={handleSaveQueueEvent}
+          isSavedClipsView={showSavedFiles}
+        />
+      )}
       {!!files.length && (
         <ClipGrid clips={files} baseFolder={folderPath} onSelect={(clip) => {
           console.log("Selected clip:", clip);
           setClip(clip);
         }} />
       )}
+      <SavingClipsWidget
+        clips={savingClips}
+        expanded={showSavingList}
+        onToggleExpanded={() => setShowSavingList((prev) => !prev)}
+      />
     </div>
   );
 }

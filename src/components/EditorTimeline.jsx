@@ -1,6 +1,6 @@
 import {useState, useEffect, useRef} from 'react'
 
-export default function Timeline({duration, currentTime, inPoint, outPoint, onSeek, onSetIn, onSetOut}) {
+export default function EditorTimeline({duration, currentTime, inPoint, outPoint, onSeek, onSetIn, onSetOut}) {
   if (!duration) return null;
 
   const MINIMUM_CLIP_LENGTH = 3; // seconds
