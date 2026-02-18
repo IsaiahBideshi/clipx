@@ -238,8 +238,9 @@ async function getFastFileId(filePath, stats, bytesToRead = 256 * 1024) {
 
     // Include size + mtime for quick change detection; include head hash for better uniqueness
     return `${stats.size}:${stats.mtimeMs}:${headHash}`;
-  } finally {
-    await fd.close();
+  } catch (e) {
+    console.error("Error generating file ID for", filePath, e);
+    throw e;
   }
 }
 
@@ -432,6 +433,8 @@ ipcMain.handle("save-clip", async (_e, options) => {
   let startTime = options.start;
   let endTime = options.end;
   let clipTitle = options.title || "Untitled Clip " + Date.now();
+  const tags = options.tags || [];
+  const game = options.game || null;
 
   if (!videoPath || typeof videoPath !== "string") {
     throw new TypeError("save-clip: videoPath must be a non-empty string");
@@ -478,6 +481,7 @@ ipcMain.handle("link-youtube", async () => {
       try {
         if (queryObject.code) {
           res.end("You can close this window now.");
+          server.removeAllListeners("request");
           server.close();
 
           await exchangeCodeForTokens(queryObject.code);
@@ -487,10 +491,12 @@ ipcMain.handle("link-youtube", async () => {
           resolve(userInfo);
         } else if (queryObject.error) {
           res.end("Authorization failed.");
+          server.removeAllListeners("request");
           server.close();
           resolve(null);
         }
       } catch (e) {
+        server.removeAllListeners("request");
         server.close();
         console.error(e);
         reject(e);

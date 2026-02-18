@@ -4,11 +4,6 @@ import STOREDGAMES from "../data/games.json"
 
 import EditorTimeline from "./EditorTimeline.jsx";
 import VideoPreview from "./VideoPreview";
-import PlayArrowIcon from '@mui/icons-material/PlayArrow';
-import PauseIcon from '@mui/icons-material/Pause';
-import VolumeOffIcon from '@mui/icons-material/VolumeOff';
-import VolumeUpIcon from '@mui/icons-material/VolumeUp';
-import VolumeDownIcon from '@mui/icons-material/VolumeDown';
 import ArrowBackIosNewIcon from '@mui/icons-material/ArrowBackIosNew';
 import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 import TextField from '@mui/material/TextField';
@@ -36,12 +31,6 @@ export default function ClipEditor({clip, onSaveQueueEvent, isSavedClipsView = f
   const [volume, setVolume] = useState(1);
   const [isMuted, setIsMuted] = useState(false);
 
-  const durationMinutes = duration / 60;
-  const durationSeconds = duration % 60;
-
-  const currentMinutes = currentTime / 60;
-  const currentSeconds = currentTime % 60;
-
   const [hideUploadMenu, setHideUploadMenu] = useState(true);
 
   // When video loads
@@ -54,7 +43,7 @@ export default function ClipEditor({clip, onSaveQueueEvent, isSavedClipsView = f
   // When video plays
   function handleTimeUpdate(e) {
     const time = e.target.currentTime;
-    console.log(time);
+    // console.log(time);
 
     setCurrentTime(time);
   }
@@ -121,6 +110,7 @@ export default function ClipEditor({clip, onSaveQueueEvent, isSavedClipsView = f
   useEffect(() => {
     function isEditableTarget(target) {
       if (!(target instanceof HTMLElement)) return false;
+      if (target.closest('input[type="range"]')) return false;
 
       // includes MUI input/textarea, selects, and any contenteditable container
       const editable = target.closest(
@@ -251,43 +241,28 @@ export default function ClipEditor({clip, onSaveQueueEvent, isSavedClipsView = f
           videoRef={videoRef}
           onLoadedMetadata={handleLoadedMetadata}
           onTimeUpdate={handleTimeUpdate}
-          onClick={togglePlay}
+          onTogglePlay={togglePlay}
+          onSeek={seek}
+          isPlaying={isPlaying}
+          currentTime={currentTime}
+          duration={duration}
+          startTime={inPoint}
+          endTime={outPoint}
+          volume={volume}
+          isMuted={isMuted}
+          onToggleMute={toggleMute}
+          onSetVolume={setVideoVolume}
         />
-        <div style={{display: "flex", gap: "8px", alignItems: "center", marginBottom: "8px"}}>
-          <button className={"play-button"} type="button" onClick={togglePlay}>
-            {isPlaying ? <PauseIcon/> : <PlayArrowIcon/>}
-          </button>
-
-          <div style={{display: "flex", alignItems: "center", gap: "8px", marginLeft: "auto"}}>
-            <button className={"mute-button"} type="button" onClick={toggleMute} aria-pressed={isMuted}>
-              {isMuted || volume === 0 ? (<VolumeOffIcon/>) :
-                volume < 0.5 ? (<VolumeDownIcon/>) : (<VolumeUpIcon/>)
-              }
-            </button>
-
-            <input
-              type="range"
-              min={0}
-              max={100}
-              value={Math.round(volume * 100)}
-              onChange={(e) => setVideoVolume(Number(e.target.value) / 100)}
-              aria-label="Volume"
-            />
-
-            <div style={{width: "42px", fontSize: "12px", textAlign: "right", opacity: 0.8}}>
-              {Math.round(volume * 100)}%
-            </div>
+        {isSavedClipsView && (
+          <div className={"clip-info"}>
+            <div><strong>{clip?.name || "Untitled Clip"}</strong></div>
+            <div style={{fontSize: "0.9em", color: "#ccc"}}>{clip?.game || "Unknown Game"}</div>
+          {/*  date*/}
+           <div style={{fontSize: "0.8em", color: "#666"}}>{new Date(clip?.createdAt).toLocaleString() || "Unknown Date"}</div>
           </div>
+        )}
 
-          <div style={{fontSize: "12px", opacity: 0.8}}>
-            {`${Math.floor(currentMinutes)}:${String(Math.floor(currentSeconds)).padStart(2, '0')} / `}
-            {duration && (
-              `${Math.floor(durationMinutes)}:${String(Math.floor(durationSeconds)).padStart(2, '0')}`
-            )}
-          </div>
-        </div>
-
-        <EditorTimeline
+        {!isSavedClipsView && (<EditorTimeline
           duration={duration}
           currentTime={currentTime}
           inPoint={inPoint}
@@ -295,7 +270,7 @@ export default function ClipEditor({clip, onSaveQueueEvent, isSavedClipsView = f
           onSeek={seek}
           onSetIn={setInPoint}
           onSetOut={setOutPoint}
-        />
+        />)}
       </div>
 
       {!isSavedClipsView && (
