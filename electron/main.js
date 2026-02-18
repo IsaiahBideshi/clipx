@@ -241,7 +241,65 @@ async function getFastFileId(filePath, stats, bytesToRead = 256 * 1024) {
   } catch (e) {
     console.error("Error generating file ID for", filePath, e);
     throw e;
+  } finally {
+    await fd.close();
   }
+}
+
+const CLIPS_DATA_FILE = "clipsData.json";
+
+async function getClipData(clipDir) {
+  const clipDataPath = path.join(clipDir, CLIPS_DATA_FILE);
+  try {
+    const raw = await fs.promises.readFile(clipDataPath, "utf-8");
+    if (!raw.trim()) {
+      return { clips: [] };
+    }
+
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed?.clips)) {
+      return parsed;
+    }
+    if (Array.isArray(parsed)) {
+      return { clips: parsed };
+    }
+    return { clips: [] };
+  } catch (e) {
+    if (e && e.code === "ENOENT") {
+      await fs.promises.mkdir(clipDir, { recursive: true });
+      const initialData = { clips: [] };
+      await fs.promises.writeFile(clipDataPath, JSON.stringify(initialData, null, 2), "utf-8");
+      return initialData;
+    }
+    console.error("ClipX: Failed to read clipsData.json:", e);
+    return { clips: [] };
+  }
+}
+
+async function saveClipData(clipDir, clipEntry) {
+  const clipDataPath = path.join(clipDir, CLIPS_DATA_FILE);
+  const clipsData = await getClipData(clipDir);
+
+  if (!Array.isArray(clipsData.clips)) {
+    clipsData.clips = [];
+  }
+
+  const index = clipsData.clips.findIndex((item) => item.path === clipEntry.path);
+  if (index >= 0) {
+    clipsData.clips[index] = {
+      ...clipsData.clips[index],
+      ...clipEntry,
+      updatedAt: Date.now(),
+    };
+  } else {
+    clipsData.clips.push({
+      ...clipEntry,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    });
+  }
+
+  await fs.promises.writeFile(clipDataPath, JSON.stringify(clipsData, null, 2), "utf-8");
 }
 
 ipcMain.handle("pick-video-file", async () => {
@@ -462,6 +520,19 @@ ipcMain.handle("save-clip", async (_e, options) => {
   const stat = await fs.promises.stat(outputPath);
   if (!stat.size) throw new Error("Output file is empty");
 
+  await saveClipData(outputDir, {
+    path: outputPath,
+    name: path.basename(outputPath),
+    sourcePath: videoPath,
+    size: stat.size,
+    modifiedAt: stat.mtimeMs,
+    startTime,
+    endTime,
+    duration: endTime - startTime,
+    tags: tags,
+    game: game,
+  });
+
   return 200;
 });
 
@@ -537,4 +608,14 @@ ipcMain.handle("get-google-info", async () => {
     console.error("Failed to get Google info:", e);
     return null;
   }
+});
+
+ipcMain.handle("get-clip-data", async (_e, clipPath) => {
+  if (typeof clipPath !== "string" || clipPath.length === 0) {
+    throw new TypeError("get-clip-data: clipPath must be a non-empty string");
+  }
+  const clipDir = path.dirname(clipPath);
+  const clipsData = await getClipData(clipDir);
+  const clipEntry = clipsData.clips.find(c => c.path === clipPath);
+  return clipEntry || null;
 });

@@ -33,6 +33,8 @@ export default function ClipEditor({clip, onSaveQueueEvent, isSavedClipsView = f
 
   const [hideUploadMenu, setHideUploadMenu] = useState(true);
 
+  const [clipData, setClipData] = useState(null);
+
   // When video loads
   function handleLoadedMetadata(e) {
     const d = e.target.duration;
@@ -105,6 +107,27 @@ export default function ClipEditor({clip, onSaveQueueEvent, isSavedClipsView = f
     setIsMuted(nextMuted);
     if (el) el.muted = nextMuted;
   }
+
+  useEffect( () => {
+    async function loadClipData() {
+      if (!clip?.id) return;
+      if (!window.clipx?.getClipData) {
+        console.error("window.clipx.getClipData is not available (preload not wired?)");
+        return;
+      }
+      try {
+        const data = await window.clipx.getClipData(clip?.path);
+        setClipData(data);
+      } catch (err) {
+        console.error("Failed to load clip data:", err);
+      }
+    }
+
+    const data = loadClipData();
+    setClipData(data);
+  }, [clip]);
+
+  console.log("clip data:",clipData);
 
   // Keyboard controls
   useEffect(() => {
@@ -253,24 +276,28 @@ export default function ClipEditor({clip, onSaveQueueEvent, isSavedClipsView = f
           onToggleMute={toggleMute}
           onSetVolume={setVideoVolume}
         />
-        {isSavedClipsView && (
+        {isSavedClipsView && clipData && (
           <div className={"clip-info"}>
-            <div><strong>{clip?.name || "Untitled Clip"}</strong></div>
-            <div style={{fontSize: "0.9em", color: "#ccc"}}>{clip?.game || "Unknown Game"}</div>
-          {/*  date*/}
-           <div style={{fontSize: "0.8em", color: "#666"}}>{new Date(clip?.createdAt).toLocaleString() || "Unknown Date"}</div>
+            <h2 style={{marginBottom: 0}} >{clip?.name || "Untitled Clip"}</h2>
+            <div style={{display: "flex", alignItems: "center"}}>
+              <img style={{width: "30px", marginRight: 10}} src={`https:${clipData?.game?.image}`} alt="ds"/>
+              <div style={{fontSize: "0.9em", color: "#ccc"}}>{clipData?.game?.label || "Unknown Game"}</div>
+            </div>
+           <div style={{fontSize: "0.8em", color: "#666"}}>{new Date(clipData?.createdAt).toLocaleString() || "Unknown Date"}</div>
           </div>
         )}
 
-        {!isSavedClipsView && (<EditorTimeline
-          duration={duration}
-          currentTime={currentTime}
-          inPoint={inPoint}
-          outPoint={outPoint}
-          onSeek={seek}
-          onSetIn={setInPoint}
-          onSetOut={setOutPoint}
-        />)}
+        {!isSavedClipsView && (
+          <EditorTimeline
+            duration={duration}
+            currentTime={currentTime}
+            inPoint={inPoint}
+            outPoint={outPoint}
+            onSeek={seek}
+            onSetIn={setInPoint}
+            onSetOut={setOutPoint}
+          />
+        )}
       </div>
 
       {!isSavedClipsView && (

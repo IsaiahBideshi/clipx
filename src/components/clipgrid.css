@@ -12,6 +12,7 @@
   margin-left: auto;
   gap: 1rem;
   padding: 20px;
+  min-width: 100vw;
 }
 .clip-editor{
   background: #1e1f22;
@@ -19,7 +20,7 @@
   border-radius: 12px;
   box-shadow: 0 4px 32px rgba(0,0,0,0.2);
   min-width: 320px;
-  max-width: 100vw;
+  max-width: 70vw;
   text-align: center;
 }
 
