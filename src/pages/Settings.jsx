@@ -1,6 +1,6 @@
 import './settings.css';
 
-import { useState, useEffect } from "react";
+import {useEffect, useState} from "react";
 import CircularProgress from '@mui/material/CircularProgress';
 import FormGroup from "@mui/material/FormGroup";
 import FormControlLabel from "@mui/material/FormControlLabel";
@@ -36,9 +36,54 @@ export async function getOptions() {
   }
 }
 
+async function getGoogleInfo() {
+  if (!window.clipx?.getGoogleInfo) {
+    console.log("no getGoogleInfo function");
+    return null;
+  }
+
+  try {
+    return await window.clipx.getGoogleInfo();
+  }
+  catch (err) {
+    console.error("Failed to get Google account info:", err);
+    return null;
+  }
+}
+
+export async function linkYoutube() {
+    if (!window.clipx?.linkYoutube) {
+      console.log("no linkYoutube function");
+      return null;
+    }
+
+    try {
+      return await window.clipx.linkYoutube();
+    }
+    catch (err) {
+      console.error("Failed to link Youtube account:", err);
+    }
+}
+
+async function unlinkYoutube() {
+    if (!window.clipx?.unlinkYoutube) {
+      console.log("no unlinkYoutube function");
+      return;
+    }
+
+    try {
+      await window.clipx.unlinkYoutube();
+    }
+    catch (err) {
+      console.error("Failed to unlink Youtube account:", err);
+    }
+}
+
 export default function Settings() {
   const [options, setOptions] = useState();
   const [defaultOptions, setDefaultOptions] = useState();
+  const [googleInfo, setGoogleInfo] = useState(null);
+  const [loadingGoogleInfo, setLoadingGoogleInfo] = useState(true);
   console.log(options);
 
   function pickFolder() {
@@ -59,6 +104,18 @@ export default function Settings() {
     });
   }
 
+  const handleLinkYoutube = async () => {
+    const info = await linkYoutube();
+    setGoogleInfo(info);
+    setLoadingGoogleInfo(false);
+  }
+  const handleUnlinkYoutube = async () => {
+    await unlinkYoutube();
+    setGoogleInfo(null);
+  }
+  console.log(googleInfo);
+  console.log(loadingGoogleInfo);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -72,8 +129,24 @@ export default function Settings() {
         if (!cancelled) setOptions({});
       }
     }
+    async function loadGoogleInfo() {
+      try {
+        const info = await getGoogleInfo();
+        if (!cancelled) {
+          setGoogleInfo(info);
+          setLoadingGoogleInfo(false);
+        };
+      } catch (err) {
+        console.error("Failed to load Google account info:", err);
+        if (!cancelled) {
+          setGoogleInfo(null);
+          setLoadingGoogleInfo(false);
+        };
+      }
+    }
 
     loadOptions();
+    loadGoogleInfo();
     return () => {
       cancelled = true;
     };
@@ -114,6 +187,24 @@ export default function Settings() {
               }}/>} label="Delete Clip After Cut?"/>
               <span style={{fontWeight: "bold", color: "#90caf9"}}>{options.clipsFolder || "Not Set"}</span>
               <Button id={"pick-folder"} variant={"contained"} onClick={pickFolder}>Choose Folder</Button>
+              <div className={"yt"}>
+                <h4 style={{marginBottom: 0}}>Connect Youtube Account:</h4>
+                  <div style={{color: "#90caf9"}}>
+                    {googleInfo && (
+                      <>
+                        <img style={{borderRadius: "100px"}} src={googleInfo.picture} alt=""/>
+                        <p>{googleInfo.name}</p>
+                      </>
+                    )}
+
+                    {loadingGoogleInfo && (
+                      <div className="loading"><CircularProgress/></div>
+                    )}
+                  </div>
+
+                <Button variant={"contained"} onClick={handleLinkYoutube} disabled={loadingGoogleInfo || googleInfo} >Link</Button>
+                <Button variant={"outlined"} onClick={handleUnlinkYoutube} disabled={loadingGoogleInfo || !googleInfo} >Unlink</Button>
+              </div>
             </FormGroup>
           )}
         </div>

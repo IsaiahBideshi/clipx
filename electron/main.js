@@ -1,11 +1,84 @@
-import { app, BrowserWindow, ipcMain, dialog, protocol, net } from "electron";
+import {app, BrowserWindow, dialog, ipcMain, protocol, shell} from "electron";
+import http from "http";
+import url, {fileURLToPath} from "url";
+import keytar from "keytar";
 import path from "path";
-import { fileURLToPath } from "url";
 import fs from "fs";
 import crypto from "crypto";
 import ffmpeg from "fluent-ffmpeg";
 import ffmpegPath from "ffmpeg-static";
+
 ffmpeg.setFfmpegPath(ffmpegPath);
+
+const SERVICE = "ClipX";
+const ACCOUNT = "youtube_refresh_token";
+
+async function storeRefreshToken(token) {
+  await keytar.setPassword(SERVICE, ACCOUNT, token);
+}
+async function getRefreshToken() {
+  return await keytar.getPassword(SERVICE, ACCOUNT);
+}
+async function deleteRefreshToken() {
+  await keytar.deletePassword(SERVICE, ACCOUNT);
+}
+
+async function getAccessToken() {
+  const refreshToken = await getRefreshToken();
+  if (!refreshToken) {
+    throw new Error("No refresh token found");
+  }
+
+  const response = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: new URLSearchParams({
+      refresh_token: refreshToken,
+      client_id: clientId,
+      client_secret: clientSecret,
+      grant_type: "refresh_token",
+    }),
+  });
+
+  const data = await response.json();
+  if (data.error) {
+    throw new Error(`Failed to refresh access token: ${data.error_description || data.error}`);
+  }
+  return data.access_token;
+}
+
+const clientId = "170688170367-cesbl36crdh2qk3up02egjduffq4nepe.apps.googleusercontent.com";
+const clientSecret = "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";
+
+async function exchangeCodeForTokens(code) {
+  const response = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: new URLSearchParams({
+      code: code,
+      client_id: clientId,
+      client_secret: clientSecret,
+      redirect_uri: `http://127.0.0.1:51723`,
+      grant_type: "authorization_code",
+    }),
+  });
+
+  const data = await response.json();
+  await storeRefreshToken(data.refresh_token);
+}
+
+async function getGoogleUserInfo(accessToken) {
+  const response = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    }
+  });
+  return await response.json();
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -324,7 +397,6 @@ ipcMain.handle("get-options", async () => {
 
   try {
     const data = await fs.promises.readFile(optionsPath, "utf-8");
-    console.log(data);
     return JSON.parse(data);
   } catch (e) {
     if (e && e.code === "ENOENT") { // File does not exist so create it with default options
@@ -384,8 +456,79 @@ ipcMain.handle("save-clip", async (_e, options) => {
   });
 
   // Optional extra safety check:
-    const stat = await fs.promises.stat(outputPath);
-    if (!stat.size) throw new Error("Output file is empty");
+  const stat = await fs.promises.stat(outputPath);
+  if (!stat.size) throw new Error("Output file is empty");
 
   return 200;
+});
+
+ipcMain.handle("link-youtube", async () => {
+  const refreshToken = await getRefreshToken();
+  if (refreshToken) {
+    const accessToken = await getAccessToken();
+    const userInfo = await getGoogleUserInfo(accessToken);
+    console.log("Linked YouTube account:", userInfo);
+    return userInfo;
+  }
+  const port = 51723;
+
+  return await new Promise(async (resolve, reject) => {
+    const server = http.createServer(async (req, res) => {
+      const queryObject = url.parse(req.url, true).query;
+      try {
+        if (queryObject.code) {
+          res.end("You can close this window now.");
+          server.close();
+
+          await exchangeCodeForTokens(queryObject.code);
+          const accessToken = await getAccessToken();
+          const userInfo = await getGoogleUserInfo(accessToken);
+          console.log("Linked YouTube account:", userInfo);
+          resolve(userInfo);
+        } else if (queryObject.error) {
+          res.end("Authorization failed.");
+          server.close();
+          resolve(null);
+        }
+      } catch (e) {
+        server.close();
+        console.error(e);
+        reject(e);
+      }
+    });
+
+    server.listen(port);
+
+
+    const params = new URLSearchParams({
+      client_id: clientId,
+      redirect_uri: `http://127.0.0.1:${port}`,
+      response_type: "code",
+      scope: [
+        "https://www.googleapis.com/auth/youtube",
+        "https://www.googleapis.com/auth/userinfo.profile",
+        "https://www.googleapis.com/auth/userinfo.email",
+      ].join(" "),
+      access_type: "offline",
+      prompt: "consent"
+    });
+
+    const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+    await shell.openExternal(authUrl);
+  })
+});
+
+ipcMain.handle("unlink-youtube", async () => {
+  await deleteRefreshToken();
+});
+
+ipcMain.handle("get-google-info", async () => {
+  try {
+    const accessToken = await getAccessToken();
+    const userInfo = await getGoogleUserInfo(accessToken);
+    return userInfo;
+  } catch (e) {
+    console.error("Failed to get Google info:", e);
+    return null;
+  }
 });
