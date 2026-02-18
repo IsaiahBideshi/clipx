@@ -8,23 +8,32 @@
   border-radius: 5px;
 }
 
-.auth-separator {
+.menu-separator {
   display: flex;
   align-items: center;
   text-align: center;
   color: #6b7280;
-  margin: 16px 0 12px;
+  margin: 30px 0 12px;
 }
 
-.auth-separator::before,
-.auth-separator::after {
+.menu-separator::before,
+.menu-separator::after {
   content: "";
   flex: 1;
-  border-bottom: 1px solid #d1d5db;
+  height: 1px;
 }
 
-.auth-separator span {
-  padding: 0 10px;
+.menu-separator::before {
+  background: linear-gradient(to right, transparent, #d1d5db);
+}
+
+.menu-separator::after {
+  background: linear-gradient(to right, #d1d5db, transparent);
+}
+
+.menu-separator span {
+  margin: 0px 8px;
+  padding: 0 2px;
   text-transform: uppercase;
   font-size: 12px;
   letter-spacing: 0.08em;

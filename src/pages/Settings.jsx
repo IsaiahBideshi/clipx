@@ -84,6 +84,7 @@ export default function Settings() {
   const [defaultOptions, setDefaultOptions] = useState();
   const [googleInfo, setGoogleInfo] = useState(null);
   const [loadingGoogleInfo, setLoadingGoogleInfo] = useState(true);
+  const [confirmUnlink, setConfirmUnlink] = useState(false);
   console.log(options);
 
   function pickFolder() {
@@ -110,8 +111,14 @@ export default function Settings() {
     setLoadingGoogleInfo(false);
   }
   const handleUnlinkYoutube = async () => {
+    if (!confirmUnlink) {
+      setConfirmUnlink(true);
+      return;
+    }
+
     await unlinkYoutube();
     setGoogleInfo(null);
+    setConfirmUnlink(false);
   }
   console.log(googleInfo);
   console.log(loadingGoogleInfo);
@@ -170,12 +177,18 @@ export default function Settings() {
     saveOptions();
   }, [options]);
 
+  useEffect(() => {
+    if (!googleInfo) {
+      setConfirmUnlink(false);
+    }
+  }, [googleInfo]);
+
   return (
     <>
       <div className={"settings-container"}>
         <h2>Settings</h2>
         <div className={"options"}>
-          <h4 style={{marginBottom: 0}}>Options</h4>
+          <div className={"menu-separator"} style={{width: "100%"}}><span>Options</span></div>
           {options ? null : <div className="loading"><CircularProgress/></div>}
           {options && defaultOptions && (
             <FormGroup className={"options-form"}>
@@ -185,10 +198,18 @@ export default function Settings() {
                   deleteClipAfterCut: e.target.checked,
                 })
               }}/>} label="Delete Clip After Cut?"/>
+
+              <div className={"menu-separator"} style={{width: "100%"}}><span>Choose Clip Folder</span></div>
+
+
               <span style={{fontWeight: "bold", color: "#90caf9"}}>{options.clipsFolder || "Not Set"}</span>
               <Button id={"pick-folder"} variant={"contained"} onClick={pickFolder}>Choose Folder</Button>
+
+              <div className={"menu-separator"} style={{width: "100%"}}><span>Connect Youtube Account</span></div>
+
+
               <div className={"yt"}>
-                <h4 style={{marginBottom: 0}}>Connect Youtube Account:</h4>
+                <h4 style={{marginBottom: 0}}></h4>
                   <div style={{color: "#90caf9"}}>
                     {googleInfo && (
                       <>
@@ -201,10 +222,29 @@ export default function Settings() {
                       <div className="loading"><CircularProgress/></div>
                     )}
                   </div>
+                <div className={"yt-btns"}>
+                  {!(loadingGoogleInfo || googleInfo) && (<Button variant={"contained"} onClick={handleLinkYoutube}>Link</Button>)}
 
-                <Button variant={"contained"} onClick={handleLinkYoutube} disabled={loadingGoogleInfo || googleInfo} >Link</Button>
-                <Button variant={"outlined"} onClick={handleUnlinkYoutube} disabled={loadingGoogleInfo || !googleInfo} >Unlink</Button>
+                  {!(loadingGoogleInfo || !googleInfo) && (
+                    !confirmUnlink ? (
+                      <Button variant={"outlined"} onClick={handleUnlinkYoutube}>Unlink</Button>
+                    ) : (
+                      <>
+                        <Button color={"error"} variant={"contained"} onClick={handleUnlinkYoutube}>
+                          Confirm Unlink
+                        </Button>
+                        <Button variant={"text"} onClick={() => setConfirmUnlink(false)}>
+                          Cancel
+                        </Button>
+                      </>
+                    )
+                  )}
+                </div>
               </div>
+
+              <div className={"menu-separator"} style={{width: "100%"}}><span></span></div>
+
+
             </FormGroup>
           )}
         </div>
