@@ -1,0 +1,111 @@
+.uploading-clips-widget {
+	position: fixed;
+	right: 16px;
+	bottom: 128px;
+	width: min(320px, calc(100vw - 32px));
+	background: rgba(30, 31, 34, 0.96);
+	border: 1px solid rgba(255, 255, 255, 0.15);
+	border-radius: 10px;
+	box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+	z-index: 25;
+}
+
+.uploading-clips-header {
+	width: 100%;
+	border: none;
+	background: transparent;
+	color: #fff;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 10px;
+	padding: 10px 12px;
+	cursor: pointer;
+}
+
+.uploading-clips-header-left {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	min-width: 0;
+}
+
+.uploading-spinner {
+	width: 14px;
+	height: 14px;
+	border-radius: 50%;
+	border: 2px solid rgba(255, 255, 255, 0.25);
+	border-top-color: #90caf9;
+	animation: uploading-spin 0.8s linear infinite;
+	flex: 0 0 auto;
+}
+
+.uploading-clips-title {
+	font-size: 13px;
+	font-weight: 600;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.uploading-clips-toggle {
+	font-size: 11px;
+	color: #b0bec5;
+	flex: 0 0 auto;
+}
+
+.uploading-clips-list {
+	border-top: 1px solid rgba(255, 255, 255, 0.1);
+	max-height: 220px;
+	overflow-y: auto;
+}
+
+.uploading-clip-item {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 10px;
+	padding: 8px 12px;
+	color: #fff;
+}
+
+.uploading-clip-main {
+	min-width: 0;
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+
+.uploading-clip-name {
+	font-size: 12px;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.uploading-clip-link {
+	color: #90caf9;
+	text-decoration: none;
+	font-size: 11px;
+	background: transparent;
+	border: none;
+	padding: 0;
+	cursor: pointer;
+}
+
+.uploading-clip-status {
+	font-size: 11px;
+	color: #90caf9;
+	text-transform: lowercase;
+	flex: 0 0 auto;
+}
+
+.uploading-clip-status.failed {
+	color: #ef9a9a;
+}
+
+@keyframes uploading-spin {
+	to {
+		transform: rotate(360deg);
+	}
+}

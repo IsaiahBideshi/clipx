@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld("clipx", {
   getOptions: () => ipcRenderer.invoke("get-options"),
   saveOptions: (options) => ipcRenderer.invoke("save-options", options),
   saveClip: (clipInfo) => ipcRenderer.invoke("save-clip", clipInfo),
+  uploadClip: (clipInfo) => ipcRenderer.invoke("upload-clip", clipInfo),
   linkYoutube: () => ipcRenderer.invoke("link-youtube"),
   unlinkYoutube: () => ipcRenderer.invoke("unlink-youtube"),
   getGoogleInfo: () => ipcRenderer.invoke("get-google-info"),

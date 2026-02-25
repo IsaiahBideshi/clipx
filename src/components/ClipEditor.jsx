@@ -8,7 +8,7 @@ import ArrowBackIosNewIcon from '@mui/icons-material/ArrowBackIosNew';
 import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 import TextField from '@mui/material/TextField';
 import Button from '@mui/material/Button';
-import AutoComplete from '@mui/material/AutoComplete';
+import AutoComplete from '@mui/material/Autocomplete';
 
 // RAWG Key: 93dc6283e654485db211470c64885d60
 const GAMES_API_KEY = '93dc6283e654485db211470c64885d60';
@@ -18,7 +18,7 @@ const GAMES_API_KEY = '93dc6283e654485db211470c64885d60';
 // Secret: lk8frdqd9wqa687gmsx5lz0g7d0yfa
 // Access Token: vkibr6jlgoaw8uh9bk9dgacdx14gjv
 
-export default function ClipEditor({clip, onSaveQueueEvent, isSavedClipsView = false}) {
+export default function ClipEditor({clip, onSaveQueueEvent, onUploadQueueEvent, isSavedClipsView = false}) {
   const videoRef = useRef(null);
 
   const [duration, setDuration] = useState(0);
@@ -313,7 +313,13 @@ export default function ClipEditor({clip, onSaveQueueEvent, isSavedClipsView = f
 
           <div className={`upload-container ${hideUploadMenu ? 'hidden' : ''}`}>
             {!hideUploadMenu && (
-              <UploadMenu clip={clip} start={inPoint} end={outPoint} onSaveQueueEvent={onSaveQueueEvent}/>
+              <UploadMenu
+                clip={clip}
+                start={inPoint}
+                end={outPoint}
+                onSaveQueueEvent={onSaveQueueEvent}
+                onUploadQueueEvent={onUploadQueueEvent}
+              />
             )}
           </div>
         </>
@@ -359,7 +365,7 @@ async function searchGames(gameName) {
 }
 
 
-function UploadMenu({clip, start, end, onSaveQueueEvent}) {
+function UploadMenu({clip, start, end, onSaveQueueEvent, onUploadQueueEvent}) {
   const [tags, setTags] = useState([]);
   const [friendsInClip, setFriendsInClip] = useState([]);
   const [peopleInput, setPeopleInput] = useState('');
@@ -368,6 +374,7 @@ function UploadMenu({clip, start, end, onSaveQueueEvent}) {
   const [gameInput, setGameInput] = useState("");
   const [gameOptions, setGameOptions] = useState([{ id: "testgame", label: "Test Game"},]);
   const [storedGamesLabels, setStoredGamesLabels] = useState([]);
+  const [uploading, setUploading] = useState(false);
   useEffect(() => {
     console.log("Searching games for input:", gameInput);
     handleSearchGame();
@@ -393,6 +400,37 @@ function UploadMenu({clip, start, end, onSaveQueueEvent}) {
     } catch (err) {
       console.error("Failed to save clip:", err);
       onSaveQueueEvent?.({ type: "failed", id: saveId });
+    }
+  }
+
+  async function uploadClip(clip, start, end, title, game, tags) {
+    if (!window?.clipx?.uploadClip) {
+      console.error("window.clipx.uploadClip is not available (preload not wired?)");
+      return;
+    }
+    setUploading(true);
+
+    const uploadId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const displayName = title?.trim() || clip?.name || "Untitled Clip";
+    onUploadQueueEvent?.({ type: "started", id: uploadId, name: displayName });
+
+    try {
+      const response = await window.clipx.uploadClip({ clip, start, end, title, game, tags });
+      if (response?.status === 200) {
+        onUploadQueueEvent?.({
+          type: "success",
+          id: uploadId,
+          youtubeUrl: response.youtubeUrl,
+          videoId: response.videoId,
+        });
+        return;
+      }
+      onUploadQueueEvent?.({ type: "failed", id: uploadId });
+    } catch (err) {
+      console.error("Failed to upload clip:", err);
+      onUploadQueueEvent?.({ type: "failed", id: uploadId });
+    } finally {
+      setUploading(false);
     }
   }
 
@@ -464,7 +502,14 @@ function UploadMenu({clip, start, end, onSaveQueueEvent}) {
           )}
         />
       </form>
-      <Button sx={{marginRight: "10px"}} variant={"contained"}>Upload Clip</Button>
+      <Button
+        sx={{marginRight: "10px"}}
+        variant={"contained"}
+        onClick={() => {uploadClip(clip, start, end, clipTitle, game, tags)}}
+        disabled={uploading}
+      >
+        Upload Clip
+      </Button>
       <Button variant={"outlined"} onClick={() => {saveClip(clip, start, end, clipTitle, game, tags)}} >Save Clip</Button>
     </div>
   );

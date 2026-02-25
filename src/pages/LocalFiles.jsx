@@ -2,6 +2,7 @@ import '../App.css';
 import ClipGrid from '../components/ClipGrid.jsx';
 import ClipEditor from '../components/ClipEditor.jsx';
 import SavingClipsWidget from "../components/SavingClipsWidget.jsx";
+import UploadingClipsWidget from "../components/UploadingClipsWidget.jsx";
 import Settings from './Settings.jsx';
 import {useState, useEffect} from 'react';
 import Button from '@mui/material/Button';
@@ -20,7 +21,9 @@ export default function LocalFiles() {
 
   const [clip, setClip] = useState(null);
   const [savingClips, setSavingClips] = useState([]);
+  const [uploadingClips, setUploadingClips] = useState([]);
   const [showSavingList, setShowSavingList] = useState(true);
+  const [showUploadingList, setShowUploadingList] = useState(true);
 
   console.log(files);
 
@@ -96,6 +99,16 @@ export default function LocalFiles() {
     setSavingClips((prev) => prev.filter((item) => item.id !== id));
   }
 
+  function upsertUploadingClip(id, nextValues) {
+    setUploadingClips((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, ...nextValues } : item))
+    );
+  }
+
+  function removeUploadingClip(id) {
+    setUploadingClips((prev) => prev.filter((item) => item.id !== id));
+  }
+
   function handleSaveQueueEvent(event) {
     if (!event?.id) return;
 
@@ -115,6 +128,33 @@ export default function LocalFiles() {
     }
   }
 
+  function handleUploadQueueEvent(event) {
+    if (!event?.id) return;
+
+    if (event.type === "started") {
+      setUploadingClips((prev) => [
+        ...prev,
+        { id: event.id, name: event.name || "Untitled Clip", status: "uploading" }
+      ]);
+      return;
+    }
+
+    if (event.type === "success") {
+      upsertUploadingClip(event.id, {
+        status: "uploaded",
+        youtubeUrl: event.youtubeUrl,
+        videoId: event.videoId,
+      });
+      setTimeout(() => removeUploadingClip(event.id), 15000);
+      return;
+    }
+
+    if (event.type === "failed") {
+      upsertUploadingClip(event.id, { status: "failed" });
+      setTimeout(() => removeUploadingClip(event.id), 7000);
+    }
+  }
+
   return (
     <div className={"app"}>
       {options && (<> <span>Saved Clips</span> <Switch defaultChecked={false} onChange={(e) => setShowSavedFiles(e.target.checked)}/></>)}
@@ -130,6 +170,7 @@ export default function LocalFiles() {
         <ClipEditor
           clip={clip}
           onSaveQueueEvent={handleSaveQueueEvent}
+          onUploadQueueEvent={handleUploadQueueEvent}
           isSavedClipsView={showSavedFiles}
         />
       )}
@@ -143,6 +184,11 @@ export default function LocalFiles() {
         clips={savingClips}
         expanded={showSavingList}
         onToggleExpanded={() => setShowSavingList((prev) => !prev)}
+      />
+      <UploadingClipsWidget
+        clips={uploadingClips}
+        expanded={showUploadingList}
+        onToggleExpanded={() => setShowUploadingList((prev) => !prev)}
       />
     </div>
   );
