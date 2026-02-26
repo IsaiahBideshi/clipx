@@ -161,7 +161,7 @@ export default function Settings() {
 
   useEffect(() => {
     async function saveOptions() {
-      if (options === {}) return;
+      if (!options) return;
       if (typeof options !== "object") return;
       if (!window.clipx?.saveOptions) {
         console.log("no saveOptions function");
