@@ -1,22 +1,19 @@
 import "./auth.css";
 import { useState } from "react";
-import GoogleIcon from "@mui/icons-material/Google";
 import { Button, TextField } from "@mui/material";
 import { useNavigate } from "react-router-dom";
-import { signupWithEmail } from "../lib/auth";
+import { signUpWithEmail } from "../lib/supabase";
 
 function getAuthMessage(error) {
-  if (!error?.code) return "Something went wrong. Please try again.";
+  if (error?.message) return error.message;
 
   const messages = {
-    "auth/email-already-in-use": "This email is already registered.",
-    "auth/invalid-email": "Invalid email address.",
-    "auth/weak-password": "Password should be at least 6 characters.",
-    "auth/too-many-requests": "Too many attempts. Try again later.",
-    "auth/popup-closed-by-user": "Google sign-in was canceled.",
+    user_already_exists: "This email is already registered.",
+    weak_password: "Password should be at least 6 characters.",
+    over_request_rate_limit: "Too many attempts. Try again later.",
   };
 
-  return messages[error.code] || "Sign up failed. Please try again.";
+  return messages[error?.code] || "Sign up failed. Please try again.";
 }
 
 export default function Signup() {
@@ -33,7 +30,7 @@ export default function Signup() {
     try {
       setLoading(true);
       setError("");
-      await signupWithEmail(email.trim(), password, username);
+      await signUpWithEmail(username, email.trim(), password);
       navigate("/");
     } catch (err) {
       setError(getAuthMessage(err));

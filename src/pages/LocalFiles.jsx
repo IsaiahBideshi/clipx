@@ -10,6 +10,8 @@ import SettingsIcon from '@mui/icons-material/Settings';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import {Switch} from "@mui/material";
 
+import { auth } from '../lib/supabase.js';
+
 
 
 export default function LocalFiles() {
@@ -25,14 +27,13 @@ export default function LocalFiles() {
   const [showSavingList, setShowSavingList] = useState(true);
   const [showUploadingList, setShowUploadingList] = useState(true);
 
-  console.log(files);
 
   useEffect(() => {
     let cancelled = false;
 
     async function run() {
       if (!window.clipx?.getOptions()) {
-        console.error("window.clipx.getFolderPath is not available (preload not wired?)");
+        console.error("window.clipx.getOptions is not available (preload not wired?)");
         return;
       }
       const tempOpt = await window.clipx.getOptions();

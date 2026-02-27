@@ -1,23 +1,19 @@
 import "./auth.css";
 import { useState } from "react";
-import GoogleIcon from "@mui/icons-material/Google";
 import { TextField, Button } from "@mui/material";
 import { useNavigate } from "react-router-dom";
-import { loginWithEmail } from "../lib/auth";
+import { loginWithEmail } from "../lib/supabase";
 
 function getAuthMessage(error) {
-  if (!error?.code) return "Something went wrong. Please try again.";
+  if (error?.message) return error.message;
 
   const messages = {
-    "auth/invalid-email": "Invalid email address.",
-    "auth/user-not-found": "No account exists for this email.",
-    "auth/wrong-password": "Incorrect password.",
-    "auth/invalid-credential": "Invalid email or password.",
-    "auth/too-many-requests": "Too many attempts. Try again later.",
-    "auth/popup-closed-by-user": "Google sign-in was canceled.",
+    invalid_credentials: "Invalid email or password.",
+    email_not_confirmed: "Please confirm your email before logging in.",
+    over_request_rate_limit: "Too many attempts. Try again later.",
   };
 
-  return messages[error.code] || "Authentication failed. Please try again.";
+  return messages[error?.code] || "Authentication failed. Please try again.";
 }
 
 export default function Login() {
@@ -33,7 +29,8 @@ export default function Login() {
     try {
       setLoading(true);
       setError("");
-      await loginWithEmail(email.trim(), password);
+      const user = await loginWithEmail(email.trim(), password);
+      console.log("User logged in:", user);
       navigate("/");
     } catch (err) {
       setError(getAuthMessage(err));

@@ -77,7 +77,6 @@ export function registerSettingsIpcHandlers() {
         const appDataDir = path.dirname(optionsPath);
         await fs.promises.mkdir(appDataDir, { recursive: true });
         await fs.promises.writeFile(optionsPath, "", "utf-8");
-        console.log("ClipX: Created options.json at", optionsPath);
         return {};
       }
 
@@ -93,7 +92,6 @@ export function registerSettingsIpcHandlers() {
       const appDataDir = path.dirname(optionsPath);
       await fs.promises.mkdir(appDataDir, { recursive: true });
       await fs.promises.writeFile(optionsPath, JSON.stringify(options, null, 2), "utf-8");
-      console.log("ClipX: Saved options.json at", optionsPath);
     } catch (error) {
       console.error("ClipX: Failed to save options.json:", error);
       throw error;

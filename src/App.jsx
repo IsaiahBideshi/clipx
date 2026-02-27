@@ -14,7 +14,7 @@ import SettingsIcon from '@mui/icons-material/Settings';
 import Library from "./pages/Library.jsx";
 import Profile from "./pages/Profile.jsx";
 import Signup from "./pages/signup.jsx";
-import Login from "./pages/Login.jsx";
+import Login from "./pages/login.jsx";
 
 
 export default function App() {

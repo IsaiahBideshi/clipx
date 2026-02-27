@@ -5,8 +5,9 @@ import TextField from "@mui/material/TextField";
 import {useState, useEffect} from "react";
 import {useNavigate} from "react-router-dom";
 
-import {auth, logout} from '../lib/auth.js';
+import {auth, logout} from '../lib/supabase.js';
 import SearchIcon from '@mui/icons-material/Search';
+import CircularProgress from '@mui/material/CircularProgress';
 import {FormControl, FormHelperText, Input, InputLabel} from "@mui/material";
 
 function addFriend(name) {
@@ -16,7 +17,10 @@ function addFriend(name) {
 
 export default function Profile() {
   const [friendName, setFriendName] = useState("");
+  const [user, setUser] = useState(null);
   const [loadingUsers, setLoadingUsers] = useState(false);
+  const [loadingAuth, setLoadingAuth] = useState(true);
+  const [session, setSession] = useState(null);
   const tfSx = {
     "& .MuiInputLabel-root": { color: "#e5e7eb" }, // label
     "& .MuiInputBase-input": { color: "#ffffff" }, // typed text
@@ -30,9 +34,37 @@ export default function Profile() {
   }
   const navigate = useNavigate();
 
-  console.log(auth.currentUser);
+  useEffect(() => {
+    const getSession = async () => {
+      try {
+        const { data, error } = await auth.getSession();
 
-  if (!auth.currentUser) {
+        if (error) {
+          console.error("Error getting session:", error);
+        } else {
+          setSession(data.session);
+          setLoadingAuth(false);
+        }
+      } catch (err) {
+        console.error("Unexpected error getting session:", err);
+      }
+    };
+
+    getSession();
+  }, [auth]);
+
+  if (loadingAuth) {
+    return (
+      <div className={"settings-container"}>
+        <h2>Profile</h2>
+        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100%" }}>
+          <CircularProgress />
+        </div>
+      </div>
+    );
+  }
+
+  if (!session) {
     return (
       <div className={"settings-container"}>
         <h2>Profile</h2>

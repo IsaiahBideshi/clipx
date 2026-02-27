@@ -4,6 +4,8 @@ import path from "path";
 import { generateThumbnail, scanFolder } from "../services/fileService.js";
 
 export function registerFileIpcHandlers() {
+  // ============= HANDLERS =============
+
   ipcMain.handle("pick-video-file", async () => {
     const result = await dialog.showOpenDialog({
       properties: ["openFile"],
@@ -17,6 +19,8 @@ export function registerFileIpcHandlers() {
     return result.filePaths[0];
   });
 
+
+
   ipcMain.handle("pick-folder", async () => {
     const result = await dialog.showOpenDialog({
       properties: ["openDirectory"],
@@ -29,10 +33,14 @@ export function registerFileIpcHandlers() {
     return result.filePaths[0];
   });
 
+
+
   ipcMain.handle("scan-folder", async (_event, folderPath) => {
     return await scanFolder(folderPath);
   });
 
+
+  
   ipcMain.handle("get-thumbnail", async (_event, clipPath, baseFolder) => {
     if (typeof clipPath !== "string" || clipPath.length === 0) {
       throw new TypeError("get-thumbnail: clipPath must be a non-empty string");
