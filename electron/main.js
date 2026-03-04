@@ -26,11 +26,25 @@ function createWindow() {
   const win = new BrowserWindow({
     width: 1500,
     height: 850,
+    fullscreenable: true,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
       nodeIntegration: false,
     },
+  });
+
+  // Support the browser Fullscreen API (used by YouTube's fullscreen button)
+  win.webContents.on("enter-html-full-screen", () => {
+    win.setFullScreen(true);
+  });
+  win.webContents.on("leave-html-full-screen", () => {
+    win.setFullScreen(false);
+  });
+
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    // Open all links in the user's default browser
+    return { action: "deny" };
   });
 
   win.maximize();

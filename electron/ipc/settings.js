@@ -36,6 +36,47 @@ export function registerSettingsIpcHandlers() {
     }
   });
 
+  ipcMain.handle("get-game-data", async (_event, gameId) => {
+    if (!gameId) {
+      console.error("No game ID provided for get-game-data");
+      return null;
+    }
+    const headers = {
+      "Client-ID": "31woiu66m2oeotccavjhhgaeg26jdg",
+      Authorization: "Bearer vkibr6jlgoaw8uh9bk9dgacdx14gjv",
+      "Content-Type": "text/plain",
+      Accept: "application/json",
+    };
+
+    const idNum = Number(gameId);
+    if (!Number.isFinite(idNum)) {
+      console.warn("Invalid game ID provided for get-game-data:", gameId);
+      return null;
+    }
+
+    const response = await fetch("https://api.igdb.com/v4/games", {
+      method: "POST",
+      headers,
+      body: `
+        fields name, cover.image_id, first_release_date;
+        where id = ${idNum} & game_type = 0;
+        limit 1;
+      `,
+    });
+
+    const data = await response.json();
+    if (data.length > 0) {
+      return {
+        image: data[0].cover.image_id ? `https://images.igdb.com/igdb/image/upload/t_cover_big/${data[0].cover.image_id}.jpg` : null,
+        label: data[0].name,
+        first_release_date: data[0].first_release_date
+      };
+    }
+
+    console.warn("No game data found for ID:", gameId);
+    return null;
+  });
+
   ipcMain.handle("search-games", async (_event, query) => {
     if (typeof query !== "string") {
       return [];
@@ -48,7 +89,6 @@ export function registerSettingsIpcHandlers() {
       Accept: "application/json",
     };
 
-    console.log("Searching games for query:", query);
 
     const response = await fetch("https://api.igdb.com/v4/games", {
       method: "POST",

@@ -1,0 +1,112 @@
+.library-video-preview {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background-color: #1e1f22;
+  padding: 20px;
+  border-radius: 8px;
+  width: 80%;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+}
+.video-player-container{
+  margin-top: 10px;
+  border-radius: 8px;
+  min-width: 80%;
+  margin-left: auto;
+  margin-right: auto;
+  aspect-ratio: 16 / 9;
+}
+
+.library-iframe{
+  width: 100%;
+  height: 100%;
+}
+
+.video-metadata{
+  margin-top: 10px;
+  color: #fff;
+  text-align: left;
+  width: 80%;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.video-title{
+  margin: 0 0 10px 0;
+}
+
+.video-date{
+  font-size: 12px;
+  color: #888;
+}
+
+.search-bar {
+  width: 50%;
+  margin: 20px auto 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.filtering-container{
+  /* display: flex; */
+  justify-content: center;
+}
+
+.filter-options {
+  display: flex;
+  width: 50%;
+  gap: 12px;
+  margin: 0px auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.clip-card-skeleton {
+  pointer-events: none;
+}
+
+.skeleton-thumb,
+.skeleton-line {
+  background: linear-gradient(
+    90deg,
+    #1a1a1a 25%,
+    #2a2a2a 37%,
+    #1a1a1a 63%
+  );
+  background-size: 400% 100%;
+  animation: library-skeleton-shimmer 1.4s ease infinite;
+}
+
+.skeleton-thumb {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 3px;
+  margin-bottom: 8px;
+}
+
+.skeleton-line {
+  height: 12px;
+  border-radius: 3px;
+}
+
+.skeleton-title {
+  width: 72%;
+  margin-bottom: 8px;
+}
+
+.skeleton-date {
+  width: 48%;
+}
+
+@keyframes library-skeleton-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: 0 0;
+  }
+}

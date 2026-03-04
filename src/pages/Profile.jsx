@@ -5,7 +5,7 @@ import TextField from "@mui/material/TextField";
 import {useState, useEffect} from "react";
 import {useNavigate} from "react-router-dom";
 
-import {auth, logout} from '../lib/supabase.js';
+import {auth, logout, updateDisplayName} from '../lib/supabase.js';
 import SearchIcon from '@mui/icons-material/Search';
 import CircularProgress from '@mui/material/CircularProgress';
 import {FormControl, FormHelperText, Input, InputLabel} from "@mui/material";

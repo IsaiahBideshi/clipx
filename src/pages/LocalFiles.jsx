@@ -9,6 +9,7 @@ import Button from '@mui/material/Button';
 import SettingsIcon from '@mui/icons-material/Settings';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import {Switch} from "@mui/material";
+import CloseIcon from '@mui/icons-material/Close';
 
 import { auth } from '../lib/supabase.js';
 
@@ -168,12 +169,15 @@ export default function LocalFiles() {
       />
 
       {clip && (
-        <ClipEditor
-          clip={clip}
-          onSaveQueueEvent={handleSaveQueueEvent}
-          onUploadQueueEvent={handleUploadQueueEvent}
-          isSavedClipsView={showSavedFiles}
-        />
+        <>
+          <ClipEditor
+            clip={clip}
+            onSaveQueueEvent={handleSaveQueueEvent}
+            onUploadQueueEvent={handleUploadQueueEvent}
+            isSavedClipsView={showSavedFiles}
+            onClose={() => setClip(null)}
+          />
+        </>
       )}
       {!!files.length && (
         <ClipGrid clips={files} baseFolder={folderPath} onSelect={(clip) => {

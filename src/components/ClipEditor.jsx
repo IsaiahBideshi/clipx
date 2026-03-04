@@ -9,6 +9,10 @@ import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 import TextField from '@mui/material/TextField';
 import Button from '@mui/material/Button';
 import AutoComplete from '@mui/material/Autocomplete';
+import { supabase } from "../lib/supabase.js";
+import { InputLabel, MenuItem, Select, FormControl } from '@mui/material';
+import CloseIcon from '@mui/icons-material/Close';
+
 
 // RAWG Key: 93dc6283e654485db211470c64885d60
 const GAMES_API_KEY = '93dc6283e654485db211470c64885d60';
@@ -18,7 +22,7 @@ const GAMES_API_KEY = '93dc6283e654485db211470c64885d60';
 // Secret: lk8frdqd9wqa687gmsx5lz0g7d0yfa
 // Access Token: vkibr6jlgoaw8uh9bk9dgacdx14gjv
 
-export default function ClipEditor({clip, onSaveQueueEvent, onUploadQueueEvent, isSavedClipsView = false}) {
+export default function ClipEditor({clip, onSaveQueueEvent, onUploadQueueEvent, isSavedClipsView = false, onClose}) {
   const videoRef = useRef(null);
 
   const [duration, setDuration] = useState(0);
@@ -127,7 +131,6 @@ export default function ClipEditor({clip, onSaveQueueEvent, onUploadQueueEvent, 
     setClipData(data);
   }, [clip]);
 
-  console.log("clip data:",clipData);
 
   // Keyboard controls
   useEffect(() => {
@@ -258,7 +261,11 @@ export default function ClipEditor({clip, onSaveQueueEvent, onUploadQueueEvent, 
 
   return (
     <div className="clip-editor-container">
+      
       <div className={"clip-editor"}>
+        <button className={"close-preview-btn"} onClick={onClose}>
+          <CloseIcon fontSize={"large"} />
+        </button>
         <VideoPreview
           clip={clip}
           videoRef={videoRef}
@@ -375,8 +382,13 @@ function UploadMenu({clip, start, end, onSaveQueueEvent, onUploadQueueEvent}) {
   const [gameOptions, setGameOptions] = useState([{ id: "testgame", label: "Test Game"},]);
   const [storedGamesLabels, setStoredGamesLabels] = useState([]);
   const [uploading, setUploading] = useState(false);
+  const [visibility, setVisibility] = useState("private");
+
+  const handleChange = (event) => {
+    setVisibility(event.target.value);
+  };
+
   useEffect(() => {
-    console.log("Searching games for input:", gameInput);
     handleSearchGame();
   }, [gameInput]);
 
@@ -403,6 +415,26 @@ function UploadMenu({clip, start, end, onSaveQueueEvent, onUploadQueueEvent}) {
     }
   }
 
+  async function saveClipRecord(clipData) {
+    const id = (await supabase.auth.getUser()).data.user.id;
+  
+    const { data, error } = await supabase
+    .from('clips')
+    .insert({
+      owner_id: id,
+      youtube_video_id: clipData.youtubeID || "",
+      title: clipData.title,
+      description: "",
+      visibility: clipData.visibility,
+      game_id: clipData.game?.id,
+      created_at: new Date().toISOString(),
+    });
+    if (error) {
+      return error;
+    }
+    return null;
+  }
+
   async function uploadClip(clip, start, end, title, game, tags) {
     if (!window?.clipx?.uploadClip) {
       console.error("window.clipx.uploadClip is not available (preload not wired?)");
@@ -423,7 +455,19 @@ function UploadMenu({clip, start, end, onSaveQueueEvent, onUploadQueueEvent}) {
           youtubeUrl: response.youtubeUrl,
           videoId: response.videoId,
         });
-        return;
+
+        const error  = await saveClipRecord({
+          id: uploadId,
+          name: displayName,
+          game: game,
+          tags: tags,
+          clip: clip,
+          title: title,
+          youtubeID: response.videoId,
+          visibility: visibility,
+        });
+        if (error) console.error("Failed to save clip record to database:", error);
+        else console.log("Clip record saved");
       }
       onUploadQueueEvent?.({ type: "failed", id: uploadId });
     } catch (err) {
@@ -501,6 +545,24 @@ function UploadMenu({clip, start, end, onSaveQueueEvent, onUploadQueueEvent}) {
             />
           )}
         />
+        <div style={{ display: "flex", justifyContent: "flex-start", width: "50%" }}>
+          <FormControl sx={{ alignSelf: "flex-start" }}>
+            <InputLabel id="demo-simple-select-label" sx={{color: "white"}} >Visibility</InputLabel>
+            <Select
+              className={"tf-sx"}
+              labelId="demo-simple-select-label"
+              id="demo-simple-select"
+              value={visibility}
+              label="Visibility"
+              onChange={handleChange}
+              sx={{width: "100%"}}
+            >
+              <MenuItem value={"private"} sx={{width: "100%"}}>Private</MenuItem>
+              <MenuItem value={"public"}sx={{width: "100%"}}>Public</MenuItem>
+              <MenuItem value={"friends"}sx={{width: "100%"}}>Friends</MenuItem>
+            </Select>
+          </FormControl>
+        </div>
       </form>
       <Button
         sx={{marginRight: "10px"}}

@@ -118,7 +118,8 @@ export async function saveClip(options) {
   const endTime = options.end;
   const clipTitle = options.title || `Untitled Clip ${Date.now()}`;
   const tags = options.tags || [];
-  const game = options.game || null;
+  let game = options.game;
+  game.image = game.image.replace("t_thumb", "t_cover_big") || null;
 
   if (!videoPath || typeof videoPath !== "string") {
     throw new TypeError("save-clip: videoPath must be a non-empty string");

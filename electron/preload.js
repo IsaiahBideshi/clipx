@@ -18,4 +18,5 @@ contextBridge.exposeInMainWorld("clipx", {
   unlinkYoutube: () => ipcRenderer.invoke("unlink-youtube"),
   getGoogleInfo: () => ipcRenderer.invoke("get-google-info"),
   getClipData: (clipPath) => ipcRenderer.invoke("get-clip-data", clipPath),
+  getGameData: (gameId) => ipcRenderer.invoke("get-game-data", gameId),
 });

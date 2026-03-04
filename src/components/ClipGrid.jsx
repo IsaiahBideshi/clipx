@@ -1,12 +1,12 @@
 import ClipCard from "./ClipCard.jsx";
 import './clipgrid.css'
 
-function ClipGrid({ clips, baseFolder, onSelect }) {
+function ClipGrid({ clips, baseFolder, onSelect}) {
   return (
     <div className="clip-grid">
       {clips.map((clip) => (
         <ClipCard
-          key={clip.id}
+          id={clip.id}
           clip={clip}
           onClick={() => onSelect(clip)}
         />

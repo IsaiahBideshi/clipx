@@ -93,7 +93,10 @@ export default function EditorTimeline({duration, currentTime, inPoint, outPoint
         position: "relative",
         height: "20px",
         background: "#333",
-        marginTop: "10px"
+        marginTop: "10px",
+        marginLeft: "auto",
+        marginRight: "auto",
+        width: "80%",
       }}
     >
       {/* keep region */}

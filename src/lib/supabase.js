@@ -13,6 +13,23 @@ function throwIfAuthError(error) {
     }
 }
 
+export async function updateDisplayName(newDisplayName) {
+    const id = (await auth.getUser()).data.user.id;
+    console.log(id);
+
+    const { data, error } = await supabase
+        .from('users')
+        .update({ username: newDisplayName })
+        .eq('id', id);
+    
+    if (error) {
+        console.error("Error updating display name:", error);
+        throw error;
+    }
+    console.log("Display name updated successfully:", data, newDisplayName);
+    return data;
+}
+
 export async function signUpWithEmail(displayName, email, password) {
     const normalizedEmail = String(email || "").trim();
     const normalizedDisplayName = String(displayName || "").trim();
@@ -28,8 +45,10 @@ export async function signUpWithEmail(displayName, email, password) {
     });
 
     throwIfAuthError(error);
+
+
     return data;
-}
+}   
 
 
 async function loginWithEmail(email, password) {
