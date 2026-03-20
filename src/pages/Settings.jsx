@@ -6,6 +6,7 @@ import FormGroup from "@mui/material/FormGroup";
 import FormControlLabel from "@mui/material/FormControlLabel";
 import {Switch} from "@mui/material";
 import Button from "@mui/material/Button";
+import { auth } from "../lib/supabase.js";
 
 const tfSx = {
   "& .MuiInputLabel-root": { color: "#e5e7eb" }, // label
@@ -43,7 +44,11 @@ async function getGoogleInfo() {
   }
 
   try {
-    return await window.clipx.getGoogleInfo();
+    const userId = await getCurrentUserId();
+    if (!userId) {
+      return null;
+    }
+    return await window.clipx.getGoogleInfo(userId);
   }
   catch (err) {
     console.error("Failed to get Google account info:", err);
@@ -58,7 +63,11 @@ export async function linkYoutube() {
     }
 
     try {
-      return await window.clipx.linkYoutube();
+      const userId = await getCurrentUserId();
+      if (!userId) {
+        throw new Error("No authenticated user found");
+      }
+      return await window.clipx.linkYoutube(userId);
     }
     catch (err) {
       console.error("Failed to link Youtube account:", err);
@@ -72,11 +81,24 @@ async function unlinkYoutube() {
     }
 
     try {
-      await window.clipx.unlinkYoutube();
+      const userId = await getCurrentUserId();
+      if (!userId) {
+        throw new Error("No authenticated user found");
+      }
+      await window.clipx.unlinkYoutube(userId);
     }
     catch (err) {
       console.error("Failed to unlink Youtube account:", err);
     }
+}
+
+async function getCurrentUserId() {
+  const { data, error } = await auth.getUser();
+  if (error) {
+    console.error("Failed to resolve current user:", error);
+    return null;
+  }
+  return data?.user?.id ?? null;
 }
 
 export default function Settings() {
@@ -104,6 +126,8 @@ export default function Settings() {
       console.error("Failed to pick folder:", err);
     });
   }
+
+  console.log(googleInfo);
 
   const handleLinkYoutube = async () => {
     const info = await linkYoutube();

@@ -148,10 +148,11 @@ export default function Profile() {
       } else {
         setProfileHandle(data.username);
       }
+      setLoadingAuth(false);
     };
 
-    getFriendships();
     getSession();
+    getFriendships();
     getUsername();
   }, [auth]);
 
@@ -166,7 +167,7 @@ export default function Profile() {
     );
   }
 
-  if (!profileHandle) {
+  if (!profileHandle && loadingAuth) {
     return (
           <div className={"settings-container profile-page profile-state"}>
             <h2>Profile</h2>

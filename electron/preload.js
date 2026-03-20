@@ -14,9 +14,9 @@ contextBridge.exposeInMainWorld("clipx", {
   saveOptions: (options) => ipcRenderer.invoke("save-options", options),
   saveClip: (clipInfo) => ipcRenderer.invoke("save-clip", clipInfo),
   uploadClip: (clipInfo) => ipcRenderer.invoke("upload-clip", clipInfo),
-  linkYoutube: () => ipcRenderer.invoke("link-youtube"),
-  unlinkYoutube: () => ipcRenderer.invoke("unlink-youtube"),
-  getGoogleInfo: () => ipcRenderer.invoke("get-google-info"),
+  linkYoutube: (userId) => ipcRenderer.invoke("link-youtube", userId),
+  unlinkYoutube: (userId) => ipcRenderer.invoke("unlink-youtube", userId),
+  getGoogleInfo: (userId) => ipcRenderer.invoke("get-google-info", userId),
   getClipData: (clipPath) => ipcRenderer.invoke("get-clip-data", clipPath),
   getGameData: (gameId) => ipcRenderer.invoke("get-game-data", gameId),
 });
