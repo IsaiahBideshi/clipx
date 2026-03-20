@@ -19,7 +19,6 @@ function normalizeUserId(userId) {
 }
 
 async function storeRefreshToken(token, userId) {
-  console.log("Storing refresh token for user:", userId);
   const user_id = normalizeUserId(userId);
   if (!user_id) {
     console.error("No user ID provided to storeRefreshToken");
@@ -57,7 +56,6 @@ export async function getRefreshToken(userId) {
     return null;
   }
   if (!data.refresh_token) {
-    console.log("No refresh token found in Supabase for user");
     return null;
   }
 
@@ -67,7 +65,6 @@ export async function getRefreshToken(userId) {
 }
 
 export async function deleteRefreshToken(userId) {
-  console.log("Deleting refresh token for user:", userId);
   const response = await supabaseAdmin
     .from("google_accounts")
     .delete()
@@ -80,7 +77,6 @@ export async function deleteRefreshToken(userId) {
 }
 
 async function exchangeCodeForTokens(code, userId) {
-  console.log("Exchanging authorization code: " + code + " for tokens for user:" + userId);
   const response = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: {
@@ -155,7 +151,6 @@ export async function linkYoutube(shell, userId) {
     try {
       const accessToken = await getAccessToken(normalizedUserId);
       const userInfo = await getGoogleUserInfo(accessToken);
-      console.log("Linked YouTube account:", userInfo);
       return userInfo;
     } catch (error) {
       const message = String(error?.message || "");
@@ -165,7 +160,6 @@ export async function linkYoutube(shell, userId) {
     }
   }
 
-  console.log("No valid refresh token found, starting OAuth flow to link YouTube account");
 
   return await new Promise((resolve, reject) => {
     const server = http.createServer(async (req, res) => {

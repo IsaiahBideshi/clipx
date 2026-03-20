@@ -209,43 +209,71 @@ export default function Settings() {
 
   return (
     <>
-      <div className={"settings-container"}>
-        <h2>Settings</h2>
-        <div className={"options"}>
-          <div className={"menu-separator"} style={{width: "100%"}}><span>Options</span></div>
-          {options ? null : <div className="loading"><CircularProgress/></div>}
-          {options && defaultOptions && (
-            <FormGroup className={"options-form"}>
-              <FormControlLabel control={<Switch defaultChecked={defaultOptions?.deleteClipAfterCut} onChange={(e) => {
-                setOptions({
-                  ...options,
-                  deleteClipAfterCut: e.target.checked,
-                })
-              }}/>} label="Delete Clip After Cut?"/>
+      <div className={"settings-container settings-page"}>
+        <div className="settings-hero">
+          <div>
+            <p className="eyebrow">Preferences</p>
+            <h2>Settings</h2>
+            <p className="hero-copy">Configure your editing defaults and connected services for a smoother workflow.</p>
+          </div>
+        </div>
 
-              <div className={"menu-separator"} style={{width: "100%"}}><span>Choose Clip Folder</span></div>
+        {!options ? (
+          <div className="state-loader">
+            <CircularProgress/>
+          </div>
+        ) : (
+          <div className="settings-grid">
+            <section className="settings-card">
+              <h4>General Options</h4>
+              <p className="card-copy">Choose how ClipX behaves while you edit and save clips.</p>
+              {options && defaultOptions && (
+                <FormGroup className={"options-form"}>
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        defaultChecked={defaultOptions?.deleteClipAfterCut}
+                        onChange={(e) => {
+                          setOptions({
+                            ...options,
+                            deleteClipAfterCut: e.target.checked,
+                          })
+                        }}
+                      />
+                    }
+                    label="Delete Clip After Cut?"
+                  />
+                </FormGroup>
+              )}
+            </section>
 
+            <section className="settings-card">
+              <h4>Storage</h4>
+              <p className="card-copy">Pick where your rendered clips are stored on this device.</p>
+              <div className="folder-row">
+                <span className="folder-path">{options.clipsFolder || "Not Set"}</span>
+                <Button id={"pick-folder"} variant={"contained"} onClick={pickFolder}>Choose Folder</Button>
+              </div>
+            </section>
 
-              <span style={{fontWeight: "bold", color: "#90caf9"}}>{options.clipsFolder || "Not Set"}</span>
-              <Button id={"pick-folder"} variant={"contained"} onClick={pickFolder}>Choose Folder</Button>
-
-              <div className={"menu-separator"} style={{width: "100%"}}><span>Connect Youtube Account</span></div>
-
+            <section className="settings-card yt-card">
+              <h4>YouTube</h4>
+              <p className="card-copy">Link your YouTube account to upload clips directly from ClipX.</p>
 
               <div className={"yt"}>
-                <h4 style={{marginBottom: 0}}></h4>
-                  <div style={{color: "#90caf9"}}>
-                    {googleInfo && (
-                      <>
-                        <img style={{borderRadius: "100px"}} src={googleInfo.picture} alt=""/>
-                        <p>{googleInfo.name}</p>
-                      </>
-                    )}
+                <div className="yt-profile" style={{color: "#90caf9"}}>
+                  {googleInfo && (
+                    <>
+                      <img className="yt-avatar" src={googleInfo.picture} alt="Google profile"/>
+                      <p>{googleInfo.name}</p>
+                    </>
+                  )}
 
-                    {loadingGoogleInfo && (
-                      <div className="loading"><CircularProgress/></div>
-                    )}
-                  </div>
+                  {loadingGoogleInfo && (
+                    <div className="loading"><CircularProgress/></div>
+                  )}
+                </div>
+
                 <div className={"yt-btns"}>
                   {!(loadingGoogleInfo || googleInfo) && (<Button variant={"contained"} onClick={handleLinkYoutube}>Link</Button>)}
 
@@ -265,13 +293,9 @@ export default function Settings() {
                   )}
                 </div>
               </div>
-
-              <div className={"menu-separator"} style={{width: "100%"}}><span></span></div>
-
-
-            </FormGroup>
-          )}
-        </div>
+            </section>
+          </div>
+        )}
       </div>
     </>
   );
