@@ -402,6 +402,15 @@ export default function Profile() {
                       }}>
                       Accept
                     </button>
+                    <button className="add-friend-btn add-friend-btn--decline" onClick={async () => {
+                        await supabase
+                          .from("friendships")
+                          .delete()
+                          .eq("friend_id", session.user.id)
+                          .eq("user_id", f.user_id);
+                      }}>
+                      Decline
+                    </button>
                   </div>
                 </div>
               );

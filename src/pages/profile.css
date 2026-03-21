@@ -224,6 +224,17 @@
   background: linear-gradient(135deg, rgba(41, 181, 232, 0.22), rgba(97, 218, 251, 0.2));
   border-color: rgba(97, 218, 251, 0.42);
 }
+.add-friend-btn--decline {
+  background: rgba(255, 76, 76, 0.18);
+  border-color: rgba(255, 113, 113, 0.55);
+  color: #ffd7d7;
+  margin-left: 8px;
+}
+
+.add-friend-btn--decline:hover {
+  background: rgba(255, 76, 76, 0.34);
+  border-color: rgba(255, 130, 130, 0.85);
+}
 
 .add-friend-btn--remove {
   width: 32px;

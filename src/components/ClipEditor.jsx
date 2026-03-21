@@ -383,10 +383,51 @@ function UploadMenu({clip, start, end, onSaveQueueEvent, onUploadQueueEvent}) {
   const [storedGamesLabels, setStoredGamesLabels] = useState([]);
   const [uploading, setUploading] = useState(false);
   const [visibility, setVisibility] = useState("private");
+  const [friendsOptions, setFriendsOptions] = useState([]);
 
   const handleChange = (event) => {
     setVisibility(event.target.value);
   };
+
+useEffect(() => {
+  async function loadFriends() {
+    const userId = (await supabase.auth.getUser()).data.user.id;
+    console.log("userId", userId);
+    const { data, error } = await supabase
+      .from("friendships")
+      .select("user_id, friend_id")
+      .eq("status", "accepted")
+      .or(`user_id.eq.${userId},friend_id.eq.${userId}`);
+
+    if (error) {
+      console.error("Failed to load friendships:", error);
+      return;
+    }
+
+    console.log("friendships", data);
+    let friendIds = data.map(f => (f.user_id === userId ? f.friend_id : f.user_id));
+    console.log("friendIds", friendIds);
+
+    const { data: friendsData, error: friendsError } = await supabase
+      .from("users")
+      .select("id, username")
+      .in("id", friendIds)
+
+    console.log("friends data", friendsData);
+
+    let friendsOptionsArr = [];
+    for (const friendship of data) {
+      const friendId = friendship.user_id === userId ? friendship.friend_id : friendship.user_id;
+      const friendInfo = friendsData.find(f => f.id === friendId);
+      if (friendInfo) {
+        friendsOptionsArr.push({ id: friendId, label: friendInfo.username });
+      }
+    }
+    setFriendsOptions(friendsOptionsArr);
+  }
+
+  loadFriends();
+}, []);
 
   useEffect(() => {
     handleSearchGame();
@@ -532,7 +573,7 @@ function UploadMenu({clip, start, end, onSaveQueueEvent, onUploadQueueEvent}) {
           className={"tf-sx"}
           multiple
           id="tags-outlined"
-          options={[]}
+          options={friendsOptions}
           value={tags}
           onChange={(_e, newValue) => setTags(newValue)}
           filterSelectedOptions
