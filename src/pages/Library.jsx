@@ -160,7 +160,13 @@ export default function Library() {
 
   return (
     <div className="library" >
-      <h2>Library Page</h2>
+      <div className="library-hero">
+        <div>
+          <p className="eyebrow">Discover</p>
+          <h2>Library</h2>
+          <p className="hero-copy">Browse uploaded clips and preview details before opening full playback.</p>
+        </div>
+      </div>
       
       <div className="filtering-container">
         <div className={"search-bar"}>
@@ -176,7 +182,7 @@ export default function Library() {
               }
             }}
           />
-          <div><SearchIcon sx={{'&:hover': {cursor: 'pointer'}}} value={name} onChange={(e) => setName(e.target.value)} fontSize={"large"} onClick={() => {addFriend(friendName); setLoadingUsers(true)}}/></div>
+          <div className="search-action"><SearchIcon sx={{'&:hover': {cursor: 'pointer'}}} value={name} onChange={(e) => setName(e.target.value)} fontSize={"large"} onClick={() => {addFriend(friendName); setLoadingUsers(true)}}/></div>
         </div>
         <div className="filter-options">
           Search by:
@@ -210,7 +216,7 @@ export default function Library() {
         </div>
       </div>
 
-      <div className="clip-grid">
+      <div className="clip-grid library-grid">
         {loadingClips
           ? Array.from({ length: 16 }).map((_, index) => (
               <ClipCardSkeleton key={`clip-skeleton-${index}`} />
@@ -280,37 +286,40 @@ function VideoPreview({clip, onClose}){
   }, [gamesSrc]);
 
   return (
-    <div className="library-video-preview">
-      <button
-        type="button"
-        onClick={onClose}
-        className="close-preview-btn"
-      >
-        <CloseIcon fontSize={"large"} />
-      </button>
-      <div className="video-player-container" >
-        <iframe
-          className="library-iframe"
-          style={{borderRadius: "8px"}}
-          width="1600"
-          height="900"
-          src={src}
-          title="YouTube video player"
-          frameBorder="0"
-          allow="encrypted-media; picture-in-picture"
-          referrerPolicy="strict-origin-when-cross-origin"
-          allowFullScreen
-        />
+    <>
+      <div className="library-video-preview-overlay" />
+      <div className="library-video-preview">
+        <button
+          type="button"
+          onClick={onClose}
+          className="close-preview-btn"
+        >
+          <CloseIcon fontSize={"large"} />
+        </button>
+        <div className="video-player-container" >
+          <iframe
+            className="library-iframe"
+            style={{borderRadius: "8px"}}
+            width="1600"
+            height="900"
+            src={src}
+            title="YouTube video player"
+            frameBorder="0"
+            allow="encrypted-media; picture-in-picture"
+            referrerPolicy="strict-origin-when-cross-origin"
+            allowFullScreen
+          />
+        </div>
+        <div className="video-metadata">
+          <h2 className="video-title">{clip?.title || "No Video Selected"}</h2>
+          {gamesSrc && (<div className="video-game-row">
+            <img className="video-game-image" src={gamesSrc.image} alt="game"/>
+            <div className="video-game-label">{gamesSrc.label || "Unknown Game"}</div>
+          </div>)}
+          {/* <div className="video-tags">Tags: {clip.tags}</div> */}
+          <div className="video-date">{clip?.created_at ? new Date(clip.created_at).toLocaleString() : "No Date Available"}</div>
+        </div>
       </div>
-      <div className="video-metadata">
-        <h2 className="video-title">{clip?.title || "No Video Selected"}</h2>
-        {gamesSrc && (<div style={{display: "flex", alignItems: "center"}}>
-          <img style={{width: "30px", marginRight: 10}} src={gamesSrc.image} alt="ds"/>
-          <div style={{fontSize: "0.9em", color: "#ccc"}}>{gamesSrc.label || "Unknown Game"}</div>
-        </div>)}
-        {/* <div className="video-tags">Tags: {clip.tags}</div> */}
-        <div className="video-date">{clip?.created_at ? new Date(clip.created_at).toLocaleString() : "No Date Available"}</div>
-      </div>
-    </div>
+    </>
   );
 } 

@@ -4,8 +4,6 @@ import STOREDGAMES from "../data/games.json"
 
 import EditorTimeline from "./EditorTimeline.jsx";
 import VideoPreview from "./VideoPreview";
-import ArrowBackIosNewIcon from '@mui/icons-material/ArrowBackIosNew';
-import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 import TextField from '@mui/material/TextField';
 import Button from '@mui/material/Button';
 import AutoComplete from '@mui/material/Autocomplete';
@@ -34,8 +32,6 @@ export default function ClipEditor({clip, onSaveQueueEvent, onUploadQueueEvent, 
 
   const [volume, setVolume] = useState(1);
   const [isMuted, setIsMuted] = useState(false);
-
-  const [hideUploadMenu, setHideUploadMenu] = useState(true);
 
   const [clipData, setClipData] = useState(null);
 
@@ -285,12 +281,12 @@ export default function ClipEditor({clip, onSaveQueueEvent, onUploadQueueEvent, 
         />
         {isSavedClipsView && clipData && (
           <div className={"clip-info"}>
-            <h2 style={{marginBottom: 0}} >{clip?.name || "Untitled Clip"}</h2>
-            <div style={{display: "flex", alignItems: "center"}}>
-              <img style={{width: "30px", marginRight: 10}} src={`https:${clipData?.game?.image}`} alt="ds"/>
-              <div style={{fontSize: "0.9em", color: "#ccc"}}>{clipData?.game?.label || "Unknown Game"}</div>
+            <h2 className="clip-info-title">{clip?.name || "Untitled Clip"}</h2>
+            <div className="clip-info-game-row">
+              <img className="clip-info-game-image" src={`https:${clipData?.game?.image}`} alt="game"/>
+              <div className="clip-info-game-label">{clipData?.game?.label || "Unknown Game"}</div>
             </div>
-           <div style={{fontSize: "0.8em", color: "#666"}}>{new Date(clipData?.createdAt).toLocaleString() || "Unknown Date"}</div>
+            <div className="clip-info-date">{new Date(clipData?.createdAt).toLocaleString() || "Unknown Date"}</div>
           </div>
         )}
 
@@ -308,28 +304,15 @@ export default function ClipEditor({clip, onSaveQueueEvent, onUploadQueueEvent, 
       </div>
 
       {!isSavedClipsView && (
-        <>
-          <div className={`hide-upload-menu-btn ${hideUploadMenu ? 'hidden-btn' : ''}`}>
-            {!hideUploadMenu ? (
-              <div onClick={() => setHideUploadMenu(true)} className={"hide-upload-menu-btn"}><ArrowForwardIosIcon
-                style={{marginTop: "auto", marginBottom: "auto"}}/></div>
-            ) : (
-              <div onClick={() => setHideUploadMenu(false)} className={"hide-upload-menu-btn"}><ArrowBackIosNewIcon/></div>
-            )}
-          </div>
-
-          <div className={`upload-container ${hideUploadMenu ? 'hidden' : ''}`}>
-            {!hideUploadMenu && (
-              <UploadMenu
-                clip={clip}
-                start={inPoint}
-                end={outPoint}
-                onSaveQueueEvent={onSaveQueueEvent}
-                onUploadQueueEvent={onUploadQueueEvent}
-              />
-            )}
-          </div>
-        </>
+        <div className="upload-container">
+          <UploadMenu
+            clip={clip}
+            start={inPoint}
+            end={outPoint}
+            onSaveQueueEvent={onSaveQueueEvent}
+            onUploadQueueEvent={onUploadQueueEvent}
+          />
+        </div>
       )}
     </div>
   );
@@ -533,9 +516,13 @@ useEffect(() => {
 
   return (
     <div className="upload-menu">
-      <form>
+      <div className="upload-menu-header">
+        <p className="eyebrow">Publish</p>
+        <h4>Upload Details</h4>
+      </div>
+      <form className="upload-menu-form">
         <TextField fullWidth label={"Title"} className={"tf-sx"} value={clipTitle} onChange={(e) => setClipTitle(e.target.value)} />
-        <div style={{display: "flex", justifyContent: "space-between"}} >
+        <div className="upload-menu-game-row" >
           <AutoComplete
             fullWidth
             options={gameOptions}
@@ -587,7 +574,7 @@ useEffect(() => {
           )}
         />
         <div style={{ display: "flex", justifyContent: "flex-start", width: "50%" }}>
-          <FormControl sx={{ alignSelf: "flex-start" }}>
+          <FormControl sx={{ alignSelf: "flex-start" }} className="upload-menu-visibility-control">
             <InputLabel id="demo-simple-select-label" sx={{color: "white"}} >Visibility</InputLabel>
             <Select
               className={"tf-sx"}
@@ -605,15 +592,17 @@ useEffect(() => {
           </FormControl>
         </div>
       </form>
-      <Button
-        sx={{marginRight: "10px"}}
-        variant={"contained"}
-        onClick={() => {uploadClip(clip, start, end, clipTitle, game, tags)}}
-        disabled={uploading}
-      >
-        Upload Clip
-      </Button>
-      <Button variant={"outlined"} onClick={() => {saveClip(clip, start, end, clipTitle, game, tags)}} >Save Clip</Button>
+      <div className="upload-menu-actions">
+        <Button
+          sx={{marginRight: "10px"}}
+          variant={"contained"}
+          onClick={() => {uploadClip(clip, start, end, clipTitle, game, tags)}}
+          disabled={uploading}
+        >
+          Upload Clip
+        </Button>
+        <Button variant={"outlined"} onClick={() => {saveClip(clip, start, end, clipTitle, game, tags)}} >Save Clip</Button>
+      </div>
     </div>
   );
 }

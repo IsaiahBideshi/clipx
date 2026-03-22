@@ -89,65 +89,37 @@ export default function EditorTimeline({duration, currentTime, inPoint, outPoint
       onClick={handleClick}
       onMouseDown={(e) => startDrag(e, "playhead")}
       className="timeline"
-      style={{
-        position: "relative",
-        height: "20px",
-        background: "#333",
-        marginTop: "10px",
-        marginLeft: "auto",
-        marginRight: "auto",
-        width: "80%",
-      }}
     >
       {/* keep region */}
       {/*In Pointer*/}
       <div
         onMouseDown={(e) => startDrag(e, "in")}
+        className="timeline-handle timeline-handle-in"
         style={{
-          position: "absolute",
           left: `${inPct}%`,
-          top: "-5px",
-          width: "5px",
-          height: "30px",
-          background: "black",
-          opacity: 1,
-          zIndex: 2,
-          cursor: "ew-resize"
         }}
       />
       <div
+        className="timeline-range"
         style={{
-          position: "absolute",
           left: `${inPct}%`,
           width: `${outPct - inPct}%`,
-          height: "100%",
-          background: "#4ade80"
         }}
       />
 
       {/* playhead */}
       <div
+        className="timeline-playhead"
         style={{
-          position: "absolute",
           left: `${playheadPct}%`,
-          width: "2px",
-          height: "100%",
-          background: "red"
         }}
       />
       {/*Out Point*/}
       <div
         onMouseDown={(e) => startDrag(e, "out")}
+        className="timeline-handle timeline-handle-out"
         style={{
-          position: "absolute",
           left: `${outPct}%`,
-          top: "-5px",
-          width: "5px",
-          height: "30px",
-          background: "black",
-          opacity: 1,
-          zIndex: 2,
-          cursor: "ew-resize"
         }}
       />
     </div>

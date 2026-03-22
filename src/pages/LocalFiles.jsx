@@ -1,4 +1,5 @@
 import '../App.css';
+import './localfiles.css';
 import ClipGrid from '../components/ClipGrid.jsx';
 import ClipEditor from '../components/ClipEditor.jsx';
 import SavingClipsWidget from "../components/SavingClipsWidget.jsx";
@@ -27,13 +28,14 @@ export default function LocalFiles() {
   const [uploadingClips, setUploadingClips] = useState([]);
   const [showSavingList, setShowSavingList] = useState(true);
   const [showUploadingList, setShowUploadingList] = useState(true);
+  const [loading, setLoading] = useState(true);
 
 
   useEffect(() => {
     let cancelled = false;
 
     async function run() {
-      if (!window.clipx?.getOptions()) {
+      if (!window.clipx?.getOptions) {
         console.error("window.clipx.getOptions is not available (preload not wired?)");
         return;
       }
@@ -158,11 +160,21 @@ export default function LocalFiles() {
   }
 
   return (
-    <div className={"app"}>
-      {options && (<> <span>Saved Clips</span> <Switch defaultChecked={false} onChange={(e) => setShowSavedFiles(e.target.checked)}/></>)}
+    <div className={"local-files-page"}>
+      {options && (
+        <>
+          <span className="local-files-toggle-label">Saved Clips</span>
+          <Switch
+            className="local-files-toggle"
+            defaultChecked={false}
+            onChange={(e) => setShowSavedFiles(e.target.checked)}
+          />
+        </>
+      )}
 
-      {folderPath && <pre>Folder: {folderPath}</pre>}
+      {folderPath && <pre className="local-files-path">Folder: {folderPath}</pre>}
       <RefreshIcon
+        className="local-files-refresh"
         fontSize={"large"}
         sx={{ cursor: "pointer" }}
         onClick={refreshFiles}
@@ -179,11 +191,16 @@ export default function LocalFiles() {
           />
         </>
       )}
-      {!!files.length && (
+      {!!files.length ? (
         <ClipGrid clips={files} baseFolder={folderPath} onSelect={(clip) => {
           console.log("Selected clip:", clip);
           setClip(clip);
         }} />
+      ) : (
+        <ClipGrid clips={[]} baseFolder={folderPath} loading={loading} />
+      )}
+      {!files.length && (
+        <p className="local-files-empty">No clips found in the selected folder.</p>
       )}
       <SavingClipsWidget
         clips={savingClips}

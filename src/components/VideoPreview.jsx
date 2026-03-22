@@ -32,7 +32,11 @@ export default function VideoPreview({
   onSetVolume,
 }) {
   const shellRef = useRef(null);
+  const idleTimerRef = useRef(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isMouseIdle, setIsMouseIdle] = useState(false);
+
+  const IDLE_HIDE_MS = 1200;
 
   const src = clip?.path
     ? `clipx://video?path=${encodeURIComponent(clip.path)}`
@@ -45,6 +49,9 @@ export default function VideoPreview({
   const durationSafe = Number.isFinite(duration) && duration > 0 ? duration : 0;
   const currentSafe = Math.min(Math.max(currentTime || 0, 0), durationSafe || 0);
   const volumePercent = Math.round((isMuted ? 0 : volume) * 100);
+  const miniProgressPct = endTime > startTime
+    ? ((currentSafe - startTime) / (endTime - startTime)) * 100
+    : 0;
 
   useEffect(() => {
     function onFullscreenChange() {
@@ -54,6 +61,49 @@ export default function VideoPreview({
     document.addEventListener("fullscreenchange", onFullscreenChange);
     return () => document.removeEventListener("fullscreenchange", onFullscreenChange);
   }, []);
+
+  useEffect(() => {
+    if (!isFullscreen) {
+      if (idleTimerRef.current) {
+        clearTimeout(idleTimerRef.current);
+      }
+      setIsMouseIdle(false);
+    }
+  }, [isFullscreen]);
+
+  useEffect(() => {
+    return () => {
+      if (idleTimerRef.current) {
+        clearTimeout(idleTimerRef.current);
+      }
+    };
+  }, []);
+
+  function scheduleIdle() {
+    if (!isFullscreen) return;
+
+    if (idleTimerRef.current) {
+      clearTimeout(idleTimerRef.current);
+    }
+
+    idleTimerRef.current = setTimeout(() => {
+      setIsMouseIdle(true);
+    }, IDLE_HIDE_MS);
+  }
+
+  function handlePointerActivity() {
+    if (!isFullscreen) {
+      if (isMouseIdle) setIsMouseIdle(false);
+      return;
+    }
+
+    if (isMouseIdle) {
+      setIsMouseIdle(false);
+    }
+    scheduleIdle();
+  }
+
+  const shouldUseIdleUi = isFullscreen && isMouseIdle;
 
   async function toggleFullscreen() {
     const shell = shellRef.current;
@@ -68,7 +118,14 @@ export default function VideoPreview({
   }
 
   return (
-    <div className="video-preview-shell" ref={shellRef}>
+    <div
+      className="video-preview-shell"
+      ref={shellRef}
+      onMouseMove={handlePointerActivity}
+      onMouseEnter={handlePointerActivity}
+      onMouseDown={handlePointerActivity}
+      onMouseLeave={scheduleIdle}
+    >
       <video
         ref={videoRef}
         src={src}
@@ -78,7 +135,7 @@ export default function VideoPreview({
         className="video-preview-player"
       />
 
-      <div className="video-preview-controls" onClick={(e) => e.stopPropagation()}>
+      <div className={`video-preview-controls ${shouldUseIdleUi ? "controls-hidden" : ""}`} onClick={(e) => e.stopPropagation()}>
         <div className="video-progress-row">
           <span>{formatTime(currentTime-startTime)}</span>
           <input
@@ -124,6 +181,23 @@ export default function VideoPreview({
           </div>
         </div>
       </div>
+
+      {shouldUseIdleUi && (
+        <div className="video-mini-timeline-wrap" onClick={(e) => e.stopPropagation()}>
+          <input
+            type="range"
+            min={startTime}
+            max={endTime}
+            step={0.01}
+            value={currentSafe}
+            onChange={(e) => onSeek(Number(e.target.value))}
+            onPointerUp={(e) => e.currentTarget.blur()}
+            aria-label="Seek timeline"
+            className="video-mini-seek-slider"
+            style={{ "--mini-progress": `${Math.max(0, Math.min(100, miniProgressPct))}%` }}
+          />
+        </div>
+      )}
     </div>
   );
 }
