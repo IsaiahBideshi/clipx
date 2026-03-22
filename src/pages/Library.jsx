@@ -7,6 +7,8 @@ import SearchIcon from '@mui/icons-material/Search';
 import TuneIcon from '@mui/icons-material/Tune';
 import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
+import { OverlayScrollbarsComponent } from "overlayscrollbars-react";
+import "overlayscrollbars/overlayscrollbars.css";
 
 import "./library.css";
 
@@ -159,7 +161,11 @@ export default function Library() {
   
 
   return (
-    <div className="library" >
+    <OverlayScrollbarsComponent
+      className="library"
+      defer
+      options={{ scrollbars: { autoHide: 'scroll', theme: 'os-theme-dark' } }}
+    >
       <div className="library-hero">
         <div>
           <p className="eyebrow">Discover</p>
@@ -217,21 +223,21 @@ export default function Library() {
       </div>
 
       <div className="clip-grid library-grid">
-        {loadingClips
-          ? Array.from({ length: 16 }).map((_, index) => (
-              <ClipCardSkeleton key={`clip-skeleton-${index}`} />
-            ))
-          : clips && clips.map((clip) => (
-              <ClipCard
-                key={clip.id}
-                clip={clip}
-                onSelect={setSelectedClip}
-              />
-            ))}
+          {loadingClips
+            ? Array.from({ length: 16 }).map((_, index) => (
+                <ClipCardSkeleton key={`clip-skeleton-${index}`} />
+              ))
+            : clips && clips.map((clip) => (
+                <ClipCard
+                  key={clip.id}
+                  clip={clip}
+                  onSelect={setSelectedClip}
+                />
+              ))}
       </div>
 
       {selectedClip && <VideoPreview clip={selectedClip} onClose={() => setSelectedClip(null)} />}
-    </div>
+    </OverlayScrollbarsComponent>
   );
 }
 

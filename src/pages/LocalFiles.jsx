@@ -14,6 +14,9 @@ import CloseIcon from '@mui/icons-material/Close';
 
 import { auth } from '../lib/supabase.js';
 
+import { OverlayScrollbarsComponent } from "overlayscrollbars-react";
+import "overlayscrollbars/overlayscrollbars.css";
+
 
 
 export default function LocalFiles() {
@@ -160,7 +163,11 @@ export default function LocalFiles() {
   }
 
   return (
-    <div className={"local-files-page"}>
+    <OverlayScrollbarsComponent
+      className="local-files-page"
+      defer
+      options={{ scrollbars: { autoHide: 'scroll', theme: 'os-theme-dark' } }}
+    >
       {options && (
         <>
           <span className="local-files-toggle-label">Saved Clips</span>
@@ -212,6 +219,6 @@ export default function LocalFiles() {
         expanded={showUploadingList}
         onToggleExpanded={() => setShowUploadingList((prev) => !prev)}
       />
-    </div>
+    </OverlayScrollbarsComponent>
   );
 }
