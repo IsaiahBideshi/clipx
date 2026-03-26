@@ -1,67 +1,117 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
+import Fuse from "fuse.js";
+import STOREDGAMES from "../data/games.json";
 import { supabase } from '../lib/supabase.js';
 
 import CloseIcon from '@mui/icons-material/Close';
 import TextField from '@mui/material/TextField';
-import SearchIcon from '@mui/icons-material/Search';
-import TuneIcon from '@mui/icons-material/Tune';
-import ToggleButton from '@mui/material/ToggleButton';
-import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
+import AutoComplete from '@mui/material/Autocomplete';
 import { OverlayScrollbarsComponent } from "overlayscrollbars-react";
-import FilterAltIcon from '@mui/icons-material/FilterAlt';
 import "overlayscrollbars/overlayscrollbars.css";
 
 import "./library.css";
 
+async function checkStoredGames(query) {
+  const fuseOptions = {
+    threshold: 0.3,
+    keys: ["name"],
+  };
+
+  const fuse = new Fuse(STOREDGAMES, fuseOptions);
+  const results = fuse.search(query);
+  return results.map((result) => result.item);
+}
+
+async function searchGames(gameName) {
+  if (!gameName) return [];
+  if (gameName.length < 3) return [];
+
+  const localGames = await checkStoredGames(gameName);
+  if (localGames.length > 5) return localGames;
+
+  const api = window?.clipx?.searchGames;
+  if (typeof api !== "function") return localGames;
+
+  try {
+    const fetchedGames = await api(gameName);
+    return [...localGames, ...fetchedGames];
+  } catch (e) {
+    console.error("searchGames failed:", e);
+    return localGames;
+  }
+}
+
 export default function Library() {
-  const [clips, setClips] = useState(null);
+  const [clips, setClips] = useState([]);
   const [selectedClip, setSelectedClip] = useState(null);
-  const [error, setError] = useState(null);
   const [loadingClips, setLoadingClips] = useState(true);
-  const [friends, setFriends] = useState([]);
-
-  const [filterOption, setFilterOption] = useState("title");
-
-  const [gameId, setGameId] = useState(null);
+  const [titleQuery, setTitleQuery] = useState("");
+  const [game, setGame] = useState(null);
   const [gameOptions, setGameOptions] = useState([]);
   const [gameInput, setGameInput] = useState("");
+  const [friendsOptions, setFriendsOptions] = useState([]);
+  const [selectedFriends, setSelectedFriends] = useState([]);
+  const [filteredClips, setFilteredClips] = useState([]);
 
-  const [name, setName] = useState();
-  const [tags, setTags] = useState([]);
+  console.log(clips);
 
   const tfSx = {
-    "& .MuiInputLabel-root": { color: "#e5e7eb" }, // label
-    "& .MuiInputBase-input": { color: "#ffffff" }, // typed text
+    "& .MuiInputLabel-root": { color: "#e5e7eb" },
+    "& .MuiInputBase-input": { color: "#ffffff" },
     "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.35)" },
     "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.6)" },
     "& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: "#90caf9" },
     "& .MuiInputLabel-root.Mui-focused": { color: "#90caf9" },
     marginBottom: '10px',
-    textColor: 'white',
-    width: "90%",
-  }
+    width: "100%",
+  };
 
   useEffect(() => {
-    async function fetchFriends() {
+    async function loadFriendsOptions() {
       try {
-        const id = (await supabase.auth.getUser()).data.user.id;
+        const userId = (await supabase.auth.getUser()).data.user.id;
         const { data, error } = await supabase
-        .from('friendships')
-        .select('friend_id')
-        .eq('user_id', id)
-        .eq('status', 'accepted');
+          .from("friendships")
+          .select("user_id, friend_id")
+          .eq("status", "accepted")
+          .or(`user_id.eq.${userId},friend_id.eq.${userId}`);
 
-        if (error) {
-          console.error("Error fetching friends:", error);
-        } else {
-          setFriends(data);
+        if (error || !data) {
+          console.error("Failed to load friendships:", error);
+          return;
         }
+
+        const friendIds = data.map((f) => (f.user_id === userId ? f.friend_id : f.user_id));
+        if (friendIds.length === 0) {
+          setFriendsOptions([]);
+          return;
+        }
+
+        const { data: friendsData, error: friendsError } = await supabase
+          .from("users")
+          .select("id, username")
+          .in("id", friendIds);
+
+        if (friendsError || !friendsData) {
+          console.error("Failed to load user records for friends:", friendsError);
+          return;
+        }
+
+        const nextOptions = friendIds
+          .map((friendId) => {
+            const friendInfo = friendsData.find((f) => f.id === friendId);
+            if (!friendInfo) return null;
+            return { id: friendId, label: friendInfo.username };
+          })
+          .filter(Boolean);
+
+        setFriendsOptions(nextOptions);
       } catch (err) {
-        console.error("Unexpected error fetching friends:", err);
+        console.error("Unexpected error loading friend options:", err);
       }
     }
 
-    fetchFriends();
+    loadFriendsOptions();
 
     function onKeyDown(e) {
       if (e.code === "Escape") {
@@ -76,18 +126,19 @@ export default function Library() {
   }, []);
 
   useEffect(() => {
-    async function fetchAllClips() {
+    async function fetchClips() {
       try {
         const { data, error } = await supabase
           .from('clips')
           .select('*')
+          .neq('visibility', 'private')
           .order('created_at', { ascending: false });
 
-          if (error) {
-            console.error("Error fetching clips:", error);
-          } else {
-            setClips(data);
-          }
+        if (error) {
+          console.error("Error fetching clips:", error);
+        } else {
+          setClips(data || []);
+        }
       } catch (err) {
         console.error("Unexpected error fetching clips:", err);
       } finally {
@@ -95,71 +146,77 @@ export default function Library() {
       }
     }
 
-    async function fetchFriendsClips() {
-      if (!friends || friends.length === 0) {
-        setClips([]);
-        setLoadingClips(false);
-        return;
-      }
-      try {
-        const { data, error } = await supabase
-          .from('clips')
-          .select('*')
-          .in('owner_id', friends.map(f => f.friend_id))
-          .order('created_at', { ascending: false });
+    fetchClips();
+  }, []);
 
-          if (error) {
-            console.error("Error fetching friends' clips:", error);
-          } else {
-            setClips(data);
+  useEffect(() => {
+    async function handleSearchGame() {
+      const games = await searchGames(gameInput);
+      const options = games.map((entry) => ({
+        id: entry.id,
+        label:
+          entry.name +
+          (entry.first_release_date
+            ? ` (${new Date(entry.first_release_date * 1000).getFullYear()})`
+            : ""),
+        image: entry?.cover?.url,
+      }));
+      setGameOptions(options);
+    }
+
+    handleSearchGame();
+  }, [gameInput]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function applyFilters() {
+      const normalizedTitle = titleQuery.trim().toLowerCase();
+      const friendIds = new Set(selectedFriends.map((friend) => friend.id));
+
+      const mapped = await Promise.all(
+        clips.map(async (clip) => {
+          if (normalizedTitle && !String(clip.title || "").toLowerCase().includes(normalizedTitle)) {
+            return null;
           }
-      } catch (err) {
-        console.error("Unexpected error fetching friends' clips:", err);
-      } finally {
-        setLoadingClips(false);
-      }
-    }
 
-    async function fetchGameClips() {
-      if (!gameId) {
-        setClips([]);
-        return;
-      }
-      try {
-        const { data, error } = await supabase
-          .from('clips')
-          .select('*')
-          .eq('game_id', gameId)
-          .order('created_at', { ascending: false });
-
-          if (error) {
-            console.error("Error fetching game clips:", error);
-          } else {
-            setClips(data);
+          if (game?.id && clip.game_id !== game.id) {
+            return null;
           }
-      } catch (err) {
-        console.error("Unexpected error fetching game clips:", err);
-      } finally {
-        setLoadingClips(false);
+
+          if (friendIds.size > 0) {
+            const { data: clipWithFriendIds, error: clipTagsError } = await supabase
+              .from("clip_tags")
+              .select("user_id")
+              .eq("clip_id", clip.id);
+
+            if (!clipTagsError && clipWithFriendIds) {
+              const clipFriendIds = new Set(clipWithFriendIds.map((tag) => tag.user_id));
+              const hasFriend = Array.from(friendIds).some((friendId) => clipFriendIds.has(friendId));
+              if (!hasFriend) {
+                return null;
+              }
+            }
+          }
+
+          return clip;
+        })
+      );
+
+      if (!cancelled) {
+        setFilteredClips(mapped.filter(Boolean));
       }
     }
 
-    switch (filterOption) {
-      case "title":
-        fetchAllClips();
-        break;
-      case "friend":
-        fetchFriendsClips();
-        break;
-      case "game":
-        fetchGameClips();
-        break;
-    }
+    applyFilters();
 
-  }, [friends, filterOption]);
+    return () => {
+      cancelled = true;
+    };
+  }, [clips, game, selectedFriends, titleQuery]);
 
 
-  
+
 
   return (
     <OverlayScrollbarsComponent
@@ -176,50 +233,64 @@ export default function Library() {
       </div>
       
       <div className="filtering-container">
-        <div className={"search-bar"}>
+        <div className="search-bar">
           <TextField
             sx={tfSx}
-            placeholder={"Search clips"}
-            value={""}
-            onChange={(e) => setFriendName(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                addFriend(friendName);
-              }
-            }}
+            label="Clip title"
+            placeholder="Search by clip title"
+            value={titleQuery}
+            onChange={(e) => setTitleQuery(e.target.value)}
           />
-          <div className="search-action"><SearchIcon sx={{'&:hover': {cursor: 'pointer'}}} value={name} onChange={(e) => setName(e.target.value)} fontSize={"large"} onClick={() => {addFriend(friendName); setLoadingUsers(true)}}/></div>
         </div>
-        <div className="filter-options">
-          Search by:
-          <ToggleButtonGroup
-            sx={{
-              '& .MuiToggleButton-root': {
-                color: "#e5e7eb",
-                borderColor: "rgba(255,255,255,0.35)",
-              },
-              '& .MuiToggleButton-root:hover': {
-                borderColor: "rgba(255,255,255,0.6)",
-              },
-              '& .MuiToggleButton-root.Mui-selected': {
-                color: "#90caf9",
-                borderColor: "#90caf9",
-              },
-              '& .MuiToggleButtonGroup-grouped': {
-                borderColor: "rgba(255,255,255,0.35)",
-              },
+        <div className="search-bar filter-search-bar">
+          <AutoComplete
+            options={gameOptions}
+            filterOptions={(options) => options}
+            freeSolo
+            value={game}
+            inputValue={gameInput}
+            onInputChange={(_e, newInputValue) => setGameInput(newInputValue)}
+            onChange={(_e, newValue) => {
+              setGame(newValue);
+              setGameInput(newValue?.label ?? "");
             }}
-            color="primary"
-            value={filterOption}
-            exclusive
-            onChange={(e, newValue) => {(newValue ? setFilterOption(newValue) : null)}}
-            aria-label="Platform"
-          >
-            <ToggleButton sx={{borderColor: "white"}} value="title">Clip title</ToggleButton>
-            <ToggleButton value="friend">Friend</ToggleButton>
-            <ToggleButton value="game">Game</ToggleButton>
-          </ToggleButtonGroup>
+            renderOption={(props, opt) => (
+              <li {...props} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                {opt.image && (
+                  <img
+                    src={opt.image}
+                    alt={opt.label}
+                    style={{ width: 32, height: 45, objectFit: "cover", borderRadius: 2 }}
+                  />
+                )}
+                <span>{opt.label}</span>
+              </li>
+            )}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                sx={tfSx}
+                label="Game"
+                placeholder="Search game"
+              />
+            )}
+          />
+
+          <AutoComplete
+            multiple
+            options={friendsOptions}
+            value={selectedFriends}
+            onChange={(_e, newValue) => setSelectedFriends(newValue)}
+            filterSelectedOptions
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                sx={tfSx}
+                label="Friends"
+                placeholder="Search friends"
+              />
+            )}
+          />
         </div>
       </div>
 
@@ -228,7 +299,7 @@ export default function Library() {
             ? Array.from({ length: 16 }).map((_, index) => (
                 <ClipCardSkeleton key={`clip-skeleton-${index}`} />
               ))
-            : clips && clips.map((clip) => (
+            : filteredClips.map((clip) => (
                 <ClipCard
                   key={clip.id}
                   clip={clip}
