@@ -42,7 +42,7 @@ async function searchGames(gameName) {
   }
 }
 
-export default function Library({session}) {
+export default function Library() {
   const [clips, setClips] = useState([]);
   const [selectedClip, setSelectedClip] = useState(null);
   const [loadingClips, setLoadingClips] = useState(true);
@@ -53,8 +53,10 @@ export default function Library({session}) {
   const [friendsOptions, setFriendsOptions] = useState([]);
   const [selectedFriends, setSelectedFriends] = useState([]);
   const [filteredClips, setFilteredClips] = useState([]);
-  const [sessionState, setSession] = useState(session);
+  const [session, setSession] = useState();
   const [loadingSession, setLoadingSession] = useState(true);
+
+  const navigate = useNavigate();
 
 
   const tfSx = {
@@ -230,8 +232,7 @@ export default function Library({session}) {
 
 
 
-  if (!session) {
-    const navigate = useNavigate();
+  if (!session && !loadingSession) {
     navigate("/login");
   }
 
