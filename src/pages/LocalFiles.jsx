@@ -169,23 +169,23 @@ export default function LocalFiles() {
       options={{ scrollbars: { autoHide: 'scroll', theme: 'os-theme-dark' } }}
     >
       {options && (
-        <>
+        <div className="local-files-header">
+          <RefreshIcon
+            className="local-files-refresh"
+            fontSize={"large"}
+            sx={{ cursor: "pointer" }}
+            onClick={refreshFiles}
+          />
           <span className="local-files-toggle-label">Saved Clips</span>
           <Switch
             className="local-files-toggle"
             defaultChecked={false}
             onChange={(e) => setShowSavedFiles(e.target.checked)}
           />
-        </>
+        </div>
       )}
 
       {folderPath && <pre className="local-files-path">Folder: {folderPath}</pre>}
-      <RefreshIcon
-        className="local-files-refresh"
-        fontSize={"large"}
-        sx={{ cursor: "pointer" }}
-        onClick={refreshFiles}
-      />
 
       {clip && (
         <>

@@ -1,13 +1,12 @@
 .local-files-page {
   position: relative;
   isolation: isolate;
-  width: 90%;
-  height: 83%;
-  overflow-x: hidden;
-  margin: 24px auto 24px auto;
+  box-sizing: border-box;
   padding: 24px;
+  width: 100%;
+  height: calc(100vh - 8vh);
+  overflow-x: hidden;
   border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 24px;
   background:
     radial-gradient(circle at 10% 10%, rgba(255, 176, 101, 0.16) 0%, rgba(255, 176, 101, 0) 44%),
     radial-gradient(circle at 90% 90%, rgba(41, 181, 232, 0.16) 0%, rgba(41, 181, 232, 0) 42%),
@@ -18,6 +17,14 @@
   font-family: "Sora", "Segoe UI", "Trebuchet MS", sans-serif;
   overflow-y: auto;
   text-align: left;
+}
+
+.local-files-header{
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 18px;
 }
 
 .local-files-page::before {
@@ -34,15 +41,16 @@
 }
 
 .local-files-toggle-label {
-  margin-right: 8px;
+  margin: 0;
   font-size: 0.82rem;
   text-transform: uppercase;
   letter-spacing: 0.11em;
   color: rgba(255, 255, 255, 0.7);
+  line-height: 1;
 }
 
 .local-files-toggle {
-  margin-right: 12px;
+  margin: 0;
   vertical-align: middle;
 }
 
@@ -59,7 +67,7 @@
 }
 
 .local-files-refresh {
-  margin: 2px 0 12px;
+  margin: 0;
   color: rgba(255, 255, 255, 0.84);
   padding: 8px;
   border: 1px solid rgba(255, 255, 255, 0.18);

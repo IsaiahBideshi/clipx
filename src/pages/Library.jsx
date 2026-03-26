@@ -8,6 +8,7 @@ import TuneIcon from '@mui/icons-material/Tune';
 import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import { OverlayScrollbarsComponent } from "overlayscrollbars-react";
+import FilterAltIcon from '@mui/icons-material/FilterAlt';
 import "overlayscrollbars/overlayscrollbars.css";
 
 import "./library.css";

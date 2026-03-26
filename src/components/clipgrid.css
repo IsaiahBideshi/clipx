@@ -68,12 +68,7 @@
 .clip-grid{
   display: flex;
   flex-wrap: wrap;
-  gap: 20px;
-  max-width: 100vw;
-  align-content: flex-start;
   margin: 0 auto;
-  width: 1300px;
-  height: auto;
 }
 .css-1n3vtnx-MuiFormControl-root{
   width: 100%;
