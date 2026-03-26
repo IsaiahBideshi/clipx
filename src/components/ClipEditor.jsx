@@ -359,6 +359,7 @@ function UploadMenu({clip, start, end, onSaveQueueEvent, onUploadQueueEvent}) {
   const [tags, setTags] = useState([]);
   const [friendsInClip, setFriendsInClip] = useState([]);
   const [peopleInput, setPeopleInput] = useState('');
+  const [session, setSession] = useState(null);
   const [game, setGame] = useState(null);
   const [clipTitle, setClipTitle] = useState("");
   const [gameInput, setGameInput] = useState("");
@@ -411,6 +412,19 @@ useEffect(() => {
 
   loadFriends();
 }, []);
+
+  useEffect(() => {
+    async function getSession() {
+      const { data, error } = await supabase.auth.getSession();
+      if (error) {
+        console.error("Failed to get session:", error);
+      } else {
+        setSession(data.session);
+      }
+    }
+
+    getSession();
+  }, []);
 
   useEffect(() => {
     handleSearchGame();
@@ -556,7 +570,7 @@ useEffect(() => {
             )}
           />
         </div>
-        <AutoComplete
+        {session && (<AutoComplete
           className={"tf-sx"}
           multiple
           id="tags-outlined"
@@ -572,9 +586,10 @@ useEffect(() => {
               placeholder="Friends"
             />
           )}
-        />
+        />)}
         <div style={{ display: "flex", justifyContent: "flex-start", width: "50%" }}>
-          <FormControl sx={{ alignSelf: "flex-start" }} className="upload-menu-visibility-control">
+          {session && (
+            <FormControl sx={{ alignSelf: "flex-start" }} className="upload-menu-visibility-control">
             <InputLabel id="demo-simple-select-label" sx={{color: "white"}} >Visibility</InputLabel>
             <Select
               className={"tf-sx"}
@@ -590,18 +605,19 @@ useEffect(() => {
               <MenuItem value={"friends"}sx={{width: "100%"}}>Friends</MenuItem>
             </Select>
           </FormControl>
+          )}
         </div>
       </form>
       <div className="upload-menu-actions">
-        <Button
-          sx={{marginRight: "10px"}}
-          variant={"contained"}
-          onClick={() => {uploadClip(clip, start, end, clipTitle, game, tags)}}
-          disabled={uploading}
-        >
-          Upload Clip
-        </Button>
-        <Button variant={"outlined"} onClick={() => {saveClip(clip, start, end, clipTitle, game, tags)}} >Save Clip</Button>
+          {session && (<Button
+            sx={{marginRight: "10px"}}
+            variant={"contained"}
+            onClick={() => {uploadClip(clip, start, end, clipTitle, game, tags)}}
+            disabled={uploading}
+          >
+            Upload Clip
+          </Button>)}
+        <Button variant={session ? "outlined" : "contained"} onClick={() => {saveClip(clip, start, end, clipTitle, game, tags)}} >Save Clip</Button>
       </div>
     </div>
   );

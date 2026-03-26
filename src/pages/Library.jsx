@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import Fuse from "fuse.js";
 import STOREDGAMES from "../data/games.json";
 import { supabase } from '../lib/supabase.js';
+import { useNavigate } from "react-router-dom";
 
 import CloseIcon from '@mui/icons-material/Close';
 import TextField from '@mui/material/TextField';
@@ -41,7 +42,7 @@ async function searchGames(gameName) {
   }
 }
 
-export default function Library() {
+export default function Library({session}) {
   const [clips, setClips] = useState([]);
   const [selectedClip, setSelectedClip] = useState(null);
   const [loadingClips, setLoadingClips] = useState(true);
@@ -52,8 +53,9 @@ export default function Library() {
   const [friendsOptions, setFriendsOptions] = useState([]);
   const [selectedFriends, setSelectedFriends] = useState([]);
   const [filteredClips, setFilteredClips] = useState([]);
+  const [sessionState, setSession] = useState(session);
+  const [loadingSession, setLoadingSession] = useState(true);
 
-  console.log(clips);
 
   const tfSx = {
     "& .MuiInputLabel-root": { color: "#e5e7eb" },
@@ -67,6 +69,16 @@ export default function Library() {
   };
 
   useEffect(() => {
+    async function getSession() {
+      const {data, error} = await supabase.auth.getSession();
+      if (error) {
+        console.error("Error getting session:", error);
+      } else {
+        setSession(data.session);
+        setLoadingSession(false);
+      }
+    }
+
     async function loadFriendsOptions() {
       try {
         const userId = (await supabase.auth.getUser()).data.user.id;
@@ -112,6 +124,7 @@ export default function Library() {
     }
 
     loadFriendsOptions();
+    getSession();
 
     function onKeyDown(e) {
       if (e.code === "Escape") {
@@ -217,6 +230,10 @@ export default function Library() {
 
 
 
+  if (!session) {
+    const navigate = useNavigate();
+    navigate("/login");
+  }
 
   return (
     <OverlayScrollbarsComponent
