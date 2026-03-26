@@ -200,7 +200,6 @@ export default function LocalFiles() {
       )}
       {!!files.length ? (
         <ClipGrid clips={files} baseFolder={folderPath} onSelect={(clip) => {
-          console.log("Selected clip:", clip);
           setClip(clip);
         }} />
       ) : (
