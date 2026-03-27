@@ -1,5 +1,6 @@
 import { app, BrowserWindow, protocol } from "electron";
 import path from "path";
+import "dotenv/config";
 import { fileURLToPath } from "url";
 
 import { registerClipIpcHandlers } from "./ipc/clips.js";
@@ -12,7 +13,7 @@ import { createClient } from "@supabase/supabase-js";
 
 export const supabaseAdmin = createClient(
   "https://vymaqpjhajwpbzmnoadk.supabase.co",
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ5bWFxcGpoYWp3cGJ6bW5vYWRrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjA1Mjk1NCwiZXhwIjoyMDg3NjI4OTU0fQ.piV5SVH0zQBTJ3UcKDjiUsdzu5aVnk5fGjG4y3bzFKM"
+  process.env.SERVICE_ROLE_KEY
 );
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -56,7 +57,6 @@ function createWindow() {
 
   win.maximize();
   win.loadURL("http://localhost:5173");
-  win.webContents.openDevTools();
 }
 
 function registerIpcHandlers() {

@@ -42,8 +42,8 @@ export function registerSettingsIpcHandlers() {
       return null;
     }
     const headers = {
-      "Client-ID": "31woiu66m2oeotccavjhhgaeg26jdg",
-      Authorization: "Bearer vkibr6jlgoaw8uh9bk9dgacdx14gjv",
+      "Client-ID": process.env.IGDB_CLIENT_ID,
+      Authorization: "Bearer " + process.env.IGDB_ACCESS_TOKEN,
       "Content-Type": "text/plain",
       Accept: "application/json",
     };
@@ -83,8 +83,8 @@ export function registerSettingsIpcHandlers() {
     }
 
     const headers = {
-      "Client-ID": "31woiu66m2oeotccavjhhgaeg26jdg",
-      Authorization: "Bearer vkibr6jlgoaw8uh9bk9dgacdx14gjv",
+      "Client-ID": process.env.IGDB_CLIENT_ID,
+      Authorization: "Bearer " + process.env.IGDB_ACCESS_TOKEN,
       "Content-Type": "text/plain",
       Accept: "application/json",
     };

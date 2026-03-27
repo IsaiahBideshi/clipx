@@ -21,6 +21,7 @@
     "@mui/icons-material": "^7.3.7",
     "@mui/material": "^7.3.8",
     "@supabase/supabase-js": "^2.98.0",
+    "dotenv": "^17.3.1",
     "ffmpeg": "^0.0.4",
     "ffmpeg-static": "^5.3.0",
     "firebase": "^12.9.0",

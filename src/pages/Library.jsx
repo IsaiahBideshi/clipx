@@ -7,6 +7,7 @@ import { useNavigate } from "react-router-dom";
 import CloseIcon from '@mui/icons-material/Close';
 import TextField from '@mui/material/TextField';
 import AutoComplete from '@mui/material/Autocomplete';
+import { CircularProgress } from "@mui/material";
 import { OverlayScrollbarsComponent } from "overlayscrollbars-react";
 import "overlayscrollbars/overlayscrollbars.css";
 
@@ -75,6 +76,7 @@ export default function Library() {
       const {data, error} = await supabase.auth.getSession();
       if (error) {
         console.error("Error getting session:", error);
+        setLoadingSession(false);
       } else {
         setSession(data.session);
         setLoadingSession(false);
@@ -188,6 +190,9 @@ export default function Library() {
     async function applyFilters() {
       const normalizedTitle = titleQuery.trim().toLowerCase();
       const friendIds = new Set(selectedFriends.map((friend) => friend.id));
+      const { data: allClipTags, error: clipTagsError } = await supabase
+        .from("clip_tags")
+        .select("*");
 
       const mapped = await Promise.all(
         clips.map(async (clip) => {
@@ -200,13 +205,14 @@ export default function Library() {
           }
 
           if (friendIds.size > 0) {
-            const { data: clipWithFriendIds, error: clipTagsError } = await supabase
-              .from("clip_tags")
-              .select("user_id")
-              .eq("clip_id", clip.id);
+            
 
-            if (!clipTagsError && clipWithFriendIds) {
-              const clipFriendIds = new Set(clipWithFriendIds.map((tag) => tag.user_id));
+            if (!clipTagsError && allClipTags) {
+              const clipFriendIds = new Set(allClipTags.map((tag) => {
+                if (tag.user_id && tag.clip_id === clip.id) {
+                  return tag.user_id;
+                }
+              }));
               const hasFriend = Array.from(friendIds).some((friendId) => clipFriendIds.has(friendId));
               if (!hasFriend) {
                 return null;
@@ -233,7 +239,13 @@ export default function Library() {
 
 
   if (!session && !loadingSession) {
-    navigate("/login");
+    navigate("/login", { replace: true });
+  }
+
+  if (loadingSession) {
+    return (
+      <CircularProgress/>
+    )
   }
 
   return (

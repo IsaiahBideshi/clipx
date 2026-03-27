@@ -123,8 +123,7 @@ export default function ClipEditor({clip, onSaveQueueEvent, onUploadQueueEvent, 
       }
     }
 
-    const data = loadClipData();
-    setClipData(data);
+    loadClipData();
   }, [clip]);
 
 
