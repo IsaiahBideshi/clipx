@@ -147,10 +147,6 @@ export default function ClipEditor({clip, onSaveQueueEvent, onUploadQueueEvent, 
     function onKeyDown(e) {
       if (isEditableTarget(e.target)) return;
 
-      if (e.key === "i") setInPoint(Math.min(currentTime, outPoint - 0.1));
-
-      if (e.key === "o") setOutPoint(Math.max(currentTime, inPoint + 0.1));
-
       if (e.key === "ArrowLeft") {
         const newTime = Math.max(currentTime - 5, 0);
         if (newTime < inPoint) {
@@ -484,7 +480,7 @@ useEffect(() => {
     onUploadQueueEvent?.({ type: "started", id: uploadId, name: displayName });
 
     try {
-      const response = await window.clipx.uploadClip({ clip, start, end, title, game, tags });
+      const response = await window.clipx.uploadClip({ clip, start, end, title, game, tags, userId: session?.user?.id });
       if (response?.status === 200) {
         onUploadQueueEvent?.({
           type: "success",
@@ -502,12 +498,20 @@ useEffect(() => {
           title: title,
           youtubeID: response.videoId,
           visibility: visibility,
+          userId: session?.user?.id,
         });
         if (error) console.error("Failed to save clip record to database:", error);
         else console.log("Clip record saved");
+        return;
       }
+
       onUploadQueueEvent?.({ type: "failed", id: uploadId });
     } catch (err) {
+      if (err.message === "No linked YouTube account. Link your account in settings first.") {
+        onUploadQueueEvent?.({ type: "failed", id: uploadId, error: "No linked YouTube account. Link your account in settings first." });
+        console.error("Failed to upload clip:", err);
+        return;
+      }
       console.error("Failed to upload clip:", err);
       onUploadQueueEvent?.({ type: "failed", id: uploadId });
     } finally {
@@ -569,7 +573,7 @@ useEffect(() => {
             )}
           />
         </div>
-        {session && (<AutoComplete
+        <AutoComplete
           className={"tf-sx"}
           multiple
           id="tags-outlined"
@@ -585,10 +589,9 @@ useEffect(() => {
               placeholder="Friends"
             />
           )}
-        />)}
+        />
         <div style={{ display: "flex", justifyContent: "flex-start", width: "50%" }}>
-          {session && (
-            <FormControl sx={{ alignSelf: "flex-start" }} className="upload-menu-visibility-control">
+          <FormControl sx={{ alignSelf: "flex-start" }} className="upload-menu-visibility-control">
             <InputLabel id="demo-simple-select-label" sx={{color: "white"}} >Visibility</InputLabel>
             <Select
               className={"tf-sx"}
@@ -599,21 +602,21 @@ useEffect(() => {
               onChange={handleChange}
               sx={{width: "100%"}}
             >
-              <MenuItem value={"private"} sx={{width: "100%"}}>Private</MenuItem>
               <MenuItem value={"public"}sx={{width: "100%"}}>Public</MenuItem>
+              <MenuItem value={"private"} sx={{width: "100%"}}>Private</MenuItem>
               <MenuItem value={"friends"}sx={{width: "100%"}}>Friends</MenuItem>
             </Select>
           </FormControl>
-          )}
         </div>
       </form>
       <div className="upload-menu-actions">
-          {session && (<Button
-            sx={{marginRight: "10px"}}
-            variant={"contained"}
-            onClick={() => {uploadClip(clip, start, end, clipTitle, game, tags)}}
-            disabled={uploading}
-          >
+          {session && (
+            <Button
+              sx={{marginRight: "10px"}}
+              variant={"contained"}
+              onClick={() => {uploadClip(clip, start, end, clipTitle, game, tags)}}
+              disabled={uploading}
+            >
             Upload Clip
           </Button>)}
         <Button variant={session ? "outlined" : "contained"} onClick={() => {saveClip(clip, start, end, clipTitle, game, tags)}} >Save Clip</Button>

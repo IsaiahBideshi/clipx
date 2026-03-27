@@ -58,6 +58,9 @@ export default function UploadingClipsWidget({ clips, expanded, onToggleExpanded
               </div>
               <span className={`uploading-clip-status ${clip.status === "failed" ? "failed" : ""}`}>
                 {clip.status}
+                {clip.status === "failed" && (
+                  <span>! Ensure google account is linked.</span>
+                )}
               </span>
             </div>
           ))}

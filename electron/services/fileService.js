@@ -33,36 +33,36 @@ export function registerClipxProtocol(protocol) {
       }
     }
 
-    if (host === "video") {
-      const chunkSize = end - start + 1;
-      const stream = fs.createReadStream(filePath, { start, end });
+if (host === "video") {
+  const chunkSize = end - start + 1;
+  const stream = fs.createReadStream(filePath, { start, end });
 
-      stream.on('error', (err) => {
-        console.error('Stream error:', err);
-        stream.destroy();
-      });
+  stream.on('error', (err) => {
+    console.error('Stream error:', err);
+    stream.destroy();
+  });
 
-      const webStream = new ReadableStream({
-        start(controller) {
-          stream.on('data', (chunk) => controller.enqueue(chunk));
-          stream.on('end', () => controller.close());
-          stream.on('error', (err) => controller.error(err));
-        },
-        cancel() {
-          stream.destroy(); // clean destroy on seek/cancel
-        }
-      });
-
-      return new Response(webStream, {
-        status: range ? 206 : 200,
-        headers: {
-          "Content-Type": getMimeType(filePath),
-          "Content-Range": `bytes ${start}-${end}/${fileStat.size}`,
-          "Accept-Ranges": "bytes",
-          "Content-Length": String(chunkSize),
-        },
-      });
+  const webStream = new ReadableStream({
+    start(controller) {
+      stream.on('data', (chunk) => controller.enqueue(chunk));
+      stream.on('end', () => controller.close());
+      stream.on('error', (err) => controller.error(err));
+    },
+    cancel() {
+      stream.destroy(); // clean destroy on seek/cancel
     }
+  });
+
+  return new Response(webStream, {
+    status: range ? 206 : 200,
+    headers: {
+      "Content-Type": getMimeType(filePath),
+      "Content-Range": `bytes ${start}-${end}/${fileStat.size}`,
+      "Accept-Ranges": "bytes",
+      "Content-Length": String(chunkSize),
+    },
+  });
+}
 
     if (host === "image") {
       return new Response(fs.createReadStream(filePath), {

@@ -266,8 +266,10 @@ export async function getGoogleInfo(userId) {
 }
 
 export async function uploadClipToYoutube({ videoPath, title, tags, game, userId }) {
+  console.log("Starting YouTube upload with userId:", userId);
   const refreshToken = await getRefreshToken(userId);
   if (!refreshToken) {
+    console.log("No refresh token found for user, cannot upload to YouTube");
     throw new Error("No linked YouTube account. Link your account in settings first.");
   }
 

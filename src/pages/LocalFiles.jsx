@@ -78,17 +78,43 @@ export default function LocalFiles() {
 
   // Keyboard controls
   useEffect(() => {
+    function moveSelectedClip(direction) {
+      if (!files.length) return;
+
+      setClip((currentClip) => {
+        if (!currentClip) {
+          return direction > 0 ? files[0] : files[files.length - 1];
+        }
+
+        const currentIndex = files.findIndex((item) => item.path === currentClip.path);
+        if (currentIndex < 0) {
+          return direction > 0 ? files[0] : files[files.length - 1];
+        }
+
+        const nextIndex = Math.max(0, Math.min(files.length - 1, currentIndex + direction));
+        return files[nextIndex];
+      });
+    }
+
     function onKeyDown(e) {
       if (e.code === "Escape") {
         setClip(null);
       }
-      if (e.code === "ArrowUp" || e.code === "ArrowDown") {
+
+      if (e.code === "ArrowUp") {
         e.preventDefault();
+        moveSelectedClip(1);
+      }
+
+      if (e.code === "ArrowDown") {
+        e.preventDefault();
+        moveSelectedClip(-1);
       }
     }
+
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
+  }, [files]);
 
 
 

@@ -71,6 +71,49 @@ export default function Library() {
     width: "100%",
   };
 
+  console.log(clips)
+
+  useEffect(() => {
+    function moveSelectedClip(direction) {
+      if (!clips.length) return;
+
+      setSelectedClip((currentClip) => {
+        if (!currentClip) {
+          return direction > 0 ? clips[0] : clips[clips.length - 1];
+        }
+
+        const currentIndex = clips.findIndex((item) => item.path === currentClip.path);
+        console.log(currentIndex, direction);
+
+        if (currentIndex < 0) {
+          return direction > 0 ? clips[0] : clips[clips.length - 1];
+        }
+
+        const nextIndex = Math.max(0, Math.min(clips.length - 1, currentIndex + direction));
+        return clips[nextIndex];
+      });
+    }
+
+    function onKeyDown(e) {
+      if (e.code === "Escape") {
+        setSelectedClip(null);
+      }
+
+      if (e.code === "ArrowUp") {
+        e.preventDefault();
+        moveSelectedClip(1);
+      }
+
+      if (e.code === "ArrowDown") {
+        e.preventDefault();
+        moveSelectedClip(-1);
+      }
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [clips]);
+
   useEffect(() => {
     async function getSession() {
       const {data, error} = await supabase.auth.getSession();
@@ -129,17 +172,6 @@ export default function Library() {
 
     loadFriendsOptions();
     getSession();
-
-    function onKeyDown(e) {
-      if (e.code === "Escape") {
-        setSelectedClip(null);
-      }
-      if (e.code === "ArrowUp" || e.code === "ArrowDown") {
-        e.preventDefault();
-      }
-    }
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
   useEffect(() => {

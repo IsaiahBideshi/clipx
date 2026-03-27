@@ -164,6 +164,7 @@ export async function uploadClip(app, options) {
   const clipTitle = options?.title || `Untitled Clip ${Date.now()}`;
   const tags = options?.tags || [];
   const game = options?.game || null;
+  const userId = options?.userId || null;
 
   if (!videoPath || typeof videoPath !== "string") {
     throw new TypeError("upload-clip: videoPath must be a non-empty string");
@@ -183,6 +184,7 @@ export async function uploadClip(app, options) {
       title: clipTitle,
       tags,
       game,
+      userId,
     });
 
     return {
