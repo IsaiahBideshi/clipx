@@ -2,6 +2,9 @@
 A desktop application for capturing, trimming, and sharing game clips with friends. 
 Built with Electron, React, and Supabase.
 
+> [!WARNING]
+> Still under development. No download is currently available yet.
+
 ## Features
 - <b>Video Trimming</b> — Cut clips down to its main purpose
 - <b>YouTube Upload</b> — Clips are stored as unlisted YouTube videos via your connected Google account <br/>
