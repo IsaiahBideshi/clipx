@@ -12,13 +12,6 @@ import { InputLabel, MenuItem, Select, FormControl } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 
 
-// RAWG Key: 93dc6283e654485db211470c64885d60
-const GAMES_API_KEY = '93dc6283e654485db211470c64885d60';
-
-// IGDB Key: 1b8c8d9e311a4c8d71c3c732fbbaccc
-// Client ID: 31woiu66m2oeotccavjhhgaeg26jdg
-// Secret: lk8frdqd9wqa687gmsx5lz0g7d0yfa
-// Access Token: vkibr6jlgoaw8uh9bk9dgacdx14gjv
 
 export default function ClipEditor({clip, onSaveQueueEvent, onUploadQueueEvent, isSavedClipsView = false, onClose}) {
   const videoRef = useRef(null);
