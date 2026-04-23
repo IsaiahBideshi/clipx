@@ -11,6 +11,7 @@ import { supabase } from "../lib/supabase.js";
 import { InputLabel, MenuItem, Select, FormControl } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 
+const baseUrl = import.meta.env.VITE_DATABASE_URL || "";
 
 
 export default function ClipEditor({clip, onSaveQueueEvent, onUploadQueueEvent, isSavedClipsView = false, onClose}) {
@@ -365,11 +366,9 @@ useEffect(() => {
   async function loadFriends() {
     const userId = (await supabase.auth.getUser()).data.user.id;
     console.log("userId", userId);
-    const { data, error } = await supabase
-      .from("friendships")
-      .select("user_id, friend_id")
-      .eq("status", "accepted")
-      .or(`user_id.eq.${userId},friend_id.eq.${userId}`);
+    const response = await fetch(`${baseUrl}/api/friendships?userId=${userId}`);
+    const payload = await response.json();
+    const { data, error } = payload;
 
     if (error) {
       console.error("Failed to load friendships:", error);

@@ -12,6 +12,10 @@ import { OverlayScrollbarsComponent } from "overlayscrollbars-react";
 import "overlayscrollbars/overlayscrollbars.css";
 
 import "./library.css";
+import { CommitSharp } from "@mui/icons-material";
+
+const baseUrl = import.meta.env.VITE_DATABASE_URL || "";
+
 
 async function checkStoredGames(query) {
   const fuseOptions = {
@@ -129,11 +133,9 @@ export default function Library() {
     async function loadFriendsOptions() {
       try {
         const userId = (await supabase.auth.getUser()).data.user.id;
-        const { data, error } = await supabase
-          .from("friendships")
-          .select("user_id, friend_id")
-          .eq("status", "accepted")
-          .or(`user_id.eq.${userId},friend_id.eq.${userId}`);
+        const response = await fetch(`${baseUrl}/api/friendships?userId=${userId}`);
+        const payload = await response.json();
+        const { data, error } = payload;
 
         if (error || !data) {
           console.error("Failed to load friendships:", error);
@@ -177,13 +179,11 @@ export default function Library() {
   useEffect(() => {
     async function fetchClips() {
       try {
-        const { data, error } = await supabase
-          .from('clips')
-          .select('*')
-          .neq('visibility', 'private')
-          .order('created_at', { ascending: false });
+        const response = await fetch(`${baseUrl}/api/clips?visibility=public`);
+        const { data, error } = await response.json();
+        console.log("Fetch clips response:", { data, error });
 
-        if (error) {
+        if (!response.ok || error) {
           console.error("Error fetching clips:", error);
         } else {
           setClips(data || []);

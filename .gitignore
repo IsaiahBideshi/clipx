@@ -24,3 +24,5 @@ dist-ssr
 *.sw?
 ./public/replay%201.mp4 
 .env
+.vercel
+.env*.local

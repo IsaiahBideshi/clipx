@@ -13,7 +13,7 @@ import { createClient } from "@supabase/supabase-js";
 
 export const supabaseAdmin = createClient(
   "https://vymaqpjhajwpbzmnoadk.supabase.co",
-  process.env.SERVICE_ROLE_KEY
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ5bWFxcGpoYWp3cGJ6bW5vYWRrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjA1Mjk1NCwiZXhwIjoyMDg3NjI4OTU0fQ.piV5SVH0zQBTJ3UcKDjiUsdzu5aVnk5fGjG4y3bzFKM"
 );
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));

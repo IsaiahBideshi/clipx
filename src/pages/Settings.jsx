@@ -7,6 +7,7 @@ import FormControlLabel from "@mui/material/FormControlLabel";
 import {Switch} from "@mui/material";
 import Button from "@mui/material/Button";
 import { auth } from "../lib/supabase.js";
+import { useNavigate } from "react-router-dom";
 
 const tfSx = {
   "& .MuiInputLabel-root": { color: "#e5e7eb" }, // label
@@ -102,6 +103,7 @@ async function getCurrentUserId() {
 }
 
 export default function Settings() {
+  const navigate = useNavigate();
   const [options, setOptions] = useState();
   const [defaultOptions, setDefaultOptions] = useState();
   const [googleInfo, setGoogleInfo] = useState(null);
@@ -245,6 +247,10 @@ export default function Settings() {
                   />
                 </FormGroup>
               )}
+              <div className="folder-row" style={{ marginTop: "14px" }}>
+                <span className="folder-path">Account security</span>
+                <Button variant={"outlined"} onClick={() => navigate("/change-password")}>Change Password</Button>
+              </div>
             </section>
 
             <section className="settings-card">
