@@ -1,9 +1,13 @@
 import fs from "fs";
 import http from "http";
 import keytar from "keytar";
+import dotenv from "dotenv";
 import { google } from "googleapis";
+import path from "path";
 import url from "url";
-import { supabaseAdmin } from "../main.js";
+
+dotenv.config({ path: path.resolve(process.cwd(), ".env.local"), override: true });
+dotenv.config();
 
 const SERVICE = "ClipX";
 const ACCOUNT = "youtube_refresh_token";
@@ -12,6 +16,8 @@ const clientSecret = "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";
 const redirectPort = 51723;
 const redirectUri = `http://127.0.0.1:${redirectPort}`;
 const OAUTH_TIMEOUT_MS = 90_000;
+
+const baseUrl = process.env.VITE_DATABASE_URL || "";
 
 function normalizeUserId(userId) {
   const normalized = String(userId || "").trim();
@@ -24,11 +30,20 @@ async function storeRefreshToken(token, userId) {
     console.error("No user ID provided to storeRefreshToken");
     return;
   }
-  const { data, error } = await supabaseAdmin
-    .from("google_accounts")
-    .upsert({ user_id: user_id, refresh_token: token }, { onConflict: "user_id" })
-    .select()
-    .single();
+
+  const response = await fetch(`${baseUrl}/api/google_accounts`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ user_id: user_id, token: token })
+  });
+  const { data, error } = response ? await response.json() : { data: null, error: "Failed to store refresh token via API" };
+  if (error) {
+    console.error("Error storing refresh token via API:", error);
+    return;
+  }
+
   
   if (error) {
     console.error("Error storing refresh token in Supabase:", error);
@@ -45,30 +60,45 @@ export async function getRefreshToken(userId) {
     return null;
   }
 
-  const { data, error } = await supabaseAdmin
-    .from("google_accounts")
-    .select("refresh_token")
-    .eq("user_id", user_id)
-    .single();
+  const response = await fetch(`${baseUrl}/api/google_accounts?user_id=${encodeURIComponent(user_id)}`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json"
+    }
+  });
+  const { data, error } = response ? await response.json() : { data: null, error: "Failed to fetch refresh token via API" };
+  if (error) {
+    console.error("Error fetching refresh token via API:", error);
+    return null;
+  }
 
   if (error) {
     console.error("Error fetching refresh token from Supabase:", error);
     return null;
   }
-  if (!data.refresh_token) {
+  const token = typeof data === "string" ? data : data?.refresh_token;
+  if (!token) {
     return null;
   }
 
-  const token = data.refresh_token;
   await storeRefreshToken(token, userId);
   return token;
 }
 
 export async function deleteRefreshToken(userId) {
-  const response = await supabaseAdmin
-    .from("google_accounts")
-    .delete()
-    .eq("user_id", userId);
+  const response = await fetch(`${baseUrl}/api/google_accounts`, {
+    method: "DELETE",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ user_id: userId })
+  });
+  const { data, error } = response ? await response.json() : { data: null, error: "Failed to delete refresh token via API" };
+  if (error) {
+    console.error("Error deleting refresh token via API:", error);
+    return;
+  }
+
   if (response.error) {
     console.error("Error deleting refresh token from Supabase:", response.error);
     return;
@@ -138,6 +168,31 @@ export async function getGoogleUserInfo(accessToken) {
     },
   });
   return await response.json();
+}
+
+async function getGoogleProfileImageDataUrl(accessToken, pictureUrl) {
+  if (!pictureUrl) {
+    return null;
+  }
+
+  try {
+    const response = await fetch(pictureUrl, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const contentType = response.headers.get("content-type") || "image/jpeg";
+    const bytes = Buffer.from(await response.arrayBuffer());
+    return `data:${contentType};base64,${bytes.toString("base64")}`;
+  } catch (error) {
+    console.warn("Failed to fetch Google profile image as data URL:", error);
+    return null;
+  }
 }
 
 export async function linkYoutube(shell, userId) {
@@ -243,10 +298,15 @@ export async function unlinkYoutube(userId) {
     return null;
   }
 
-  const response = await supabaseAdmin
-    .from("google_accounts")
-    .delete()
-    .eq("user_id", normalizedUserId);
+  const response = await fetch(`${baseUrl}/api/google_accounts`, {
+    method: "DELETE",
+    headers: {
+      "Content-Type": "application/json"
+    },  
+    body: JSON.stringify({ user_id: normalizedUserId })
+  });
+  const { data, error } = response ? await response.json() : { data: null, error: "Failed to delete refresh token via API" };//
+
 
   if (response.error) {
     console.error("Error deleting refresh token from Supabase:", response.error);
@@ -258,7 +318,12 @@ export async function unlinkYoutube(userId) {
 export async function getGoogleInfo(userId) {
   try {
     const accessToken = await getAccessToken(userId);
-    return await getGoogleUserInfo(accessToken);
+    const userInfo = await getGoogleUserInfo(accessToken);
+    const pictureDataUrl = await getGoogleProfileImageDataUrl(accessToken, userInfo?.picture);
+    return {
+      ...userInfo,
+      picture_data_url: pictureDataUrl,
+    };
   } catch (error) {
     console.error("Failed to get Google info:", error);
     return null;

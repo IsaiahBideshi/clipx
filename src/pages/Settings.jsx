@@ -105,6 +105,7 @@ export default function Settings() {
   const [options, setOptions] = useState();
   const [defaultOptions, setDefaultOptions] = useState();
   const [googleInfo, setGoogleInfo] = useState(null);
+  const [avatarLoadError, setAvatarLoadError] = useState(false);
   const [loadingGoogleInfo, setLoadingGoogleInfo] = useState(true);
   const [confirmUnlink, setConfirmUnlink] = useState(false);
   console.log(options);
@@ -207,6 +208,10 @@ export default function Settings() {
     }
   }, [googleInfo]);
 
+  useEffect(() => {
+    setAvatarLoadError(false);
+  }, [googleInfo?.picture, googleInfo?.picture_data_url]);
+
   return (
     <>
       <div className={"settings-container settings-page"}>
@@ -264,7 +269,15 @@ export default function Settings() {
                 <div className="yt-profile" style={{color: "#90caf9"}}>
                   {googleInfo && (
                     <>
-                      <img className="yt-avatar" src={googleInfo.picture} alt="Google profile"/>
+                      {(!avatarLoadError && (googleInfo.picture_data_url || googleInfo.picture)) && (
+                        <img
+                          className="yt-avatar"
+                          src={googleInfo.picture_data_url || googleInfo.picture}
+                          alt="Google profile"
+                          referrerPolicy="no-referrer"
+                          onError={() => setAvatarLoadError(true)}
+                        />
+                      )}
                       <p>{googleInfo.name}</p>
                     </>
                   )}
