@@ -2,14 +2,12 @@ import "./profile.css";
 
 import Button from "@mui/material/Button";
 import TextField from "@mui/material/TextField";
-import {useState, useEffect, useRef, useCallback} from "react";
+import {useState, useEffect, useRef} from "react";
 import {useNavigate} from "react-router-dom";
 
 import {auth, logout, supabase} from '../lib/supabase.js';
 import SearchIcon from '@mui/icons-material/Search';
 import CircularProgress from '@mui/material/CircularProgress';
-
-const baseUrl = (import.meta.env.VITE_DATABASE_URL || "").replace(/\/$/, "");
 
 
 export default function Profile() {
@@ -23,7 +21,6 @@ export default function Profile() {
   const displayResults = useRef(null);
   const [showResults, setShowResults] = useState(false);
   const [searchResults, setSearchResults] = useState([]);
-  const [sendingFriendIds, setSendingFriendIds] = useState(new Set());
   const [profileHandle, setProfileHandle] = useState("");
   const [loadingFriendships, setLoadingFriendships] = useState(true);
 
@@ -68,61 +65,30 @@ export default function Profile() {
     }
   }
 
-  const getFriendships = useCallback(async () => {
+  async function getFriendships() {
     const userId = (await auth.getUser()).data.user.id;
-    let data = null;
-    let error = null;
-
-    try {
-      const response = await fetch(`${baseUrl}/api/friendships?userId=${userId}`);
-      const payload = await response.json();
-      data = payload?.data ?? null;
-      error = payload?.error ?? null;
-
-      if (!response.ok) {
-        error = error || `Request failed with status ${response.status}`;
-      }
-    } catch (networkError) {
-      console.error("Network error fetching friendships:", networkError);
-      setFriendships([]);
-      setLoadingFriendships(false);
-      return "error";
-    }
-
+    const { data, error } = await supabase
+      .from("friendships")
+      .select("*")
+      .or(`user_id.eq.${userId},friend_id.eq.${userId}`);
     if (error) {
       console.error("Error fetching friendship:", error);
       setFriendships([]);
-      setLoadingFriendships(false);
       return "error";
     }
-
-    const friendIds = [...new Set((data || []).map((f) => (f.user_id === userId ? f.friend_id : f.user_id)).filter(Boolean))];
-    let usernameById = new Map();
-
-    if (friendIds.length > 0) {
-      const { data: usersData, error: usersError } = await supabase
-        .from("users")
-        .select("id, username")
-        .in("id", friendIds);
-
-      if (usersError) {
-        console.error("Error fetching friend usernames:", usersError);
-      } else {
-        usernameById = new Map((usersData || []).map((user) => [user.id, user.username]));
-      }
-    }
-
-    const friendshipsData = (data || []).map((f) => {
+    let friendshipsData = [];
+    for (let f of data) {
       const friendId = f.user_id === userId ? f.friend_id : f.user_id;
-      return {
-        ...f,
-        friendName: usernameById.get(friendId) || "Unknown User",
-      };
-    });
-
+      const { data: friendData, error: friendError } = await supabase
+        .from("users")
+        .select("username")
+        .eq("id", friendId)
+        .single();
+      friendshipsData.push({ ...f, friendName: friendData ? friendData.username : "Unknown User" });
+    }
     setFriendships(friendshipsData);
     setLoadingFriendships(false);
-  }, []);
+  }
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -188,7 +154,7 @@ export default function Profile() {
     getSession();
     getFriendships();
     getUsername();
-  }, [getFriendships]);
+  }, [auth]);
 
   if (loadingAuth) {
     return (
@@ -236,69 +202,22 @@ export default function Profile() {
 
 
   async function handleSendRequest(friendId) {
-    if (sendingFriendIds.has(friendId)) {
-      return;
-    }
-
     const userId = session.user.id;
-    const friendName = searchResults.find((entry) => entry.id === friendId)?.username || "Unknown User";
-    const optimisticId = `optimistic-${userId}-${friendId}`;
-    const previousFriendships = friendships || [];
-
-    setSendingFriendIds((prev) => {
-      const next = new Set(prev);
-      next.add(friendId);
-      return next;
-    });
-
-    setFriendships((prev) => {
-      const current = prev || [];
-      const alreadyExists = current.some(
-        (item) =>
-          ((item.user_id === userId && item.friend_id === friendId) ||
-            (item.user_id === friendId && item.friend_id === userId)) &&
-          (item.status === "pending" || item.status === "accepted")
-      );
-
-      if (alreadyExists) {
-        return current;
-      }
-
-      return [
-        ...current,
-        {
-          id: optimisticId,
-          user_id: userId,
-          friend_id: friendId,
-          status: "pending",
-          friendName,
-        },
-      ];
-    });
-
     console.log("Sending friend request from", userId, "to", friendId);
-    const response = await fetch(`${baseUrl}/api/friendships`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({ user_id: userId, friend_id: friendId })
+    const { data, error } = await supabase
+    .from("friendships")
+    .insert({
+      user_id: userId,
+      friend_id: friendId,
+      status: "pending"
     });
-    const { data, error } = await response.json();
 
-    if (!response.ok || error) {
-      console.error("Error sending friend request:", error || response.statusText);
-      setFriendships(previousFriendships);
+    if (error) {
+      console.error("Error sending friend request:", error);
     } else {
       console.log("Friend request sent:", data);
       getFriendships();
     }
-
-    setSendingFriendIds((prev) => {
-      const next = new Set(prev);
-      next.delete(friendId);
-      return next;
-    });
   }
 
   function handleOpenRemoveConfirm(friendshipId, friendDisplayName) {
@@ -322,47 +241,32 @@ export default function Profile() {
       return;
     }
 
-    const actionTarget = removeTarget;
-    setRemoveTarget(null);
     setConfirmingAction(true);
     let response;
-    let payload;
 
-    if (actionTarget.type === "remove-friend") {
-      response = await fetch(`${baseUrl}/api/friendships`, {
-        method: "DELETE",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          type: "remove-friend",
-          user_id: session.user.id,
-          friend_id: actionTarget.id
-        })
-      });
+    if (removeTarget.type === "remove-friend") {
+      response = await supabase
+        .from("friendships")
+        .delete()
+        .or(`and(user_id.eq.${session.user.id},friend_id.eq.${removeTarget.id}),and(user_id.eq.${removeTarget.id},friend_id.eq.${session.user.id})`);
     } else {
-      response = await fetch(`${baseUrl}/api/friendships`, {
-        method: "DELETE",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          type: "cancel-request",
-          user_id: session.user.id,
-          friend_id: actionTarget.id
-        })
-      });
+      response = await supabase
+        .from("friendships")
+        .delete()
+        .eq("user_id", session.user.id)
+        .eq("friend_id", removeTarget.id)
+        .eq("status", "pending");
     }
-
-    payload = await response.json();
-
-    console.log("Confirm response:", payload);
-    if (!response.ok || payload?.error) {
-      console.error("Error handling friendship action:", payload?.error || response.statusText);
+    
+    console.log("Confirm response:", response);
+    setConfirmingAction(false);
+    if (response.error) {
+      console.error("Error handling friendship action:", response.error);
       return;
     }
+
+    setRemoveTarget(null);
     getFriendships();
-    setConfirmingAction(false);
   }
 
   return (
@@ -408,7 +312,6 @@ export default function Profile() {
                 <div>
                   {searchResults.length > 0 ? (
                     searchResults.map((result) => {
-                      const isSending = sendingFriendIds.has(result.id);
                       const isAccepted = friendships?.some(
                         ({ user_id, friend_id, status }) =>
                           (user_id === result.id || friend_id === result.id) && status === "accepted"
@@ -424,10 +327,6 @@ export default function Profile() {
                           {isAccepted ? (
                             <button className="add-friend-btn add-friend-btn--friends" disabled>
                               Friends
-                            </button>
-                          ) : isSending ? (
-                            <button className="add-friend-btn add-friend-btn--sent" disabled>
-                              Sending...
                             </button>
                           ) : isPending ? (
                             <button className="add-friend-btn add-friend-btn--sent" disabled>
@@ -495,57 +394,20 @@ export default function Profile() {
                   <p>{f.friendName ? f.friendName : "Unknown User"}</p>
                   <div>
                     <button className="add-friend-btn add-friend-btn--accept" onClick={async () => {
-                        setFriendships((prev) =>
-                          (prev || []).map((item) =>
-                            item.user_id === f.user_id && item.friend_id === session.user.id
-                              ? { ...item, status: "accepted" }
-                              : item
-                          )
-                        );
-
-                        const response = await fetch(`${baseUrl}/api/friendships`, {
-                          method: "PUT",
-                          headers: {
-                            "Content-Type": "application/json"
-                          },
-                          body: JSON.stringify({
-                            friend_id: f.user_id,
-                            user_id: session.user.id,
-                          })
-                        });
-                        const payload = await response.json();
-                        if (!response.ok || payload?.error) {
-                          console.error("Error accepting request:", payload?.error || response.statusText);
-                          getFriendships();
-                          return;
-                        }
+                        await supabase
+                          .from("friendships")
+                          .update({ status: "accepted" })
+                          .eq("friend_id", session.user.id)
+                          .eq("user_id", f.user_id);
                       }}>
                       Accept
                     </button>
                     <button className="add-friend-btn add-friend-btn--decline" onClick={async () => {
-                        setFriendships((prev) =>
-                          (prev || []).filter(
-                            (item) => !(item.user_id === f.user_id && item.friend_id === session.user.id && item.status === "pending")
-                          )
-                        );
-
-                        const response = await fetch(`${baseUrl}/api/friendships`, {
-                            method: "DELETE",
-                            headers: {
-                              "Content-Type": "application/json"
-                            },
-                            body: JSON.stringify({
-                              type: "decline-request",
-                              friend_id: f.user_id,
-                              user_id: session.user.id,
-                            })
-                        });
-                        const payload = await response.json();
-                        if (!response.ok || payload?.error) {
-                          console.error("Error declining request:", payload?.error || response.statusText);
-                          getFriendships();
-                          return;
-                        }
+                        await supabase
+                          .from("friendships")
+                          .delete()
+                          .eq("friend_id", session.user.id)
+                          .eq("user_id", f.user_id);
                       }}>
                       Decline
                     </button>
@@ -627,7 +489,6 @@ export default function Profile() {
           </div>
         </div>
       )}
-
     </div>
   );
 }
