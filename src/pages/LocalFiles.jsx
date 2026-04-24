@@ -231,7 +231,7 @@ export default function LocalFiles() {
       ) : (
         <ClipGrid clips={[]} baseFolder={folderPath} loading={loading} />
       )}
-      {!files.length && (
+      {!files.length && !loading && (
         <p className="local-files-empty">No clips found in the selected folder.</p>
       )}
       <SavingClipsWidget
