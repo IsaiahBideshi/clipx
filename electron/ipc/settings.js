@@ -100,7 +100,10 @@ export function registerSettingsIpcHandlers() {
       limit 5;
     `,
     });
-
+    if (!response.ok) {
+      console.error("IGDB API error:", response.status, await response.text());
+      return [];
+    }
     const data = await response.json();
     data.sort((a, b) => (b.total_rating_count || 0) - (a.total_rating_count || 0));
     return data;
