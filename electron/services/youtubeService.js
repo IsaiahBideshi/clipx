@@ -17,7 +17,7 @@ const redirectPort = 51723;
 const redirectUri = `http://127.0.0.1:${redirectPort}`;
 const OAUTH_TIMEOUT_MS = 90_000;
 
-const baseUrl = process.env.VITE_DATABASE_URL || "";
+const baseUrl = (process.env.VITE_DATABASE_URL || "https://clipx.bideshi.tech").replace(/\/+$/, "");
 
 function normalizeUserId(userId) {
   const normalized = String(userId || "").trim();

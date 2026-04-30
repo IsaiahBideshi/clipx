@@ -2,7 +2,9 @@ import "./auth.css";
 import { useState } from "react";
 import { Button, TextField } from "@mui/material";
 import { useNavigate } from "react-router-dom";
-import { signUpWithEmail } from "../lib/supabase";
+import { signUpWithEmail, signInWithGoogle} from "../lib/supabase";
+
+import GoogleIcon from '@mui/icons-material/Google';
 
 function getAuthMessage(error) {
   if (error?.message) return error.message;
@@ -32,6 +34,18 @@ export default function Signup() {
       setError("");
       await signUpWithEmail(username, email.trim(), password);
       navigate("/");
+    } catch (err) {
+      setError(getAuthMessage(err));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function googleSignIn() {
+    setLoading(true);
+    setError("");
+    try {
+      await signInWithGoogle();
     } catch (err) {
       setError(getAuthMessage(err));
     } finally {
@@ -76,6 +90,10 @@ export default function Signup() {
           </Button>
         </div>
         {error && <p className="auth-error">{error}</p>}
+        <Button fullWidth variant="outlined" style={{ marginTop: "20px" }} onClick={googleSignIn} disabled={loading}>
+          <GoogleIcon style={{ marginRight: "8px" }} />
+            Sign Up with Google
+        </Button>
       </form>
     </div>
   );

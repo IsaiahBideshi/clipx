@@ -7,6 +7,11 @@ export const supabase = createClient(
 
 const auth = supabase.auth;
 
+function signInWithGoogle() {
+    // Redirects to Google for authentication in browser, then back to the app
+    
+}
+
 function throwIfAuthError(error) {
     if (error) {
         throw error;
@@ -73,4 +78,4 @@ async function getSession() {
     return data.session;
 }
 
-export {  loginWithEmail, logout, auth, getSession };
+export {  loginWithEmail, logout, auth, getSession, signInWithGoogle };
