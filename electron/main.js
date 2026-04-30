@@ -12,6 +12,9 @@ import { registerClipxProtocol } from "./services/fileService.js";
 
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const isDev = !app.isPackaged;
+const devServerUrl = process.env.ELECTRON_RENDERER_URL || "http://localhost:5173";
+const rendererIndexPath = path.join(app.getAppPath(), "dist", "index.html");
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -25,7 +28,7 @@ protocol.registerSchemesAsPrivileged([
   },
 ]);
 
-function createWindow() {
+async function createWindow() {
   const win = new BrowserWindow({
     width: 1500,
     height: 850,
@@ -51,7 +54,16 @@ function createWindow() {
   });
 
   win.maximize();
-  win.loadURL("http://localhost:5173");
+  if (isDev) {
+    try {
+      await win.loadURL(devServerUrl);
+      return;
+    } catch (error) {
+      console.warn(`Failed to load dev URL (${devServerUrl}), falling back to dist build.`, error);
+    }
+  }
+
+  await win.loadFile(rendererIndexPath);
 }
 
 function registerIpcHandlers() {
@@ -61,10 +73,10 @@ function registerIpcHandlers() {
   registerYoutubeIpcHandlers();
 }
 
-app.whenReady().then(() => {
-  createWindow();
+app.whenReady().then(async () => {
   registerClipxProtocol(protocol);
   registerIpcHandlers();
+  await createWindow();
 });
 
 app.on("window-all-closed", () => {

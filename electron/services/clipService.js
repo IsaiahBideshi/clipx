@@ -4,8 +4,9 @@ import ffmpeg from "fluent-ffmpeg";
 import ffmpegPath from "ffmpeg-static";
 
 import { uploadClipToYoutube } from "./youtubeService.js";
+import { resolveFfmpegPath } from "../utils/ffmpeg.js";
 
-ffmpeg.setFfmpegPath(ffmpegPath);
+ffmpeg.setFfmpegPath(resolveFfmpegPath(ffmpegPath));
 
 const CLIPS_DATA_FILE = "clipsData.json";
 

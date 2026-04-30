@@ -15,6 +15,9 @@
   "build": {
     "appId": "com.isaiah.clipx",
     "productName": "ClipX",
+    "asarUnpack": [
+      "**/node_modules/ffmpeg-static/**"
+    ],
     "files": [
       "electron/**/*",
       "dist/**/*",

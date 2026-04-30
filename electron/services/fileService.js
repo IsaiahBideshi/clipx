@@ -5,8 +5,9 @@ import ffmpegPath from "ffmpeg-static";
 
 import { getFastFileId } from "../utils/hashing.js";
 import { getMimeType } from "../utils/mime.js";
+import { resolveFfmpegPath } from "../utils/ffmpeg.js";
 
-ffmpeg.setFfmpegPath(ffmpegPath);
+ffmpeg.setFfmpegPath(resolveFfmpegPath(ffmpegPath));
 
 const VIDEO_EXTENSIONS = [".mp4", ".mkv", ".mov", ".avi", ".flv", ".wmv", ".webm"];
 
