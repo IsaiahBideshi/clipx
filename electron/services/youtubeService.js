@@ -11,11 +11,15 @@ dotenv.config();
 
 const SERVICE = "ClipX";
 const ACCOUNT = "youtube_refresh_token";
-const clientId = "170688170367-cesbl36crdh2qk3up02egjduffq4nepe.apps.googleusercontent.com";
-const clientSecret = "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";
+const clientId = process.env.GOOGLE_CLIENT_ID;
+const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
 const redirectPort = 51723;
 const redirectUri = `http://127.0.0.1:${redirectPort}`;
 const OAUTH_TIMEOUT_MS = 90_000;
+
+if (!clientId || !clientSecret) {
+  throw new Error("Missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET in .env.local");
+}
 
 const baseUrl = (process.env.VITE_DATABASE_URL || "https://clipx.bideshi.tech").replace(/\/+$/, "");
 
