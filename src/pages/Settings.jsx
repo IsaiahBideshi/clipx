@@ -108,6 +108,7 @@ export default function Settings() {
   const [avatarLoadError, setAvatarLoadError] = useState(false);
   const [loadingGoogleInfo, setLoadingGoogleInfo] = useState(true);
   const [confirmUnlink, setConfirmUnlink] = useState(false);
+  const [linking, setLinking] = useState(false);
   console.log(options);
 
   function pickFolder() {
@@ -131,9 +132,11 @@ export default function Settings() {
   console.log(googleInfo);
 
   const handleLinkYoutube = async () => {
-    const info = await linkYoutube();
+    setLinking(true);
+    const info = await linkYoutube().then(() => {window.location.reload()});
     setGoogleInfo(info);
     setLoadingGoogleInfo(false);
+    setLinking(false);
   }
   const handleUnlinkYoutube = async () => {
     if (!confirmUnlink) {
@@ -288,7 +291,7 @@ export default function Settings() {
                 </div>
 
                 <div className={"yt-btns"}>
-                  {!(loadingGoogleInfo || googleInfo) && (<Button variant={"contained"} onClick={handleLinkYoutube}>Link</Button>)}
+                  {!(loadingGoogleInfo || googleInfo) && (<Button variant={"contained"} disabled={linking} onClick={handleLinkYoutube}>Link</Button>)}
 
                   {!(loadingGoogleInfo || !googleInfo) && (
                     !confirmUnlink ? (
