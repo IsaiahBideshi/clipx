@@ -2,7 +2,9 @@ import "./auth.css";
 import { useState } from "react";
 import { TextField, Button } from "@mui/material";
 import { useNavigate } from "react-router-dom";
-import { loginWithEmail } from "../lib/supabase";
+import { loginWithEmail, signInWithGoogle } from "../lib/supabase";
+
+import GoogleIcon from '@mui/icons-material/Google';
 
 function getAuthMessage(error) {
   if (error?.message) return error.message;
@@ -14,7 +16,7 @@ function getAuthMessage(error) {
   };
 
   return messages[error?.code] || "Authentication failed. Please try again.";
-}
+} 
 
 export default function Login() {
   const navigate = useNavigate();
@@ -37,6 +39,18 @@ export default function Login() {
     } finally {
       setLoading(false);
     }
+  }
+
+  async function googleSignIn() {
+    setLoading(true);
+    setError("");
+
+    const result = await signInWithGoogle();
+    if (!result?.ok) {
+      setError(result.error || "Google Sign-In failed.");
+    }
+    navigate("/profile");
+    setLoading(false);
   }
 
   return (
@@ -68,6 +82,10 @@ export default function Login() {
           </Button>
         </div>
         {error && <p className="auth-error">{error}</p>}
+        <Button fullWidth variant="outlined" style={{ marginTop: "20px" }} onClick={googleSignIn} disabled={loading}>
+          <GoogleIcon style={{ marginRight: "8px" }} />
+          Sign In with Google
+        </Button>
       </form>
     </div>
   );

@@ -5,9 +5,10 @@ import TextField from "@mui/material/TextField";
 import {useState, useEffect, useRef} from "react";
 import {useNavigate} from "react-router-dom";
 
-import {auth, logout, supabase} from '../lib/supabase.js';
+import {auth, logout, supabase, signInWithGoogle} from '../lib/supabase.js';
 import SearchIcon from '@mui/icons-material/Search';
 import CircularProgress from '@mui/material/CircularProgress';
+import GoogleIcon from '@mui/icons-material/Google';
 
 
 export default function Profile() {
@@ -24,7 +25,8 @@ export default function Profile() {
   const [profileHandle, setProfileHandle] = useState("");
   const [loadingFriendships, setLoadingFriendships] = useState(true);
 
-
+  const [loadingGoogleSignIn, setLoadingGoogleSignIn] = useState(false);
+  const [error, setError] = useState("");
 
   const [friendships, setFriendships] = useState();
 
@@ -88,6 +90,19 @@ export default function Profile() {
     }
     setFriendships(friendshipsData);
     setLoadingFriendships(false);
+  }
+
+  async function googleSignIn() {
+    setLoadingGoogleSignIn(true);
+    setError("");
+
+    const result = await signInWithGoogle();
+    if (!result?.ok) {
+      setError(result.error || "Google Sign-In failed.");
+    }
+    setLoadingGoogleSignIn(false);
+    await new Promise(res => setTimeout(res, 500))
+    window.location.reload();
   }
 
   useEffect(() => {
@@ -183,12 +198,19 @@ export default function Profile() {
       <div className={"settings-container profile-page profile-state"}>
         <h2>Profile</h2>
         <p className="auth-copy">Please log in or sign up to view your profile.</p>
-        <div className="auth-actions">
-          <Button variant="contained" onClick={() => navigate("/login")}>
-            Log In
-          </Button>
-          <Button variant="outlined" onClick={() => navigate("/signup")}>
-            Sign Up
+        <div style={{width: "300px", margin: "20px auto"}}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: "20px", marginTop: "20px" }}>
+            <Button fullWidth variant="contained" onClick={() => navigate("/login")}>
+              Log in
+            </Button>
+            <Button fullWidth variant="outlined" onClick={() => navigate("/signup")}>
+              Sign Up
+            </Button>
+          </div>
+          {error && <p className="auth-error">{error}</p>}
+          <Button fullWidth variant="outlined" style={{ marginTop: "20px" }} onClick={googleSignIn}>
+            <GoogleIcon style={{ marginRight: "8px" }} />
+            Sign In with Google
           </Button>
         </div>
       </div>

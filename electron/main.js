@@ -8,6 +8,7 @@ import { registerFileIpcHandlers } from "./ipc/files.js";
 import { registerSettingsIpcHandlers } from "./ipc/settings.js";
 import { registerYoutubeIpcHandlers } from "./ipc/youtube.js";
 import { registerClipxProtocol } from "./services/fileService.js";
+import { registerGoogleAuthIpcHandlers } from "./ipc/googleAuth.js";
 
 
 
@@ -71,6 +72,7 @@ function registerIpcHandlers() {
   registerSettingsIpcHandlers();
   registerClipIpcHandlers();
   registerYoutubeIpcHandlers();
+  registerGoogleAuthIpcHandlers();
 }
 
 app.whenReady().then(async () => {

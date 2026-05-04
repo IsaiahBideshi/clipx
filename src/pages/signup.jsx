@@ -6,7 +6,7 @@ import { signUpWithEmail, signInWithGoogle} from "../lib/supabase";
 
 import GoogleIcon from '@mui/icons-material/Google';
 
-function getAuthMessage(error) {
+export function getAuthMessage(error) {
   if (error?.message) return error.message;
 
   const messages = {
@@ -44,13 +44,13 @@ export default function Signup() {
   async function googleSignIn() {
     setLoading(true);
     setError("");
-    try {
-      await signInWithGoogle();
-    } catch (err) {
-      setError(getAuthMessage(err));
-    } finally {
-      setLoading(false);
+
+    const result = await signInWithGoogle();
+    if (!result?.ok) {
+      setError(result.error || "Google Sign-In failed.");
     }
+    navigate("/profile");
+    setLoading(false);
   }
 
   return (

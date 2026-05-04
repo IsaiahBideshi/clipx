@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { getAuthMessage } from "../pages/signup";
 
 export const supabase = createClient(
   "https://vymaqpjhajwpbzmnoadk.supabase.co",
@@ -7,9 +8,25 @@ export const supabase = createClient(
 
 const auth = supabase.auth;
 
-function signInWithGoogle() {
-    // Redirects to Google for authentication in browser, then back to the app
-    
+console.log("Supabase client initialized:", auth);
+
+async function signInWithGoogle() {
+  let error = "";
+  try {
+    if (window?.clipx?.signInWithGoogle) {
+      const result = await window.clipx.signInWithGoogle();
+      if (result?.ok) {
+        supabase.auth.setSession(result.session);
+      } else {
+        error = "Google Sign-In failed.";
+      }
+    } else {
+        error = "Google Sign-In is not supported in this environment.";
+    }
+  } catch (err) {
+      error = getAuthMessage(err);
+  }
+  return { ok: !error, error };
 }
 
 function throwIfAuthError(error) {

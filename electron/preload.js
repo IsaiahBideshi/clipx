@@ -19,4 +19,5 @@ contextBridge.exposeInMainWorld("clipx", {
   getGoogleInfo: (userId) => ipcRenderer.invoke("get-google-info", userId),
   getClipData: (clipPath) => ipcRenderer.invoke("get-clip-data", clipPath),
   getGameData: (gameId) => ipcRenderer.invoke("get-game-data", gameId),
+  signInWithGoogle: () => ipcRenderer.invoke("sign-in-with-google"),
 });
