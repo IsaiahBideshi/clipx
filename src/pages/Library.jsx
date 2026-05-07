@@ -101,12 +101,12 @@ export default function Library() {
 
       if (e.code === "ArrowUp") {
         e.preventDefault();
-        moveSelectedClip(1);
+        moveSelectedClip(-1);
       }
 
       if (e.code === "ArrowDown") {
         e.preventDefault();
-        moveSelectedClip(-1);
+        moveSelectedClip(1);
       }
     }
 

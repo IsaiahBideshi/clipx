@@ -103,12 +103,12 @@ export default function LocalFiles() {
 
       if (e.code === "ArrowUp") {
         e.preventDefault();
-        moveSelectedClip(1);
+        moveSelectedClip(-1);
       }
 
       if (e.code === "ArrowDown") {
         e.preventDefault();
-        moveSelectedClip(-1);
+        moveSelectedClip(1);
       }
     }
 
