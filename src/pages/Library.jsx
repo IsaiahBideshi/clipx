@@ -82,9 +82,7 @@ export default function Library() {
           return direction > 0 ? clips[0] : clips[clips.length - 1];
         }
 
-        const currentIndex = clips.findIndex((item) => item.path === currentClip.path);
-        console.log(currentIndex, direction);
-
+        const currentIndex = clips.findIndex((item) => item.id === currentClip.id);
         if (currentIndex < 0) {
           return direction > 0 ? clips[0] : clips[clips.length - 1];
         }
@@ -375,7 +373,7 @@ export default function Library() {
   );
 }
 
-function ClipCardSkeleton() {
+export function ClipCardSkeleton() {
   return (
     <div className="clip-card clip-card-skeleton" aria-hidden="true">
       <div className="skeleton-thumb" />
@@ -386,7 +384,7 @@ function ClipCardSkeleton() {
 }
 
 
-function ClipCard({clip, onSelect}) {
+export function ClipCard({clip, onSelect}) {
   const clipDate = new Date(clip.created_at).toLocaleString( undefined, { dateStyle: 'long', timeStyle: 'short' });
 
   return (
@@ -399,7 +397,7 @@ function ClipCard({clip, onSelect}) {
   );
 }
 
-function VideoPreview({clip, onClose}){
+export function VideoPreview({clip, onClose}){
   const src = `https://www.youtube.com/embed/${clip.youtube_video_id}?rel=0&modestbranding=1&autoplay=1`;
   const [gamesSrc, setGamesSrc] = useState(null);
 
