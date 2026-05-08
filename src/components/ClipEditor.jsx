@@ -15,6 +15,7 @@ import CloseIcon from '@mui/icons-material/Close';
 
 export default function ClipEditor({clip, onSaveQueueEvent, onUploadQueueEvent, isSavedClipsView = false, onClose}) {
   const videoRef = useRef(null);
+  const shellRef = useRef(null);
 
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
@@ -139,6 +140,25 @@ export default function ClipEditor({clip, onSaveQueueEvent, onUploadQueueEvent, 
 
     function onKeyDown(e) {
       if (isEditableTarget(e.target)) return;
+      if (e.ctrlKey) return;
+
+      if (e.key >= "0" && e.key <= "9") {
+        e.preventDefault();
+        const percentage = (e.key === "0") ? 0 : (e.key / 10);
+        const newTime = percentage * duration;
+        seek(newTime);
+      }
+
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        const newVolume = Math.min(volume + 0.1, 1);
+        setVideoVolume(newVolume);
+      }
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        const newVolume = Math.max(volume - 0.1, 0);
+        setVideoVolume(newVolume);
+      }
 
       if (e.key === "ArrowLeft") {
         const newTime = Math.max(currentTime - 5, 0);
@@ -243,10 +263,19 @@ export default function ClipEditor({clip, onSaveQueueEvent, onUploadQueueEvent, 
     };
   }, []);
 
+  useEffect(() => {
+    function onFullscreenChange() {
+      setIsFullscreen(document.fullscreenElement === shellRef.current);
+    }
+
+    document.addEventListener("fullscreenchange", onFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", onFullscreenChange);
+  }, []);
+
   return (
     <div className="clip-editor-container">
       
-      <div className={"clip-editor"}>
+      <div className={"clip-editor"} tabIndex={-1}>
         <button className={"close-preview-btn"} onClick={onClose}>
           <CloseIcon fontSize={"large"} />
         </button>

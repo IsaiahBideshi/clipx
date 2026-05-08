@@ -101,12 +101,12 @@ export default function LocalFiles() {
         setClip(null);
       }
 
-      if (e.code === "ArrowUp") {
+      if (e.ctrlKey && e.code === "ArrowLeft") {
         e.preventDefault();
         moveSelectedClip(-1);
       }
 
-      if (e.code === "ArrowDown") {
+      if (e.ctrlKey && e.code === "ArrowRight") {
         e.preventDefault();
         moveSelectedClip(1);
       }

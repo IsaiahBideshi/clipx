@@ -36,6 +36,7 @@ export default function VideoPreview({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isMouseIdle, setIsMouseIdle] = useState(false);
 
+
   const IDLE_HIDE_MS = 1200;
 
   const src = clip?.path
@@ -52,6 +53,19 @@ export default function VideoPreview({
   const miniProgressPct = endTime > startTime
     ? ((currentSafe - startTime) / (endTime - startTime)) * 100
     : 0;
+
+  // keyboard controls
+  useEffect(() => {
+    function onKeyDown(e) {
+      if (e.code === "KeyF") {
+        e.preventDefault();
+        toggleFullscreen();
+      }
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   useEffect(() => {
     function onFullscreenChange() {
