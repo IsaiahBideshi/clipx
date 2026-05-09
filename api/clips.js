@@ -44,6 +44,21 @@ export default async function handler(req, res) {
         return res.status(200).json({ data, error: null })
       }
       
+      if (req.query.userId) {
+        console.log('Fetching clips for user ID:', req.query.userId)
+        const { data, error } = await supabase
+          .from('clips')
+          .select('*')
+          .eq('owner_id', req.query.userId)
+          .order('created_at', { ascending: false })
+        if (error) {
+          console.error('Error fetching user clips:', error)
+          return res.status(500).json({ data: null, error: error.message })
+        }
+
+        return res.status(200).json({ data, error: null })
+      }
+      
       return res.status(400).json({ data: null, error: 'Invalid visibility parameter' })
 
     case 'POST':

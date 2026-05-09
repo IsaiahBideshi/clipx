@@ -5,10 +5,22 @@ import TextField from "@mui/material/TextField";
 import {useState, useEffect, useRef} from "react";
 import {useNavigate} from "react-router-dom";
 
-import {auth, logout, supabase, signInWithGoogle} from '../lib/supabase.js';
+import {auth, logout, supabase} from '../lib/supabase.js';
+import { VideoPreview, ClipCard, ClipCardSkeleton } from "./Library.jsx";
+
 import SearchIcon from '@mui/icons-material/Search';
 import CircularProgress from '@mui/material/CircularProgress';
+import Avatar from '@mui/material/Avatar';
+import Box from '@mui/material/Box';
+import Tabs from '@mui/material/Tabs';
+import Tab from '@mui/material/Tab';
 import GoogleIcon from '@mui/icons-material/Google';
+import CloseIcon from '@mui/icons-material/Close';
+
+import { OverlayScrollbarsComponent } from "overlayscrollbars-react";
+import "overlayscrollbars/overlayscrollbars.css";
+
+const baseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
 
 
 export default function Profile() {
@@ -17,15 +29,20 @@ export default function Profile() {
   const [loadingAuth, setLoadingAuth] = useState(true);
   const [session, setSession] = useState(null);
   const [removeTarget, setRemoveTarget] = useState(null);
+  const [tab, setTab] = useState(0);
   const [confirmingAction, setConfirmingAction] = useState(false);
 
   const displayResults = useRef(null);
   const [showResults, setShowResults] = useState(false);
   const [searchResults, setSearchResults] = useState([]);
   const [profileHandle, setProfileHandle] = useState("");
+  const [email, setEmail] = useState("");
   const [loadingFriendships, setLoadingFriendships] = useState(true);
 
   const [loadingGoogleSignIn, setLoadingGoogleSignIn] = useState(false);
+  const [loadingClips, setLoadingClips] = useState(true);
+  const [clips, setClips] = useState([]);
+  const [selectedClip, setSelectedClip] = useState(null);
   const [error, setError] = useState("");
 
   const [friendships, setFriendships] = useState();
@@ -132,6 +149,44 @@ export default function Profile() {
     return () => supabase.removeChannel(channel); // cleanup
   }, [getFriendships]);
 
+  useEffect(() => {
+    function moveSelectedClip(direction) {
+      if (!clips.length) return;
+
+      setSelectedClip((currentClip) => {
+        if (!currentClip) {
+          return direction > 0 ? clips[0] : clips[clips.length - 1];
+        }
+
+        const currentIndex = clips.findIndex((item) => item.id === currentClip.id);
+        if (currentIndex < 0) {
+          return direction > 0 ? clips[0] : clips[clips.length - 1];
+        }
+
+        const nextIndex = Math.max(0, Math.min(clips.length - 1, currentIndex + direction));
+        return clips[nextIndex];
+      });
+    }
+
+    function onKeyDown(e) {
+      if (e.code === "Escape") {
+        setSelectedClip(null);
+      }
+
+      if (e.code === "ArrowUp") {
+        e.preventDefault();
+        moveSelectedClip(-1);
+      }
+
+      if (e.code === "ArrowDown") {
+        e.preventDefault();
+        moveSelectedClip(1);
+      }
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [clips]);
 
   useEffect(() => {
     const getSession = async () => {
@@ -162,13 +217,34 @@ export default function Profile() {
         setProfileHandle("User");
       } else {
         setProfileHandle(data.username);
+        setEmail((await auth.getUser()).data.user.email);
       }
       setLoadingAuth(false);
     };
 
+    const fetchClips = async () => {
+      const userId = (await auth.getUser()).data.user.id;
+      const response = await fetch(`${baseUrl}/api/clips?userId=${userId}`);
+      if (!response.ok) {
+        console.error("Error fetching clips:", response.statusText);
+        setClips([]);
+        setLoadingClips(false);
+        return;
+      }
+      const { data, error } = await response.json();
+      if (error) {
+        console.error("Error in clips response:", error);
+        setClips([]);
+      } else {
+        setClips(data);
+      }
+      setLoadingClips(false);
+    }
+
     getSession();
     getFriendships();
     getUsername();
+    fetchClips();
   }, [auth]);
 
   if (loadingAuth) {
@@ -290,227 +366,186 @@ export default function Profile() {
     setRemoveTarget(null);
     getFriendships();
   }
+  
 
   return (
-    <div className={"settings-container profile-page"}>
-      <div className="profile-hero">
-        <div>
-          <p className="eyebrow">Your account</p>
-          <h2>Welcome back, {profileHandle}</h2>
-          <p className="hero-copy">Manage your connections and keep your clip sharing circle active.</p>
-        </div>
-        <Button onClick={async () => {await logout();navigate("/")}} variant={"contained"}>
-          Log Out
-        </Button>
-      </div>
-
-      <div className={"profile-grid"}>
-        <section className="profile-card friend-search-card">
-          <h4>Add Friends</h4>
-          <p className="card-copy">Search by username and send requests instantly.</p>
-          <div className="friend-search-shell" ref={displayResults}>
-            <div className={"add-friend"}>
-              <TextField
-                sx={tfSx}
-                placeholder={"Add a friend"}
-                value={friendName}
-                onChange={(e) => setFriendName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    setLoadingUsers(true);
-                    searchFriends(friendName);
-                  }
-                }}
-              />
-              <div><SearchIcon sx={{'&:hover': {cursor: 'pointer'}}} fontSize={"large"} onClick={() => {setLoadingUsers(true);searchFriends(friendName)}}/></div>
-            </div>
-            <div className="display-results">
-              {showResults && ( (loadingUsers) ? (
-                <div className="result search-loading result-row">
-                  <CircularProgress />
-                </div>
-              ) : (
-                <div>
-                  {searchResults.length > 0 ? (
-                    searchResults.map((result) => {
-                      const isAccepted = friendships?.some(
-                        ({ user_id, friend_id, status }) =>
-                          (user_id === result.id || friend_id === result.id) && status === "accepted"
-                      );
-                      const isPending = friendships?.some(
-                        ({ user_id, friend_id, status }) =>
-                          (user_id === result.id || friend_id === result.id) && status === "pending"
-                      );
-
-                      return (
-                        <div className="result result-row" key={result.id}>
-                          <p>{result.username}</p>
-                          {isAccepted ? (
-                            <button className="add-friend-btn add-friend-btn--friends" disabled>
-                              Friends
-                            </button>
-                          ) : isPending ? (
-                            <button className="add-friend-btn add-friend-btn--sent" disabled>
-                              Sent!
-                            </button>
-                          ) : (
-                            <button className="add-friend-btn add-friend-btn--add" onClick={() => handleSendRequest(result.id)}>
-                              Add Friend
-                            </button>
-                          )}
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <div className="result-row empty-inline">No users found.</div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section className={"profile-card"}>
-          <h4>Friends List</h4>
-          <p className="card-copy">People currently connected to your account.</p>
-          <div className="stacked-list">
-            {loadingFriendships ? (
-              <div className="result search-loading result-row">
-                <CircularProgress />
-              </div>
-            ) : (
-            acceptedFriends.length ? acceptedFriends.map((f) => {
-              return (
-                <div className="friend friend-row" key={f.user_id === session.user.id ? f.friend_id : f.user_id}>
-                  <p>{f.friendName ? f.friendName : "Unknown User"}</p>
-                  <button
-                    className="add-friend-btn add-friend-btn--remove"
-                    aria-label={`Remove ${f.friendName ? f.friendName : "friend"}`}
-                    onClick={() => handleOpenRemoveConfirm(
-                      f.user_id === session.user.id ? f.friend_id : f.user_id,
-                      f.friendName
-                    )}
-                    title="Remove friend"
-                  >
-                    X
-                  </button>
-                </div>
-              );
-            }) : <p className="empty-state">No friends yet. Try sending your first request.</p>)}
-          </div>
-        </section>
-
-        <section className={"profile-card"}>
-          <h4>Incoming Requests</h4>
-          <p className="card-copy">Approve requests from people who want to connect.</p>
-          <div className="stacked-list">
-            {loadingFriendships ? (
-              <div className="result search-loading result-row">
-                <CircularProgress />
-              </div>
-            ) : (
-            incomingRequests.length ? incomingRequests.map((f) => {
-              return (
-                <div className="friend friend-row" key={f.user_id === session.user.id ? f.friend_id : f.user_id}>
-                  <p>{f.friendName ? f.friendName : "Unknown User"}</p>
-                  <div>
-                    <button className="add-friend-btn add-friend-btn--accept" onClick={async () => {
-                        await supabase
-                          .from("friendships")
-                          .update({ status: "accepted" })
-                          .eq("friend_id", session.user.id)
-                          .eq("user_id", f.user_id);
-                      }}>
-                      Accept
-                    </button>
-                    <button className="add-friend-btn add-friend-btn--decline" onClick={async () => {
-                        await supabase
-                          .from("friendships")
-                          .delete()
-                          .eq("friend_id", session.user.id)
-                          .eq("user_id", f.user_id);
-                      }}>
-                      Decline
-                    </button>
-                  </div>
-                </div>
-              );
-            }) : <p className="empty-state">No incoming requests right now.</p>)}
-          </div>
-        </section>
-
-        <section className={"profile-card"}>
-          <h4>Outgoing Requests</h4>
-          <p className="card-copy">Pending invites you have already sent.</p>
-          <div className="stacked-list">
-            {loadingFriendships ? (
-              <div className="result search-loading result-row">
-                <CircularProgress />
-              </div>
-            ) : (
-            outgoingRequests.length ? outgoingRequests.map((f) => {
-              return (
-                <div className="friend friend-row" key={f.user_id === session.user.id ? f.friend_id : f.user_id}>
-                  <p>{f.friendName ? f.friendName : "Unknown User"}</p>
-                  <div>
-                    <button
-                      className="add-friend-btn add-friend-btn--cancel-request"
-                      onClick={() => handleOpenCancelOutgoingConfirm(
-                        f.user_id === session.user.id ? f.friend_id : f.user_id,
-                        f.friendName
-                      )}
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              );
-            }) : <p className="empty-state">No pending requests sent.</p>
-            )}
-          </div>
-        </section>
-      </div>
-
-      {removeTarget && (
-        <div className="confirm-overlay" onClick={() => !confirmingAction && setRemoveTarget(null)}>
-          <div className="confirm-modal" onClick={(e) => e.stopPropagation()}>
-            <p className="confirm-eyebrow">
-              {removeTarget.type === "cancel-outgoing" ? "Cancel Request" : "Remove Friend"}
-            </p>
-            <h3>
-              {removeTarget.type === "cancel-outgoing"
-                ? `Cancel request to ${removeTarget.name}?`
-                : `Unadd ${removeTarget.name}?`}
-            </h3>
-            <p>
-              {removeTarget.type === "cancel-outgoing"
-                ? "This pending request will be deleted. You can send a new request any time."
-                : "This will remove them from your friends list. You can always send another request later."}
-            </p>
-            <div className="confirm-actions">
-              <button
-                className="add-friend-btn confirm-cancel"
-                onClick={() => setRemoveTarget(null)}
-                disabled={confirmingAction}
-              >
-                Cancel
-              </button>
-              <button
-                className="add-friend-btn confirm-remove"
-                onClick={handleConfirmAction}
-                disabled={confirmingAction}
-              >
-                {confirmingAction
-                  ? "Working..."
-                  : removeTarget.type === "cancel-outgoing"
-                    ? "Cancel Request"
-                    : "Remove"}
-              </button>
-            </div>
+    <div className="settings-container profile-page">
+      <div className="profile-header">
+        <div className="profile-user-block">
+          <Avatar
+            className="profile-avatar"
+            alt={profileHandle}
+            src="https://i.pravatar.cc/240?img=12"
+            sx={{ width: 84, height: 84 }}
+          >
+            YU
+          </Avatar>
+          <div>
+            <p className="eyebrow">Profile</p>
+            <h2>{profileHandle}</h2>
+            <p className="profile-email">{email}</p>
           </div>
         </div>
-      )}
+      </div>
+
+      <Box className="profile-tabs-shell">
+        <Tabs
+          value={tab}
+          onChange={(_event, nextTab) => setTab(nextTab)}
+          variant="scrollable"
+          scrollButtons="auto"
+          className="profile-tabs"
+          aria-label="Profile tabs"
+        >
+          <Tab label="My Clips" />
+          <Tab label="Friends" />
+          <Tab label="Account Settings" />
+        </Tabs>
+
+        <div className="profile-tab-panel">
+          {tab === 0 && (
+            <section className="profile-tab-section">
+              <div className="section-header">
+                <h3 style={{marginBottom: "30px"}} >My Clips</h3>
+                <div className="clip-grid library-grid">
+                    {loadingClips
+                      ? Array.from({ length: 16 }).map((_, index) => (
+                          <ClipCardSkeleton key={`clip-skeleton-${index}`} />
+                        ))
+                      : clips.map((clip) => (
+                          <ClipCard
+                            key={clip.id}
+                            clip={clip}
+                            onSelect={setSelectedClip}
+                          />
+                        ))}
+                  </div>
+              </div>
+              {selectedClip && <VideoPreview clip={selectedClip} onClose={() => setSelectedClip(null)} />}
+            </section>
+          )}
+
+          {tab === 1 && (
+            <section className="profile-tab-section">
+              <div className="section-header">
+                <h3>Friends</h3>
+                <p>Three sections with placeholder items and action buttons.</p>
+              </div>
+
+              <div className="friends-layout">
+                <div className="friends-column">
+                  <h4>Icoming</h4>
+                  <div className="placeholder-friend-list">
+                    <article className="placeholder-friend-row">
+                      <div className="placeholder-avatar" />
+                      <div className="placeholder-friend-copy">
+                        <strong>Friend Request 1</strong>
+                        <span>Incoming request placeholder</span>
+                      </div>
+                      <div className="placeholder-actions">
+                        <Button size="small" variant="contained">Accept</Button>
+                        <Button size="small" variant="outlined">Decline</Button>
+                      </div>
+                    </article>
+                    <article className="placeholder-friend-row">
+                      <div className="placeholder-avatar" />
+                      <div className="placeholder-friend-copy">
+                        <strong>Friend Request 2</strong>
+                        <span>Incoming request placeholder</span>
+                      </div>
+                      <div className="placeholder-actions">
+                        <Button size="small" variant="contained">Accept</Button>
+                        <Button size="small" variant="outlined">Decline</Button>
+                      </div>
+                    </article>
+                  </div>
+                </div>
+
+                <div className="friends-column">
+                  <h4>Outgoing</h4>
+                  <div className="placeholder-friend-list">
+                    <article className="placeholder-friend-row">
+                      <div className="placeholder-avatar" />
+                      <div className="placeholder-friend-copy">
+                        <strong>Outgoing 1</strong>
+                        <span>Outgoing request placeholder</span>
+                      </div>
+                      <div className="placeholder-actions">
+                        <Button size="small" variant="outlined">Cancel</Button>
+                      </div>
+                    </article>
+                    <article className="placeholder-friend-row">
+                      <div className="placeholder-avatar" />
+                      <div className="placeholder-friend-copy">
+                        <strong>Outgoing 2</strong>
+                        <span>Outgoing request placeholder</span>
+                      </div>
+                      <div className="placeholder-actions">
+                        <Button size="small" variant="outlined">Cancel</Button>
+                      </div>
+                    </article>
+                  </div>
+                </div>
+
+                <div className="friends-column">
+                  <h4>Friends</h4>
+                  <div className="placeholder-friend-list">
+                    <article className="placeholder-friend-row">
+                      <div className="placeholder-avatar" />
+                      <div className="placeholder-friend-copy">
+                        <strong>Friend 1</strong>
+                        <span>Accepted friend placeholder</span>
+                      </div>
+                      <div className="placeholder-actions">
+                        <Button size="small" variant="outlined">Unadd</Button>
+                      </div>
+                    </article>
+                    <article className="placeholder-friend-row">
+                      <div className="placeholder-avatar" />
+                      <div className="placeholder-friend-copy">
+                        <strong>Friend 2</strong>
+                        <span>Accepted friend placeholder</span>
+                      </div>
+                      <div className="placeholder-actions">
+                        <Button size="small" variant="outlined">Unadd</Button>
+                      </div>
+                    </article>
+                  </div>
+                </div>
+              </div>
+            </section>
+          )}
+
+          {tab === 2 && (
+            <section className="profile-tab-section">
+              <div className="section-header">
+                <h3>Account Settings</h3>
+                <p>Layout only for now.</p>
+              </div>
+
+              <div className="account-settings-grid">
+                <div className="account-settings-card">
+                  <h4>Change Username</h4>
+                  <div className="settings-placeholder-line" />
+                  <Button variant="contained">Save Username</Button>
+                </div>
+
+                <div className="account-settings-card">
+                  <h4>Reset Password</h4>
+                  <div className="settings-placeholder-line" />
+                  <Button variant="contained">Send Reset Link</Button>
+                </div>
+
+                <div className="account-settings-card">
+                  <h4>Log out</h4>
+                  <p className="settings-copy">Placeholder action card for logout.</p>
+                  <Button onClick={async () => {await logout(); navigate("/")}} variant="outlined">Log Out</Button>
+                </div>
+              </div>
+            </section>
+          )}
+        </div>
+      </Box>
     </div>
   );
 }
