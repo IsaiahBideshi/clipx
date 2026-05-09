@@ -3,8 +3,6 @@ import dotenv from "dotenv";
 import path from "path";
 
 
-dotenv.config({ path: path.resolve(process.cwd(), ".env.local"), override: true });
-dotenv.config();
 
 
 export default async function handler(req, res) {
