@@ -5,6 +5,7 @@ import url from "url";
 
 import { google } from "googleapis";
 import { createClient } from "@supabase/supabase-js";
+import { generatePKCE } from "../utils/PKCE.js";
 
 dotenv.config({ path: path.resolve(process.cwd(), ".env.local"), override: true });
 dotenv.config();
@@ -15,11 +16,41 @@ const supabase = createClient(
 );
 
 const SERVICE = "ClipX";
-const clientId = process.env.GOOGLE_CLIENT_ID;
-const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+let clientId = null;
+let clientSecret = null;
 const redirectPort = 51723;
 const redirectUri = `http://127.0.0.1:${redirectPort}`;
 const OAUTH_TIMEOUT_MS = 90_000;
+
+const baseUrl = (process.env.VITE_DATABASE_URL || "https://clipx.bideshi.tech").replace(/\/+$/, "");
+
+async function fetchKeys() {
+  const response = await fetch(`${baseUrl}/api/keys`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json"
+    }
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to fetch API keys: ${response.error}`);
+  }
+  const { data, error } = await response.json();
+  if (error) {
+    throw new Error(`Error in API keys response: ${error}`);
+  }
+  if (data) {
+    clientId = data.googleClientId;
+    clientSecret = data.googleClientSecret;
+  }
+}
+
+(await fetchKeys().catch((err) => {
+  console.error("Failed to fetch API keys on startup:", err);
+  clientId = null;
+  clientSecret = null;
+}));
+
+const { verifier, challenge } = generatePKCE();
 
 export async function signInWithGoogle(shell) {
 
@@ -35,7 +66,7 @@ export async function signInWithGoogle(shell) {
           console.log("Received auth code from Google:", queryObject.code);
 
           const oauth2Client = new google.auth.OAuth2(clientId, clientSecret, redirectUri);
-          const { tokens } = await oauth2Client.getToken(queryObject.code);
+          const { tokens } = await oauth2Client.getToken({code: queryObject.code, codeVerifier: verifier});
           const { data, error } = await supabase.auth.signInWithIdToken({
             provider: 'google',
             token: tokens.id_token,
@@ -87,6 +118,8 @@ export async function signInWithGoogle(shell) {
       ],
       access_type: "offline",
       prompt: "consent",
+      code_challenge: challenge,
+      code_challenge_method: "S256",
     });
 
     shell.openExternal(authUrl);
