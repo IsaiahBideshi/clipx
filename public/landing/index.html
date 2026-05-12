@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ClipX - Capture, clip, share</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./landing.css" />
+  </head>
+  <body class="min-h-screen bg-sand text-ink">
+    <div class="relative overflow-hidden">
+      <div
+        class="pointer-events-none absolute -top-32 right-0 h-80 w-80 rounded-full bg-amber-200/70 blur-3xl"
+      ></div>
+      <div
+        class="pointer-events-none absolute -bottom-24 left-0 h-72 w-72 rounded-full bg-teal-200/70 blur-3xl"
+      ></div>
+
+      <main class="relative mx-auto flex min-h-screen max-w-6xl flex-col px-6 py-10">
+        <header class="flex flex-wrap items-center justify-between gap-6">
+          <div class="flex items-center gap-3">
+            <div
+              class="flex h-11 w-11 items-center justify-center rounded-2xl bg-ink font-display text-lg text-sand shadow-soft"
+            >
+              CX
+            </div>
+            <div>
+              <p class="font-display text-xl">ClipX</p>
+              <p class="text-xs uppercase tracking-[0.25em] text-ember">Capture made simple</p>
+            </div>
+          </div>
+          <nav class="flex flex-wrap items-center gap-4 text-sm text-slate-700">
+            <a class="transition hover:text-ink" href="#features">Features</a>
+            <a class="transition hover:text-ink" href="./privacy.html">Privacy</a>
+            <a class="transition hover:text-ink" href="./terms.html">Terms</a>
+          </nav>
+        </header>
+
+        <section class="mt-16 grid gap-12 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
+          <div class="space-y-6 animate-fade-up">
+            <p class="text-xs uppercase tracking-[0.35em] text-ember">For highlight hunters</p>
+            <h1 class="font-display text-4xl leading-tight sm:text-5xl">
+              Clip moments fast, keep them organized, and share them when it matters.
+            </h1>
+            <p class="text-lg text-slate-700">
+              ClipX keeps your best moments close with a clean, focused workflow. Capture, tag, and
+              export without digging through folders.
+            </p>
+            <div class="flex flex-wrap gap-3">
+              <!-- TODO: Add download URL to the href below. -->
+              <a
+                class="inline-flex items-center justify-center rounded-full bg-ink px-6 py-3 text-sm font-semibold text-sand shadow-glow transition hover:-translate-y-0.5"
+                href=""
+              >
+                Download ClipX for Windows
+              </a>
+              <a
+                class="inline-flex items-center justify-center rounded-full border border-ink/20 bg-white/70 px-6 py-3 text-sm font-semibold text-ink transition hover:-translate-y-0.5"
+                href="#features"
+              >
+                See how it works
+              </a>
+            </div>
+            <p class="text-xs text-slate-500">Local-first workflow. Built for creators on Windows.</p>
+          </div>
+
+          <div class="rounded-3xl border border-white/70 bg-white/75 p-8 shadow-soft">
+            <p class="text-xs uppercase tracking-[0.3em] text-ember">Workflow</p>
+            <h2 class="mt-4 font-display text-2xl">Everything you need in one place.</h2>
+            <div class="mt-6 space-y-5 text-sm text-slate-700">
+              <div class="flex items-start gap-3">
+                <span class="mt-2 h-2 w-2 rounded-full bg-ember"></span>
+                <div>
+                  <p class="font-semibold text-ink">Quick capture</p>
+                  <p>Grab a clip as soon as it happens. No interrupts, no waiting.</p>
+                </div>
+              </div>
+              <div class="flex items-start gap-3">
+                <span class="mt-2 h-2 w-2 rounded-full bg-ember"></span>
+                <div>
+                  <p class="font-semibold text-ink">Smart organization</p>
+                  <p>Tag, filter, and revisit your best moments in seconds.</p>
+                </div>
+              </div>
+              <div class="flex items-start gap-3">
+                <span class="mt-2 h-2 w-2 rounded-full bg-ember"></span>
+                <div>
+                  <p class="font-semibold text-ink">Export with clarity</p>
+                  <p>Ship clean clips quickly without breaking your flow.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="features" class="mt-20 grid gap-6 md:grid-cols-3">
+          <article class="rounded-2xl border border-white/60 bg-white/70 p-6 shadow-soft">
+            <h3 class="font-display text-lg">Timeline-first edits</h3>
+            <p class="mt-3 text-sm text-slate-700">
+              Trim and polish clips with a timeline that keeps the moment front and center.
+            </p>
+          </article>
+          <article class="rounded-2xl border border-white/60 bg-white/70 p-6 shadow-soft">
+            <h3 class="font-display text-lg">Clean metadata</h3>
+            <p class="mt-3 text-sm text-slate-700">
+              Add titles, tags, and notes so every clip stays easy to find.
+            </p>
+          </article>
+          <article class="rounded-2xl border border-white/60 bg-white/70 p-6 shadow-soft">
+            <h3 class="font-display text-lg">Creator-ready exports</h3>
+            <p class="mt-3 text-sm text-slate-700">
+              Share to your workflow with quick exports and consistent naming.
+            </p>
+          </article>
+        </section>
+
+        <section class="mt-20 flex flex-col gap-6 rounded-3xl bg-ink px-8 py-10 text-sand shadow-glow md:flex-row md:items-center md:justify-between">
+          <div>
+            <h2 class="font-display text-2xl">Ready to keep your best moments close?</h2>
+            <p class="mt-2 text-sm text-sand/80">Download ClipX and build a library you love.</p>
+          </div>
+          <!-- TODO: Add download URL to the href below. -->
+          <a
+            class="inline-flex items-center justify-center rounded-full bg-sand px-6 py-3 text-sm font-semibold text-ink transition hover:-translate-y-0.5"
+            href=""
+          >
+            Download ClipX
+          </a>
+        </section>
+
+        <footer class="mt-16 flex flex-wrap items-center justify-between gap-4 text-xs text-slate-600">
+          <p>ClipX makes clip management calm and focused.</p>
+          <div class="flex items-center gap-4">
+            <a class="transition hover:text-ink" href="./privacy.html">Privacy Policy</a>
+            <a class="transition hover:text-ink" href="./terms.html">Terms of Service</a>
+          </div>
+        </footer>
+      </main>
+    </div>
+  </body>
+</html>

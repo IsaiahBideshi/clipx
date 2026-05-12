@@ -41,15 +41,16 @@ async function fetchKeys() {
   }
 }
 
-(await fetchKeys().catch((err) => {
+(await fetchKeys().then(() => {
+  if (!clientId || !clientSecret) {
+    throw new Error("Missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET in .env.local");
+  }
+}).catch((err) => {
   console.error("Failed to fetch API keys on startup:", err);
   clientId = null;
   clientSecret = null;
 }));
 
-if (!clientId || !clientSecret) {
-  throw new Error("Missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET in .env.local");
-}
 
 
 function normalizeUserId(userId) {

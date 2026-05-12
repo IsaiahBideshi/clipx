@@ -45,7 +45,8 @@ async function fetchKeys() {
 }
 
 (await fetchKeys().catch((err) => {
-  console.error("Failed to fetch API keys on startup:", err);
+  throw new Error(`Failed to load Google OAuth credentials on startup: ${err.message}`);
+  console.error("Failed to load Google OAuth credentials on startup:", err);
   clientId = null;
   clientSecret = null;
 }));
@@ -53,6 +54,11 @@ async function fetchKeys() {
 const { verifier, challenge } = generatePKCE();
 
 export async function signInWithGoogle(shell) {
+  if (!clientId || !clientSecret) {
+    throw new Error(
+      "Google sign-in is not configured in this build. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in the packaged app environment, or point CLIPX_ENV_PATH to a file that contains them."
+    );
+  }
 
   return await new Promise((resolve, reject) => {
     const server = http.createServer(async (req, res) => {
