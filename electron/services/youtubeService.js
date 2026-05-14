@@ -5,23 +5,53 @@ import dotenv from "dotenv";
 import { google } from "googleapis";
 import path from "path";
 import url from "url";
+import { generatePKCE } from "../utils/PKCE.js";
 
 dotenv.config({ path: path.resolve(process.cwd(), ".env.local"), override: true });
 dotenv.config();
 
 const SERVICE = "ClipX";
 const ACCOUNT = "youtube_refresh_token";
-const clientId = process.env.GOOGLE_CLIENT_ID;
-const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+let clientId = null;
+let clientSecret = null;
 const redirectPort = 51723;
 const redirectUri = `http://127.0.0.1:${redirectPort}`;
 const OAUTH_TIMEOUT_MS = 90_000;
-
-if (!clientId || !clientSecret) {
-  throw new Error("Missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET in .env.local");
-}
+const { verifier, challenge } = generatePKCE();
 
 const baseUrl = (process.env.VITE_DATABASE_URL || "https://clipx.bideshi.tech").replace(/\/+$/, "");
+
+async function fetchKeys() {
+  const response = await fetch(`${baseUrl}/api/keys`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json"
+    }
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to fetch API keys: ${response.error}`);
+  }
+  const { data, error } = await response.json();
+  if (error) {
+    throw new Error(`Error in API keys response: ${error}`);
+  }
+  if (data) {
+    clientId = data.googleClientId;
+    clientSecret = data.googleClientSecret;
+  }
+}
+
+(await fetchKeys().then(() => {
+  if (!clientId || !clientSecret) {
+    throw new Error("Missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET in .env.local");
+  }
+}).catch((err) => {
+  console.error("Failed to fetch API keys on startup:", err);
+  clientId = null;
+  clientSecret = null;
+}));
+
+
 
 function normalizeUserId(userId) {
   const normalized = String(userId || "").trim();
@@ -117,11 +147,12 @@ async function exchangeCodeForTokens(code, userId) {
       "Content-Type": "application/x-www-form-urlencoded",
     },
     body: new URLSearchParams({
-      code,
       client_id: clientId,
       client_secret: clientSecret,
       redirect_uri: redirectUri,
       grant_type: "authorization_code",
+      code,
+      code_verifier: verifier,
     }),
   });
 
@@ -276,6 +307,8 @@ export async function linkYoutube(shell, userId) {
       ].join(" "),
       access_type: "offline",
       prompt: "consent",
+      code_challenge: challenge,
+      code_challenge_method: "S256",
     });
 
     const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
@@ -342,8 +375,9 @@ export async function uploadClipToYoutube({ videoPath, title, tags, game, userId
     throw new Error("No linked YouTube account. Link your account in settings first.");
   }
 
+  const accessToken = await getAccessToken(userId);
   const oauth2Client = new google.auth.OAuth2(clientId, clientSecret, redirectUri);
-  oauth2Client.setCredentials({ refresh_token: refreshToken });
+  oauth2Client.setCredentials({ access_token: accessToken });
 
   const youtube = google.youtube({ version: "v3", auth: oauth2Client });
   const normalizedTags = Array.isArray(tags)

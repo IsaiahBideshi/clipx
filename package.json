@@ -1,6 +1,6 @@
 {
   "name": "clipx",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "",
   "main": "electron/main.js",
   "type": "module",
@@ -29,9 +29,11 @@
   },
   "private": true,
   "devDependencies": {
+    "@tailwindcss/cli": "^4.3.0",
     "@vitejs/plugin-react": "^5.1.3",
     "electron": "^41.0.4",
     "electron-builder": "^26.8.1",
+    "tailwindcss": "^4.3.0",
     "vite": "^7.3.1"
   },
   "dependencies": {

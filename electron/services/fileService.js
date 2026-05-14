@@ -79,38 +79,71 @@ if (host === "video") {
 
 export async function scanFolder(folderPath) {
   try {
-    const entries = await fs.promises.readdir(folderPath, { withFileTypes: true });
     const clips = [];
+    const pendingDirs = [folderPath];
 
-    for (const entry of entries) {
-      if (!entry.isFile()) {
+    while (pendingDirs.length > 0) {
+      const currentDir = pendingDirs.pop();
+
+      if (!fs.existsSync(currentDir)) {
+        console.warn("ClipX: Directory does not exist", currentDir);
+        continue;
+      }
+      if (currentDir.toLowerCase().includes("thumbs") || currentDir.toLowerCase().includes("clipx videos")) {
         continue;
       }
 
-      const ext = path.extname(entry.name).toLowerCase();
-      if (!VIDEO_EXTENSIONS.includes(ext)) {
-        continue;
-      }
+      let entries = [];
 
-      const fullPath = path.join(folderPath, entry.name);
-      const stats = await fs.promises.stat(fullPath);
-
-      let id;
       try {
-        id = await getFastFileId(fullPath, stats);
+        entries = await fs.promises.readdir(currentDir, { withFileTypes: true });
       } catch (error) {
-        console.error("ClipX: Failed to get file ID for", fullPath, error);
+        console.error("ClipX: Failed to read directory", currentDir, error);
         continue;
       }
 
-      clips.push({
-        id,
-        name: entry.name,
-        path: fullPath,
-        size: stats.size,
-        createdAt: stats.birthtimeMs,
-        modifiedAt: stats.mtimeMs,
-      });
+      for (const entry of entries) {
+        const fullPath = path.join(currentDir, entry.name);
+
+        if (entry.isDirectory()) {
+          pendingDirs.push(fullPath);
+          continue;
+        }
+
+        if (!entry.isFile()) {
+          continue;
+        }
+
+        const ext = path.extname(entry.name).toLowerCase();
+        if (!VIDEO_EXTENSIONS.includes(ext)) {
+          continue;
+        }
+
+        let stats;
+        try {
+          stats = await fs.promises.stat(fullPath);
+        } catch (error) {
+          console.error("ClipX: Failed to stat file", fullPath, error);
+          continue;
+        }
+
+        let id;
+        try {
+          id = await getFastFileId(fullPath, stats);
+        } catch (error) {
+          console.error("ClipX: Failed to get file ID for", fullPath, error);
+          continue;
+        }
+
+        clips.push({
+          id,
+          name: entry.name,
+          path: fullPath,
+          size: stats.size,
+          createdAt: stats.birthtimeMs,
+          modifiedAt: stats.mtimeMs,
+        });
+      }
     }
 
     clips.sort((a, b) => b.createdAt - a.createdAt);
