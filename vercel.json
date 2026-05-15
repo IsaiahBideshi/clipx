@@ -1,5 +1,6 @@
 {
   "framework": null,
+  "devCommand": "npx serve public",
   "rewrites": [
     {
       "source": "/",

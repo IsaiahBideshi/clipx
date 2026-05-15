@@ -15,6 +15,7 @@ import { registerGoogleAuthIpcHandlers } from "./ipc/googleAuth.js";
 
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const appIconPath = path.join(__dirname, "assets", "clipx_icon.ico");
 const isDev = !app.isPackaged;
 const devServerUrl = process.env.ELECTRON_RENDERER_URL || "http://localhost:5173";
 const distPath = path.join(app.getAppPath(), "dist");
@@ -175,6 +176,7 @@ async function createWindow() {
     width: 1500,
     height: 850,
     fullscreenable: true,
+    icon: appIconPath,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -217,6 +219,7 @@ function registerIpcHandlers() {
   registerGoogleAuthIpcHandlers();
 }
 
+app.setAppUserModelId("com.isaiah.clipx");
 app.whenReady().then(async () => {
   registerClipxProtocol(protocol);
   registerAppProtocol();
