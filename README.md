@@ -3,7 +3,7 @@ A desktop application for capturing, trimming, and sharing game clips with frien
 Built with Electron, React, and Supabase.
 
 > [!WARNING]
-> Still under development. No download is currently available yet.
+> Still under development. Bugs may exist.
 
 ## Features
 - <b>Video Trimming</b> — Cut clips down to its main purpose
