@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import ffmpeg from "fluent-ffmpeg";
 import ffmpegPath from "ffmpeg-static";
+import { app } from "electron";
 
 import { getFastFileId } from "../utils/hashing.js";
 import { getMimeType } from "../utils/mime.js";
@@ -89,9 +90,6 @@ export async function scanFolder(folderPath) {
         console.warn("ClipX: Directory does not exist", currentDir);
         continue;
       }
-      if (currentDir.toLowerCase().includes("thumbs") || currentDir.toLowerCase().includes("clipx videos")) {
-        continue;
-      }
 
       let entries = [];
 
@@ -106,6 +104,9 @@ export async function scanFolder(folderPath) {
         const fullPath = path.join(currentDir, entry.name);
 
         if (entry.isDirectory()) {
+          if (currentDir.toLowerCase().includes("thumbs") || currentDir.toLowerCase().includes("clipx videos")) {
+            continue;
+          }
           pendingDirs.push(fullPath);
           continue;
         }
@@ -154,7 +155,15 @@ export async function scanFolder(folderPath) {
   }
 }
 
-export async function generateThumbnail(videoPath, thumbsDir) {
+export async function generateThumbnail(videoPath) {
+  const clipx = path.join(app.getPath("appData"), "clipx");
+  let thumbsDir;
+  if (videoPath.toLowerCase().includes("clipx videos")) {
+    thumbsDir = path.join(clipx, "saved clips thumbs");
+  }
+  else {
+    thumbsDir = path.join(clipx, "thumbs");
+  }
   const baseName = path.basename(videoPath, path.extname(videoPath));
   const thumbPath = path.join(thumbsDir, `${baseName}.jpg`);
 
