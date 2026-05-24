@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import ffmpeg from "fluent-ffmpeg";
 import ffmpegPath from "ffmpeg-static";
+import { app } from "electron";
 
 import { uploadClipToYoutube } from "./youtubeService.js";
 import { resolveFfmpegPath } from "../utils/ffmpeg.js";
@@ -57,7 +58,7 @@ async function renderUpscaledClipSegment4K(videoPath, startTime, endTime, output
 }
 
 async function getClipDataFromDir(clipDir) {
-  const clipDataPath = path.join(clipDir, CLIPS_DATA_FILE);
+  const clipDataPath = path.join(app.getPath("appData"), CLIPS_DATA_FILE);
   try {
     const raw = await fs.promises.readFile(clipDataPath, "utf-8");
     if (!raw.trim()) {
@@ -87,7 +88,7 @@ async function getClipDataFromDir(clipDir) {
 }
 
 async function saveClipData(clipDir, clipEntry) {
-  const clipDataPath = path.join(clipDir, CLIPS_DATA_FILE);
+  const clipDataPath = path.join(app.getPath("appData"), CLIPS_DATA_FILE);
   const clipsData = await getClipDataFromDir(clipDir);
 
   if (!Array.isArray(clipsData.clips)) {

@@ -38,35 +38,40 @@ export default function LocalFiles() {
     let cancelled = false;
 
     async function run() {
+      setLoading(true);
+
       if (!window.clipx?.getOptions) {
         console.error("window.clipx.getOptions is not available (preload not wired?)");
+        setLoading(false);
         return;
-      }
-      const tempOpt = await window.clipx.getOptions();
-      setOptions(tempOpt);
-      if (!cancelled) {
-        if (showSavedFiles) {
-          setFolderPath(`${tempOpt.clipsFolder}\\ClipX Videos`)
-          console.log(`${tempOpt.clipsFolder}\\ClipX Videos`);
-        }
-        else setFolderPath(tempOpt.clipsFolder);
       }
 
-      if (!folderPath) {
-        setFiles([]);
-        return;
+      const tempOpt = await window.clipx.getOptions();
+      setOptions(tempOpt);
+
+      const nextFolderPath = showSavedFiles
+        ? `${tempOpt.clipsFolder}\\ClipX Videos`
+        : tempOpt.clipsFolder;
+
+      if (!cancelled) {
+        setFolderPath(nextFolderPath);
       }
+
       if (!window.clipx?.scanFolder) {
         console.error("window.clipx.scanFolder is not available (preload not wired?)");
+        setLoading(false);
         return;
       }
 
       try {
-        const list = await window.clipx.scanFolder(folderPath);
+        const list = await window.clipx.scanFolder(nextFolderPath);
+        console.log("Scanned clips:", list);
         if (!cancelled) setFiles(list);
       } catch (err) {
         console.error("Failed to scan folder:", err);
         if (!cancelled) setFiles([]);
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     }
 
