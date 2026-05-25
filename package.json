@@ -1,6 +1,6 @@
 {
   "name": "clipx",
-  "version": "1.0.2",
+  "version": "1.0.3-test.1",
   "description": "",
   "main": "electron/main.js",
   "type": "module",
