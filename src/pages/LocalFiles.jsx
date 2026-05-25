@@ -11,6 +11,7 @@ import SettingsIcon from '@mui/icons-material/Settings';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import {Switch} from "@mui/material";
 import CloseIcon from '@mui/icons-material/Close';
+import { isTextEntryActive } from '../lib/hotkeys.js';
 
 import { auth } from '../lib/supabase.js';
 
@@ -102,6 +103,8 @@ export default function LocalFiles() {
     }
 
     function onKeyDown(e) {
+      if (isTextEntryActive(e)) return;
+
       if (e.code === "Escape") {
         setClip(null);
       }

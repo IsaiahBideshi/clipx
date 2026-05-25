@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import Fuse from "fuse.js";
 import STOREDGAMES from "../data/games.json";
 import { supabase } from '../lib/supabase.js';
+import { isTextEntryActive } from '../lib/hotkeys.js';
 import { useNavigate } from "react-router-dom";
 
 import CloseIcon from '@mui/icons-material/Close';
@@ -93,6 +94,8 @@ export default function Library() {
     }
 
     function onKeyDown(e) {
+      if (isTextEntryActive(e)) return;
+
       if (e.code === "Escape") {
         setSelectedClip(null);
       }

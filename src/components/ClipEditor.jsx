@@ -8,6 +8,7 @@ import TextField from '@mui/material/TextField';
 import Button from '@mui/material/Button';
 import AutoComplete from '@mui/material/Autocomplete';
 import { supabase } from "../lib/supabase.js";
+import { isTextEntryActive } from "../lib/hotkeys.js";
 import { InputLabel, MenuItem, Select, FormControl } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 
@@ -123,23 +124,8 @@ export default function ClipEditor({clip, onSaveQueueEvent, onUploadQueueEvent, 
 
   // Keyboard controls
   useEffect(() => {
-    function isEditableTarget(target) {
-      if (!(target instanceof HTMLElement)) return false;
-      if (target.closest('input[type="range"]')) return false;
-
-      // includes MUI input/textarea, selects, and any contenteditable container
-      const editable = target.closest(
-        'input, textarea, select, [contenteditable="true"], [contenteditable=""], [role="textbox"]'
-      );
-
-      // also allow elements explicitly opting out
-      const optOut = target.closest("[data-disable-global-hotkeys]");
-
-      return !!editable || !!optOut;
-    }
-
     function onKeyDown(e) {
-      if (isEditableTarget(e.target)) return;
+      if (isTextEntryActive(e)) return;
       if (e.ctrlKey) return;
 
       if (e.key >= "0" && e.key <= "9") {

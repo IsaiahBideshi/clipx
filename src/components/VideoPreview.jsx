@@ -6,6 +6,7 @@ import VolumeUpIcon from "@mui/icons-material/VolumeUp";
 import VolumeDownIcon from "@mui/icons-material/VolumeDown";
 import FullscreenIcon from "@mui/icons-material/Fullscreen";
 import FullscreenExitIcon from "@mui/icons-material/FullscreenExit";
+import { isTextEntryActive } from "../lib/hotkeys.js";
 
 function formatTime(timeInSeconds) {
   if (!Number.isFinite(timeInSeconds) || timeInSeconds < 0) return "0:00";
@@ -57,6 +58,8 @@ export default function VideoPreview({
   // keyboard controls
   useEffect(() => {
     function onKeyDown(e) {
+      if (isTextEntryActive(e)) return;
+
       if (e.code === "KeyF") {
         e.preventDefault();
         toggleFullscreen();
