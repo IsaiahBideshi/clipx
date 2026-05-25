@@ -15,7 +15,7 @@
   "build": {
     "appId": "com.isaiah.clipx",
     "productName": "ClipX",
-    "publish": "never",
+    "publish": null,
     "artifactName": "${productName}-Setup.${ext}",
     "asarUnpack": [
       "**/node_modules/ffmpeg-static/**"
