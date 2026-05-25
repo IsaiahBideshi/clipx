@@ -45,6 +45,19 @@
   color: #f7f8ff;
 }
 
+.settings-version {
+  flex: 0 0 auto;
+  margin-top: 6px;
+  color: rgba(212, 215, 221, 1);
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  opacity: 0.35;
+  transition: opacity 160ms ease, color 160ms ease;
+}
+
+
+
 .settings-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;

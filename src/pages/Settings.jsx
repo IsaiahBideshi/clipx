@@ -101,10 +101,25 @@ async function getCurrentUserId() {
   return data?.user?.id ?? null;
 }
 
+async function getAppVersion() {
+  if (!window.clipx?.getUpdateState) {
+    return null;
+  }
+
+  try {
+    const updateState = await window.clipx.getUpdateState();
+    return updateState?.currentVersion || null;
+  } catch (err) {
+    console.error("Failed to load app version:", err);
+    return null;
+  }
+}
+
 export default function Settings() {
   const [options, setOptions] = useState();
   const [defaultOptions, setDefaultOptions] = useState();
   const [googleInfo, setGoogleInfo] = useState(null);
+  const [appVersion, setAppVersion] = useState(null);
   const [avatarLoadError, setAvatarLoadError] = useState(false);
   const [loadingGoogleInfo, setLoadingGoogleInfo] = useState(true);
   const [confirmUnlink, setConfirmUnlink] = useState(false);
@@ -179,9 +194,16 @@ export default function Settings() {
         };
       }
     }
+    async function loadAppVersion() {
+      const version = await getAppVersion();
+      if (!cancelled) {
+        setAppVersion(version);
+      }
+    }
 
     loadOptions();
     loadGoogleInfo();
+    loadAppVersion();
     return () => {
       cancelled = true;
     };
@@ -224,6 +246,11 @@ export default function Settings() {
             <h2>Settings</h2>
             <p className="hero-copy">Configure your editing defaults and connected services for a smoother workflow.</p>
           </div>
+          {appVersion && (
+            <div className="settings-version" aria-label={`ClipX version ${appVersion}`}>
+              Version {appVersion}
+            </div>
+          )}
         </div>
 
         {!options ? (
