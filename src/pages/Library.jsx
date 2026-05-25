@@ -398,7 +398,7 @@ export function ClipCard({clip, onSelect}) {
 }
 
 export function VideoPreview({clip, onClose}){
-  const src = `https://www.youtube.com/embed/${clip.youtube_video_id}?rel=0&modestbranding=1&autoplay=1`;
+  const src = `https://www.youtube.com/embed/${clip.youtube_video_id}?rel=0&modestbranding=1&autoplay=1&vq=hd1080`;
   const [gamesSrc, setGamesSrc] = useState(null);
 
 

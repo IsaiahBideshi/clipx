@@ -46,12 +46,6 @@ export function registerFileIpcHandlers() {
       throw new TypeError("get-thumbnail: clipPath must be a non-empty string");
     }
 
-    const safeBaseFolder =
-      typeof baseFolder === "string" && baseFolder.length > 0
-        ? baseFolder
-        : path.dirname(clipPath);
-
-    const thumbsDir = path.join(safeBaseFolder, "thumbs");
-    return await generateThumbnail(clipPath, thumbsDir);
+    return await generateThumbnail(clipPath);
   });
 }
