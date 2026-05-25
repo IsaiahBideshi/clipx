@@ -20,4 +20,13 @@ contextBridge.exposeInMainWorld("clipx", {
   getClipData: (clipPath) => ipcRenderer.invoke("get-clip-data", clipPath),
   getGameData: (gameId) => ipcRenderer.invoke("get-game-data", gameId),
   signInWithGoogle: () => ipcRenderer.invoke("sign-in-with-google"),
+  getUpdateState: () => ipcRenderer.invoke("updates:get-state"),
+  checkForUpdates: () => ipcRenderer.invoke("updates:check"),
+  downloadUpdate: () => ipcRenderer.invoke("updates:download"),
+  installUpdate: () => ipcRenderer.invoke("updates:install"),
+  onUpdateState: (callback) => {
+    const listener = (_event, state) => callback(state);
+    ipcRenderer.on("updates:state", listener);
+    return () => ipcRenderer.removeListener("updates:state", listener);
+  },
 });

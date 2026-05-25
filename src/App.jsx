@@ -15,10 +15,12 @@ import Library from "./pages/Library.jsx";
 import Profile from "./pages/Profile.jsx";
 import Signup from "./pages/signup.jsx";
 import Login from "./pages/login.jsx";
+import UpdateModal from "./components/UpdateModal.jsx";
 
 
 export default function App() {
   return (
+    <>
       <Routes>
         <Route path="/" element={
           <ErrorBoundary FallbackComponent={ErrorFallback}>
@@ -51,5 +53,7 @@ export default function App() {
           </ErrorBoundary>
         } />
       </Routes>
+      <UpdateModal/>
+    </>
   );
 }

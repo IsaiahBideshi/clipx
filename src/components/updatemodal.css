@@ -1,0 +1,49 @@
+.update-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.68);
+}
+
+.update-modal {
+  width: min(420px, 100%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: #1e1f22;
+  color: #ffffff;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+  padding: 24px;
+  text-align: left;
+}
+
+.update-modal h2 {
+  margin: 0 0 10px;
+  font-size: 1.35rem;
+  line-height: 1.2;
+}
+
+.update-modal p {
+  margin: 0 0 20px;
+  color: #d4d7dd;
+  font-size: 0.98rem;
+  line-height: 1.5;
+}
+
+.update-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.update-progress-label {
+  display: block;
+  margin-top: 10px;
+  color: #d4d7dd;
+  font-size: 0.9rem;
+  text-align: right;
+}

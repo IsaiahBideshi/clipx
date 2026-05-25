@@ -11,6 +11,7 @@ import { registerSettingsIpcHandlers } from "./ipc/settings.js";
 import { registerYoutubeIpcHandlers } from "./ipc/youtube.js";
 import { registerClipxProtocol } from "./services/fileService.js";
 import { registerGoogleAuthIpcHandlers } from "./ipc/googleAuth.js";
+import { registerUpdateIpcHandlers, scheduleInitialUpdateCheck } from "./services/updateService.js";
 
 
 
@@ -217,6 +218,7 @@ function registerIpcHandlers() {
   registerClipIpcHandlers();
   registerYoutubeIpcHandlers();
   registerGoogleAuthIpcHandlers();
+  registerUpdateIpcHandlers();
 }
 
 app.setAppUserModelId("com.isaiah.clipx");
@@ -225,6 +227,7 @@ app.whenReady().then(async () => {
   registerAppProtocol();
   registerIpcHandlers();
   await createWindow();
+  scheduleInitialUpdateCheck();
 });
 
 app.on("window-all-closed", () => {

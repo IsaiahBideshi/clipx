@@ -51,3 +51,4 @@ jobs:
           files: |
             dist/ClipX-Setup.exe
             dist/ClipX-Setup.exe.blockmap
+            dist/latest.yml
