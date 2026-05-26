@@ -11,7 +11,7 @@ import { registerSettingsIpcHandlers } from "./ipc/settings.js";
 import { registerYoutubeIpcHandlers } from "./ipc/youtube.js";
 import { registerClipxProtocol } from "./services/fileService.js";
 import { registerGoogleAuthIpcHandlers } from "./ipc/googleAuth.js";
-import { registerUpdateIpcHandlers, scheduleInitialUpdateCheck } from "./services/updateService.js";
+import { registerUpdateIpcHandlers, registerUpdateWindowGuards, scheduleInitialUpdateCheck } from "./services/updateService.js";
 
 
 
@@ -184,6 +184,7 @@ async function createWindow() {
       nodeIntegration: false,
     },
   });
+  registerUpdateWindowGuards(win);
 
   // Support the browser Fullscreen API (used by YouTube's fullscreen button)
   win.webContents.on("enter-html-full-screen", () => {

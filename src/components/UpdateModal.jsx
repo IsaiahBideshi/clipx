@@ -7,6 +7,7 @@ export default function UpdateModal() {
   const [updateState, setUpdateState] = useState(null);
   const [dismissedVersion, setDismissedVersion] = useState(null);
   const [userStartedUpdate, setUserStartedUpdate] = useState(false);
+  const [pendingAction, setPendingAction] = useState(null);
 
   useEffect(() => {
     if (!window.clipx?.onUpdateState) {
@@ -18,6 +19,8 @@ export default function UpdateModal() {
       if (mounted) {
         setUpdateState(state);
       }
+    }).catch((err) => {
+      console.error("Failed to load update state:", err);
     });
 
     const unsubscribe = window.clipx.onUpdateState((state) => {
@@ -30,6 +33,10 @@ export default function UpdateModal() {
     };
   }, []);
 
+  useEffect(() => {
+    setPendingAction(null);
+  }, [updateState?.status]);
+
   const updateVersion = updateState?.update?.version;
   const isDismissed = updateVersion && dismissedVersion === updateVersion;
   const shouldShow = useMemo(() => {
@@ -41,7 +48,7 @@ export default function UpdateModal() {
       return !isDismissed;
     }
 
-    if (updateState.status === "downloading") {
+    if (updateState.status === "downloading" || updateState.status === "cancelling" || updateState.status === "installing") {
       return true;
     }
 
@@ -61,7 +68,14 @@ export default function UpdateModal() {
 
   async function startDownload() {
     setUserStartedUpdate(true);
-    await window.clipx?.downloadUpdate?.();
+    setPendingAction("download");
+    try {
+      await window.clipx?.downloadUpdate?.();
+    } catch (err) {
+      console.error("Failed to start update download:", err);
+    } finally {
+      setPendingAction(null);
+    }
   }
 
   function dismiss() {
@@ -69,8 +83,26 @@ export default function UpdateModal() {
     setUserStartedUpdate(false);
   }
 
-  function installUpdate() {
-    window.clipx?.installUpdate?.();
+  async function cancelDownload() {
+    setPendingAction("cancel");
+    try {
+      await window.clipx?.cancelUpdateDownload?.();
+    } catch (err) {
+      console.error("Failed to cancel update download:", err);
+    } finally {
+      setPendingAction(null);
+    }
+  }
+
+  async function installUpdate() {
+    setPendingAction("install");
+    try {
+      await window.clipx?.installUpdate?.();
+    } catch (err) {
+      console.error("Failed to install update:", err);
+    } finally {
+      setPendingAction(null);
+    }
   }
 
   return (
@@ -83,8 +115,10 @@ export default function UpdateModal() {
               ClipX {updateVersion} is available. You are currently running {currentVersion}.
             </p>
             <div className="update-modal-actions">
-              <Button variant="outlined" onClick={dismiss}>Not now</Button>
-              <Button variant="contained" onClick={startDownload}>Update</Button>
+              <Button variant="outlined" onClick={dismiss} disabled={pendingAction === "download"}>Not now</Button>
+              <Button variant="contained" onClick={startDownload} disabled={pendingAction === "download"}>
+                {pendingAction === "download" ? "Starting..." : "Update"}
+              </Button>
             </div>
           </>
         )}
@@ -95,6 +129,19 @@ export default function UpdateModal() {
             <p>ClipX {updateVersion || "update"} is downloading.</p>
             <LinearProgress variant="determinate" value={progress} />
             <span className="update-progress-label">{progress}%</span>
+            <div className="update-modal-actions">
+              <Button variant="outlined" onClick={cancelDownload} disabled={pendingAction === "cancel"}>
+                {pendingAction === "cancel" ? "Cancelling..." : "Cancel download"}
+              </Button>
+            </div>
+          </>
+        )}
+
+        {updateState.status === "cancelling" && (
+          <>
+            <h2 id="update-modal-title">Cancelling update</h2>
+            <p>{updateState.message || "Stopping the update download."}</p>
+            <LinearProgress />
           </>
         )}
 
@@ -103,9 +150,19 @@ export default function UpdateModal() {
             <h2 id="update-modal-title">Ready to install</h2>
             <p>Restart ClipX to finish installing version {updateVersion}.</p>
             <div className="update-modal-actions">
-              <Button variant="outlined" onClick={dismiss}>Later</Button>
-              <Button variant="contained" onClick={installUpdate}>Restart</Button>
+              <Button variant="outlined" onClick={dismiss} disabled={pendingAction === "install"}>Later</Button>
+              <Button variant="contained" onClick={installUpdate} disabled={pendingAction === "install"}>
+                {pendingAction === "install" ? "Restarting..." : "Restart"}
+              </Button>
             </div>
+          </>
+        )}
+
+        {updateState.status === "installing" && (
+          <>
+            <h2 id="update-modal-title">Restarting ClipX</h2>
+            <p>{updateState.message || "ClipX is restarting to install the update."}</p>
+            <LinearProgress />
           </>
         )}
 
@@ -114,8 +171,10 @@ export default function UpdateModal() {
             <h2 id="update-modal-title">Update failed</h2>
             <p>{updateState.message || "ClipX could not complete the update."}</p>
             <div className="update-modal-actions">
-              <Button variant="outlined" onClick={dismiss}>Close</Button>
-              <Button variant="contained" onClick={startDownload}>Retry</Button>
+              <Button variant="outlined" onClick={dismiss} disabled={pendingAction === "download"}>Close</Button>
+              <Button variant="contained" onClick={startDownload} disabled={pendingAction === "download"}>
+                {pendingAction === "download" ? "Retrying..." : "Retry"}
+              </Button>
             </div>
           </>
         )}

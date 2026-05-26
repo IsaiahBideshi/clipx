@@ -23,9 +23,20 @@ contextBridge.exposeInMainWorld("clipx", {
   getUpdateState: () => ipcRenderer.invoke("updates:get-state"),
   checkForUpdates: () => ipcRenderer.invoke("updates:check"),
   downloadUpdate: () => ipcRenderer.invoke("updates:download"),
+  cancelUpdateDownload: () => ipcRenderer.invoke("updates:cancel-download"),
   installUpdate: () => ipcRenderer.invoke("updates:install"),
   onUpdateState: (callback) => {
-    const listener = (_event, state) => callback(state);
+    if (typeof callback !== "function") {
+      return () => {};
+    }
+
+    const listener = (_event, state) => {
+      try {
+        callback(state);
+      } catch (error) {
+        console.error("ClipX: Update state callback failed:", error);
+      }
+    };
     ipcRenderer.on("updates:state", listener);
     return () => ipcRenderer.removeListener("updates:state", listener);
   },
