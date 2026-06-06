@@ -82,7 +82,7 @@
   background: rgba(144, 202, 249, 0.12);
 }
 
-.local-files-page .clip-grid {
+.local-files-page {
   width: 100%;
   justify-content: flex-start;
   gap: 16px;

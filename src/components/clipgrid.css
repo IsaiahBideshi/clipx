@@ -69,16 +69,15 @@
   display: flex;
   flex-wrap: wrap;
   margin: 0 auto;
+  gap: 20px;
+  width: 90%;
 }
 .css-1n3vtnx-MuiFormControl-root{
   width: 100%;
 }
 
 .clip-card{
-  margin-top: 10px;
-  margin-bottom: 10px;
-  margin-left: 10px;
-  flex: 0 0 auto;
+  flex-grow: 1;
   width: 270px;
   border: 1px solid #ccc;
   border-radius: 5px;
@@ -90,7 +89,12 @@
   transition: transform 0.2s;
   cursor: pointer;
 }
-
+.clip-card.filler {
+  visibility: hidden;
+  padding: 0;
+  border: none;
+  box-shadow: none;
+}
 
 .upload-container{
   margin-top: 0;
@@ -151,7 +155,6 @@
 
 .clip-thumb{
   width: 100%;
-  max-height: 151.8px;
   height: auto;
   border-radius: 3px;
   margin-bottom: 5px;

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import {useEffect, useRef, useState} from "react";
 import Fuse from "fuse.js";
 import STOREDGAMES from "../data/games.json";
 import { supabase } from '../lib/supabase.js';
@@ -270,6 +270,28 @@ export default function Library() {
   }, [clips, game, selectedFriends, titleQuery]);
 
 
+  const GAP = 20;
+  const containerRef = useRef(null);
+  const [fillerCount, setFillerCount] = useState(0);
+
+  useEffect(() => {
+    const update = () => {
+      if (!containerRef.current) return;
+      const firstCard = containerRef.current.querySelector(".clip-card:not(.filler)");
+      if (!firstCard) return;
+      const cardWidth = firstCard.offsetWidth;
+      const containerWidth = containerRef.current.offsetWidth;
+      const perRow = Math.round((containerWidth + GAP) / (cardWidth + GAP));
+      const remainder = clips.length % perRow;
+      setFillerCount(remainder === 0 ? 0 : perRow - remainder);
+    };
+
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, [filteredClips.length]);
+
+
 
   if (!session && !loadingSession) {
     navigate("/login", { replace: true });
@@ -357,18 +379,21 @@ export default function Library() {
         </div>
       </div>
 
-      <div className="clip-grid library-grid">
-          {loadingClips
-            ? Array.from({ length: 16 }).map((_, index) => (
-                <ClipCardSkeleton key={`clip-skeleton-${index}`} />
-              ))
-            : filteredClips.map((clip) => (
-                <ClipCard
-                  key={clip.id}
-                  clip={clip}
-                  onSelect={setSelectedClip}
-                />
-              ))}
+      <div className="clip-grid" ref={containerRef}>
+        {loadingClips
+          ? Array.from({ length: 16 }).map((_, index) => (
+              <ClipCardSkeleton key={`clip-skeleton-${index}`} />
+            ))
+          : filteredClips.map((clip) => (
+              <ClipCard
+                key={clip.id}
+                clip={clip}
+                onSelect={setSelectedClip}
+              />
+            ))}
+          {Array.from({ length: fillerCount }).map((_, i) => (
+            <div key={`filler-${i}`} className="clip-card filler" />
+          ))}
       </div>
 
       {selectedClip && <VideoPreview clip={selectedClip} onClose={() => setSelectedClip(null)} />}
