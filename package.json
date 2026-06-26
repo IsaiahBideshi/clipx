@@ -1,12 +1,12 @@
 {
   "name": "clipx",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "",
   "main": "electron/main.js",
   "type": "module",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "vite",
+    "dev": "npx electron .",
     "build:react": "vite build",
     "build:electron": "electron-builder build --win --publish never",
     "build": "vite build && electron-builder build --win --publish never",

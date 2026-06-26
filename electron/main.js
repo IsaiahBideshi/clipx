@@ -1,4 +1,4 @@
-import { app, BrowserWindow, protocol } from "electron";
+import { app, BrowserWindow, Menu, protocol, Tray } from "electron";
 import http from "http";
 import fs from "fs";
 import path from "path";
@@ -21,6 +21,9 @@ const isDev = !app.isPackaged;
 const devServerUrl = process.env.ELECTRON_RENDERER_URL || "http://localhost:5173";
 const distPath = path.join(app.getAppPath(), "dist");
 let rendererServer = null;
+let mainWindow = null;
+let tray = null;
+let isQuitting = false;
 
 const STATIC_MIME_TYPES = {
   ".html": "text/html; charset=UTF-8",
@@ -118,6 +121,75 @@ function stopRendererServer() {
   }
 }
 
+function getOptionsPath() {
+  return path.join(app.getPath("appData"), "clipx", "options.json");
+}
+
+function getStoredOptions() {
+  try {
+    const data = fs.readFileSync(getOptionsPath(), "utf-8");
+    return data.trim() ? JSON.parse(data) : {};
+  } catch (error) {
+    if (error?.code !== "ENOENT") {
+      console.error("ClipX: Failed to read options.json:", error);
+    }
+    return {};
+  }
+}
+
+function shouldMinimizeToTrayOnClose() {
+  return getStoredOptions().minimizeToTrayOnClose === true;
+}
+
+function ensureTray() {
+  if (tray) {
+    return tray;
+  }
+
+  tray = new Tray(appIconPath);
+  tray.setToolTip("ClipX");
+  tray.setContextMenu(Menu.buildFromTemplate([
+    {
+      label: "Show ClipX",
+      click: () => {
+        showMainWindow();
+      },
+    },
+    {
+      type: "separator",
+    },
+    {
+      label: "Quit ClipX",
+      click: () => {
+        isQuitting = true;
+        app.quit();
+      },
+    },
+  ]));
+  tray.on("click", () => {
+    showMainWindow();
+  });
+
+  return tray;
+}
+
+async function showMainWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    await createWindow();
+  }
+
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return;
+  }
+
+  if (mainWindow.isMinimized()) {
+    mainWindow.restore();
+  }
+
+  mainWindow.show();
+  mainWindow.focus();
+}
+
 protocol.registerSchemesAsPrivileged([
   {
     scheme: "clipx",
@@ -184,6 +256,32 @@ async function createWindow() {
       nodeIntegration: false,
     },
   });
+  mainWindow = win;
+  win.on("closed", () => {
+    if (mainWindow === win) {
+      mainWindow = null;
+    }
+  });
+
+  win.on("close", (event) => {
+    if (isQuitting) {
+      setTimeout(() => {
+        if (BrowserWindow.getAllWindows().some((window) => !window.isDestroyed())) {
+          isQuitting = false;
+        }
+      }, 0);
+      return;
+    }
+
+    if (!shouldMinimizeToTrayOnClose()) {
+      return;
+    }
+
+    event.preventDefault();
+    event.clipxMinimizedToTray = true;
+    ensureTray();
+    win.hide();
+  });
   registerUpdateWindowGuards(win);
 
   // Support the browser Fullscreen API (used by YouTube's fullscreen button)
@@ -203,7 +301,7 @@ async function createWindow() {
   if (isDev) {
     try {
       await win.loadURL(devServerUrl);
-      return;
+      return win;
     } catch (error) {
       console.warn(`Failed to load dev URL (${devServerUrl}), falling back to dist build.`, error);
     }
@@ -211,6 +309,7 @@ async function createWindow() {
 
   const rendererUrl = await startRendererServer();
   await win.loadURL(rendererUrl);
+  return win;
 }
 
 function registerIpcHandlers() {
@@ -231,6 +330,10 @@ app.whenReady().then(async () => {
   scheduleInitialUpdateCheck();
 });
 
+app.on("activate", () => {
+  showMainWindow();
+});
+
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
     app.quit();
@@ -238,5 +341,9 @@ app.on("window-all-closed", () => {
 });
 
 app.on("before-quit", () => {
+  isQuitting = true;
+});
+
+app.on("will-quit", () => {
   stopRendererServer();
 });

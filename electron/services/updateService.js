@@ -276,6 +276,10 @@ export function registerUpdateIpcHandlers() {
 
 export function registerUpdateWindowGuards(window) {
   window.on("close", (event) => {
+    if (event.defaultPrevented || event.clipxMinimizedToTray) {
+      return;
+    }
+
     if (!isDownloading || isInstalling) {
       return;
     }

@@ -4,7 +4,7 @@ import {useEffect, useState} from "react";
 import CircularProgress from '@mui/material/CircularProgress';
 import FormGroup from "@mui/material/FormGroup";
 import FormControlLabel from "@mui/material/FormControlLabel";
-import {Switch} from "@mui/material";
+import {Checkbox, Switch} from "@mui/material";
 import Button from "@mui/material/Button";
 import { auth } from "../lib/supabase.js";
 
@@ -125,6 +125,13 @@ export default function Settings() {
   const [confirmUnlink, setConfirmUnlink] = useState(false);
   const [linking, setLinking] = useState(false);
   console.log(options);
+
+  function updateOption(key, value) {
+    setOptions((prevOptions) => ({
+      ...(prevOptions || {}),
+      [key]: value,
+    }));
+  }
 
   function pickFolder() {
     if (!window.clipx?.pickFolder) {
@@ -267,16 +274,24 @@ export default function Settings() {
                   <FormControlLabel
                     control={
                       <Switch
-                        defaultChecked={defaultOptions?.deleteClipAfterCut}
+                        checked={Boolean(options.deleteClipAfterCut)}
                         onChange={(e) => {
-                          setOptions({
-                            ...options,
-                            deleteClipAfterCut: e.target.checked,
-                          })
+                          updateOption("deleteClipAfterCut", e.target.checked);
                         }}
                       />
                     }
                     label="Delete Clip After Cut?"
+                  />
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={Boolean(options.minimizeToTrayOnClose)}
+                        onChange={(e) => {
+                          updateOption("minimizeToTrayOnClose", e.target.checked);
+                        }}
+                      />
+                    }
+                    label="Minimize to tray on close"
                   />
                 </FormGroup>
               )}
