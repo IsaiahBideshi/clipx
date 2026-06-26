@@ -115,11 +115,28 @@ async function getAppVersion() {
   }
 }
 
+async function getLaunchAtStartup() {
+  if (!window.clipx?.getLaunchAtStartup) {
+    console.log("no getLaunchAtStartup function");
+    return false;
+  }
+
+  try {
+    return Boolean(await window.clipx.getLaunchAtStartup());
+  } catch (err) {
+    console.error("Failed to load launch at startup setting:", err);
+    return false;
+  }
+}
+
 export default function Settings() {
   const [options, setOptions] = useState();
   const [defaultOptions, setDefaultOptions] = useState();
   const [googleInfo, setGoogleInfo] = useState(null);
   const [appVersion, setAppVersion] = useState(null);
+  const [launchAtStartup, setLaunchAtStartup] = useState(false);
+  const [loadingLaunchAtStartup, setLoadingLaunchAtStartup] = useState(true);
+  const [savingLaunchAtStartup, setSavingLaunchAtStartup] = useState(false);
   const [avatarLoadError, setAvatarLoadError] = useState(false);
   const [loadingGoogleInfo, setLoadingGoogleInfo] = useState(true);
   const [confirmUnlink, setConfirmUnlink] = useState(false);
@@ -149,6 +166,27 @@ export default function Settings() {
     }).catch((err) => {
       console.error("Failed to pick folder:", err);
     });
+  }
+
+  async function handleLaunchAtStartupChange(event) {
+    const nextLaunchAtStartup = event.target.checked;
+    setLaunchAtStartup(nextLaunchAtStartup);
+
+    if (!window.clipx?.setLaunchAtStartup) {
+      console.log("no setLaunchAtStartup function");
+      return;
+    }
+
+    setSavingLaunchAtStartup(true);
+    try {
+      const enabled = await window.clipx.setLaunchAtStartup(nextLaunchAtStartup);
+      setLaunchAtStartup(Boolean(enabled));
+    } catch (err) {
+      console.error("Failed to save launch at startup setting:", err);
+      setLaunchAtStartup(!nextLaunchAtStartup);
+    } finally {
+      setSavingLaunchAtStartup(false);
+    }
   }
 
   console.log(googleInfo);
@@ -207,10 +245,26 @@ export default function Settings() {
         setAppVersion(version);
       }
     }
+    async function loadLaunchAtStartup() {
+      try {
+        const enabled = await getLaunchAtStartup();
+        if (!cancelled) {
+          setLaunchAtStartup(enabled);
+          setLoadingLaunchAtStartup(false);
+        }
+      } catch (err) {
+        console.error("Failed to load launch at startup setting:", err);
+        if (!cancelled) {
+          setLaunchAtStartup(false);
+          setLoadingLaunchAtStartup(false);
+        }
+      }
+    }
 
     loadOptions();
     loadGoogleInfo();
     loadAppVersion();
+    loadLaunchAtStartup();
     return () => {
       cancelled = true;
     };
@@ -292,6 +346,16 @@ export default function Settings() {
                       />
                     }
                     label="Minimize to tray on close"
+                  />
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={launchAtStartup}
+                        disabled={loadingLaunchAtStartup || savingLaunchAtStartup || !window.clipx?.setLaunchAtStartup}
+                        onChange={handleLaunchAtStartupChange}
+                      />
+                    }
+                    label="Launch at startup"
                   />
                 </FormGroup>
               )}

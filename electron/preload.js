@@ -12,6 +12,8 @@ contextBridge.exposeInMainWorld("clipx", {
   searchGames: (query) => ipcRenderer.invoke("search-games", query),
   getOptions: () => ipcRenderer.invoke("get-options"),
   saveOptions: (options) => ipcRenderer.invoke("save-options", options),
+  getLaunchAtStartup: () => ipcRenderer.invoke("get-launch-at-startup"),
+  setLaunchAtStartup: (enabled) => ipcRenderer.invoke("set-launch-at-startup", enabled),
   saveClip: (clipInfo) => ipcRenderer.invoke("save-clip", clipInfo),
   uploadClip: (clipInfo) => ipcRenderer.invoke("upload-clip", clipInfo),
   linkYoutube: (userId) => ipcRenderer.invoke("link-youtube", userId),

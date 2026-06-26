@@ -2,6 +2,21 @@ import { app, ipcMain } from "electron";
 import fs from "fs";
 import path from "path";
 
+function getLoginItemOptions(openAtLogin) {
+  const options = {};
+
+  if (typeof openAtLogin === "boolean") {
+    options.openAtLogin = openAtLogin;
+  }
+
+  if (!app.isPackaged && process.defaultApp) {
+    options.path = process.execPath;
+    options.args = [app.getAppPath()];
+  }
+
+  return options;
+}
+
 export function registerSettingsIpcHandlers() {
   ipcMain.handle("get-taglist", async () => {
     const taglistPath = path.join(app.getPath("appData"), "clipx", "taglist.json");
@@ -139,5 +154,15 @@ export function registerSettingsIpcHandlers() {
       console.error("ClipX: Failed to save options.json:", error);
       throw error;
     }
+  });
+
+  ipcMain.handle("get-launch-at-startup", async () => {
+    return app.getLoginItemSettings(getLoginItemOptions()).openAtLogin;
+  });
+
+  ipcMain.handle("set-launch-at-startup", async (_event, enabled) => {
+    const openAtLogin = Boolean(enabled);
+    app.setLoginItemSettings(getLoginItemOptions(openAtLogin));
+    return app.getLoginItemSettings(getLoginItemOptions()).openAtLogin;
   });
 }
