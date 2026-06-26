@@ -12,7 +12,14 @@ dotenv.config();
 
 const supabase = createClient(
   "https://vymaqpjhajwpbzmnoadk.supabase.co",
-  "sb_publishable_2wc5OZpO54DVJ7HUGwkWXQ_UP9zVSgv"
+  "sb_publishable_2wc5OZpO54DVJ7HUGwkWXQ_UP9zVSgv",
+  {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+      detectSessionInUrl: false,
+    },
+  }
 );
 
 const SERVICE = "ClipX";

@@ -13,8 +13,6 @@ import {Switch} from "@mui/material";
 import CloseIcon from '@mui/icons-material/Close';
 import { isTextEntryActive } from '../lib/hotkeys.js';
 
-import { auth } from '../lib/supabase.js';
-
 import { OverlayScrollbarsComponent } from "overlayscrollbars-react";
 import "overlayscrollbars/overlayscrollbars.css";
 

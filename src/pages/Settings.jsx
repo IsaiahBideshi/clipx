@@ -6,7 +6,7 @@ import FormGroup from "@mui/material/FormGroup";
 import FormControlLabel from "@mui/material/FormControlLabel";
 import {Checkbox, Switch} from "@mui/material";
 import Button from "@mui/material/Button";
-import { auth } from "../lib/supabase.js";
+import { getCurrentUserId } from "../lib/authSession.js";
 
 const tfSx = {
   "& .MuiInputLabel-root": { color: "#e5e7eb" }, // label
@@ -90,15 +90,6 @@ async function unlinkYoutube() {
     catch (err) {
       console.error("Failed to unlink Youtube account:", err);
     }
-}
-
-async function getCurrentUserId() {
-  const { data, error } = await auth.getUser();
-  if (error) {
-    console.error("Failed to resolve current user:", error);
-    return null;
-  }
-  return data?.user?.id ?? null;
 }
 
 async function getAppVersion() {

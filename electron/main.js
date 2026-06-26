@@ -11,6 +11,7 @@ import { registerSettingsIpcHandlers } from "./ipc/settings.js";
 import { registerYoutubeIpcHandlers } from "./ipc/youtube.js";
 import { registerClipxProtocol } from "./services/fileService.js";
 import { registerGoogleAuthIpcHandlers } from "./ipc/googleAuth.js";
+import { registerAuthStorageIpcHandlers } from "./ipc/authStorage.js";
 import { registerUpdateIpcHandlers, registerUpdateWindowGuards, scheduleInitialUpdateCheck } from "./services/updateService.js";
 
 
@@ -313,6 +314,7 @@ async function createWindow() {
 }
 
 function registerIpcHandlers() {
+  registerAuthStorageIpcHandlers();
   registerFileIpcHandlers();
   registerSettingsIpcHandlers();
   registerClipIpcHandlers();

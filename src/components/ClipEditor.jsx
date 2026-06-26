@@ -8,6 +8,7 @@ import TextField from '@mui/material/TextField';
 import Button from '@mui/material/Button';
 import AutoComplete from '@mui/material/Autocomplete';
 import { supabase } from "../lib/supabase.js";
+import { useAuthSession } from "../lib/authSession.js";
 import { isTextEntryActive } from "../lib/hotkeys.js";
 import { InputLabel, MenuItem, Select, FormControl } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
@@ -362,7 +363,7 @@ function UploadMenu({clip, start, end, onSaveQueueEvent, onUploadQueueEvent}) {
   const [tags, setTags] = useState([]);
   const [friendsInClip, setFriendsInClip] = useState([]);
   const [peopleInput, setPeopleInput] = useState('');
-  const [session, setSession] = useState(null);
+  const { session } = useAuthSession();
   const [game, setGame] = useState(null);
   const [clipTitle, setClipTitle] = useState("");
   const [gameInput, setGameInput] = useState("");
@@ -371,6 +372,7 @@ function UploadMenu({clip, start, end, onSaveQueueEvent, onUploadQueueEvent}) {
   const [uploading, setUploading] = useState(false);
   const [visibility, setVisibility] = useState("private");
   const [friendsOptions, setFriendsOptions] = useState([]);
+  const userId = session?.user?.id;
 
   const handleChange = (event) => {
     setVisibility(event.target.value);
@@ -378,7 +380,11 @@ function UploadMenu({clip, start, end, onSaveQueueEvent, onUploadQueueEvent}) {
 
 useEffect(() => {
   async function loadFriends() {
-    const userId = (await supabase.auth.getUser()).data.user.id;
+    if (!userId) {
+      setFriendsOptions([]);
+      return;
+    }
+
     console.log("userId", userId);
     const { data, error } = await supabase
       .from("friendships")
@@ -394,6 +400,11 @@ useEffect(() => {
     console.log("friendships", data);
     let friendIds = data.map(f => (f.user_id === userId ? f.friend_id : f.user_id));
     console.log("friendIds", friendIds);
+
+    if (friendIds.length === 0) {
+      setFriendsOptions([]);
+      return;
+    }
 
     const { data: friendsData, error: friendsError } = await supabase
       .from("users")
@@ -414,20 +425,7 @@ useEffect(() => {
   }
 
   loadFriends();
-}, []);
-
-  useEffect(() => {
-    async function getSession() {
-      const { data, error } = await supabase.auth.getSession();
-      if (error) {
-        console.error("Failed to get session:", error);
-      } else {
-        setSession(data.session);
-      }
-    }
-
-    getSession();
-  }, []);
+}, [userId]);
 
   useEffect(() => {
     handleSearchGame();
@@ -457,12 +455,14 @@ useEffect(() => {
   }
 
   async function saveClipRecord(clipData) {
-    const id = (await supabase.auth.getUser()).data.user.id;
+    if (!userId) {
+      return new Error("No authenticated user found");
+    }
   
     const { data, error } = await supabase
     .from('clips')
     .insert({
-      owner_id: id,
+      owner_id: userId,
       youtube_video_id: clipData.youtubeID || "",
       title: clipData.title,
       description: "",
@@ -488,7 +488,7 @@ useEffect(() => {
     onUploadQueueEvent?.({ type: "started", id: uploadId, name: displayName });
 
     try {
-      const response = await window.clipx.uploadClip({ clip, start, end, title, game, tags, userId: session?.user?.id });
+      const response = await window.clipx.uploadClip({ clip, start, end, title, game, tags, userId });
       if (response?.status === 200) {
         onUploadQueueEvent?.({
           type: "success",
@@ -506,7 +506,7 @@ useEffect(() => {
           title: title,
           youtubeID: response.videoId,
           visibility: visibility,
-          userId: session?.user?.id,
+          userId,
         });
         if (error) console.error("Failed to save clip record to database:", error);
         else console.log("Clip record saved");

@@ -2,6 +2,7 @@ import {useEffect, useRef, useState} from "react";
 import Fuse from "fuse.js";
 import STOREDGAMES from "../data/games.json";
 import { supabase } from '../lib/supabase.js';
+import { useAuthSession } from "../lib/authSession.js";
 import { isTextEntryActive } from '../lib/hotkeys.js';
 import { useNavigate } from "react-router-dom";
 
@@ -55,10 +56,10 @@ export default function Library() {
   const [friendsOptions, setFriendsOptions] = useState([]);
   const [selectedFriends, setSelectedFriends] = useState([]);
   const [filteredClips, setFilteredClips] = useState([]);
-  const [session, setSession] = useState();
-  const [loadingSession, setLoadingSession] = useState(true);
+  const { session, loading: loadingSession } = useAuthSession();
 
   const navigate = useNavigate();
+  const userId = session?.user?.id;
 
 
   const tfSx = {
@@ -116,20 +117,13 @@ export default function Library() {
   }, [clips]);
 
   useEffect(() => {
-    async function getSession() {
-      const {data, error} = await supabase.auth.getSession();
-      if (error) {
-        console.error("Error getting session:", error);
-        setLoadingSession(false);
-      } else {
-        setSession(data.session);
-        setLoadingSession(false);
-      }
-    }
-
     async function loadFriendsOptions() {
+      if (!userId) {
+        setFriendsOptions([]);
+        return;
+      }
+
       try {
-        const userId = (await supabase.auth.getUser()).data.user.id;
         const { data, error } = await supabase
           .from("friendships")
           .select("user_id, friend_id")
@@ -172,8 +166,13 @@ export default function Library() {
     }
 
     loadFriendsOptions();
-    getSession();
-  }, []);
+  }, [userId]);
+
+  useEffect(() => {
+    if (!loadingSession && !session) {
+      navigate("/login", { replace: true });
+    }
+  }, [loadingSession, navigate, session]);
 
   useEffect(() => {
     async function fetchClips() {
@@ -292,12 +291,7 @@ export default function Library() {
   }, [filteredClips.length]);
 
 
-
-  if (!session && !loadingSession) {
-    navigate("/login", { replace: true });
-  }
-
-  if (loadingSession) {
+  if (loadingSession || !session) {
     return (
       <CircularProgress/>
     )

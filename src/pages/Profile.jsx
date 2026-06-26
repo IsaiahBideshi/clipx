@@ -2,10 +2,11 @@ import "./profile.css";
 
 import Button from "@mui/material/Button";
 import TextField from "@mui/material/TextField";
-import {useState, useEffect, useRef} from "react";
+import {useState, useEffect, useRef, useCallback} from "react";
 import {useNavigate} from "react-router-dom";
 
-import {auth, logout, supabase, signInWithGoogle} from '../lib/supabase.js';
+import {logout, supabase, signInWithGoogle} from '../lib/supabase.js';
+import { useAuthSession } from "../lib/authSession.js";
 import SearchIcon from '@mui/icons-material/Search';
 import CircularProgress from '@mui/material/CircularProgress';
 import GoogleIcon from '@mui/icons-material/Google';
@@ -14,8 +15,8 @@ import GoogleIcon from '@mui/icons-material/Google';
 export default function Profile() {
   const [friendName, setFriendName] = useState("");
   const [loadingUsers, setLoadingUsers] = useState(false);
-  const [loadingAuth, setLoadingAuth] = useState(true);
-  const [session, setSession] = useState(null);
+  const { session, loading: loadingAuth } = useAuthSession();
+  const [loadingProfile, setLoadingProfile] = useState(true);
   const [removeTarget, setRemoveTarget] = useState(null);
   const [confirmingAction, setConfirmingAction] = useState(false);
 
@@ -29,6 +30,7 @@ export default function Profile() {
   const [error, setError] = useState("");
 
   const [friendships, setFriendships] = useState();
+  const userId = session?.user?.id;
 
   const tfSx = {
     "& .MuiInputLabel-root": { color: "#e5e7eb" }, // label
@@ -44,7 +46,7 @@ export default function Profile() {
   const navigate = useNavigate();
 
   async function searchFriends(name) {
-    if (!name) return;
+    if (!name || !userId) return;
     console.log("Searching for: ", name);
 
     const { data, error } = await supabase
@@ -58,8 +60,7 @@ export default function Profile() {
       console.error("Error searching for friends:", error);
       setLoadingUsers(false);
     } else {
-      const id = (await auth.getUser()).data.user.id;
-      let filteredResults = data.filter(user => user.id !== id);
+      let filteredResults = data.filter(user => user.id !== userId);
       
       setSearchResults(filteredResults);
       setShowResults(true);
@@ -67,8 +68,14 @@ export default function Profile() {
     }
   }
 
-  async function getFriendships() {
-    const userId = (await auth.getUser()).data.user.id;
+  const getFriendships = useCallback(async () => {
+    if (!userId) {
+      setFriendships([]);
+      setLoadingFriendships(false);
+      return;
+    }
+
+    setLoadingFriendships(true);
     const { data, error } = await supabase
       .from("friendships")
       .select("*")
@@ -76,6 +83,7 @@ export default function Profile() {
     if (error) {
       console.error("Error fetching friendship:", error);
       setFriendships([]);
+      setLoadingFriendships(false);
       return "error";
     }
     let friendshipsData = [];
@@ -90,7 +98,7 @@ export default function Profile() {
     }
     setFriendships(friendshipsData);
     setLoadingFriendships(false);
-  }
+  }, [userId]);
 
   async function googleSignIn() {
     setLoadingGoogleSignIn(true);
@@ -118,39 +126,20 @@ export default function Profile() {
 
 
   useEffect(() => {
-    const channel = supabase
-      .channel("friendships")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "friendships" },
-        (payload) => {
-          getFriendships(); // refetch on any change
-        }
-      )
-      .subscribe();
+    if (loadingAuth) {
+      return;
+    }
 
-    return () => supabase.removeChannel(channel); // cleanup
-  }, [getFriendships]);
-
-
-  useEffect(() => {
-    const getSession = async () => {
-      try {
-        const { data, error } = await auth.getSession();
-
-        if (error) {
-          console.error("Error getting session:", error);
-        } else {
-          setSession(data.session);
-          setLoadingAuth(false);
-        }
-      } catch (err) {
-        console.error("Unexpected error getting session:", err);
-      }
-    };
+    if (!userId) {
+      setProfileHandle("");
+      setLoadingProfile(false);
+      setFriendships([]);
+      setLoadingFriendships(false);
+      return;
+    }
 
     const getUsername = async () => {
-      const userId = (await auth.getUser()).data.user.id;
+      setLoadingProfile(true);
       const { data, error } = await supabase
         .from("users")
         .select("username")
@@ -163,15 +152,34 @@ export default function Profile() {
       } else {
         setProfileHandle(data.username);
       }
-      setLoadingAuth(false);
+      setLoadingProfile(false);
     };
 
-    getSession();
-    getFriendships();
     getUsername();
-  }, [auth]);
+  }, [loadingAuth, userId]);
 
-  if (loadingAuth) {
+  useEffect(() => {
+    if (!userId) {
+      return;
+    }
+
+    getFriendships();
+
+    const channel = supabase
+      .channel(`friendships:${userId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "friendships" },
+        () => {
+          getFriendships();
+        }
+      )
+      .subscribe();
+
+    return () => supabase.removeChannel(channel);
+  }, [getFriendships, userId]);
+
+  if (loadingAuth || (session && loadingProfile)) {
     return (
       <div className={"settings-container profile-page profile-state"}>
         <h2>Profile</h2>
@@ -180,17 +188,6 @@ export default function Profile() {
         </div>
       </div>
     );
-  }
-
-  if (!profileHandle && loadingAuth) {
-    return (
-          <div className={"settings-container profile-page profile-state"}>
-            <h2>Profile</h2>
-            <div className="state-loader">
-              <CircularProgress />
-            </div>
-          </div>
-        );
   }
 
   if (!session) {
