@@ -331,7 +331,7 @@ export default function Settings() {
               <p className="card-copy">Choose how ClipX behaves while you edit and save clips.</p>
               {options && defaultOptions && (
                 <FormGroup className={"options-form"}>
-                  <FormControlLabel
+                  {/* <FormControlLabel
                     control={
                       <Switch
                         checked={Boolean(options.deleteClipAfterCut)}
@@ -341,7 +341,7 @@ export default function Settings() {
                       />
                     }
                     label="Delete Clip After Cut?"
-                  />
+                  /> */}
                   <FormControlLabel
                     control={
                       <Checkbox

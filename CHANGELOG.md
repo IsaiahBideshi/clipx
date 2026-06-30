@@ -1,12 +1,8 @@
 # Changelog
 
-## v1.0.12
-
-- Test 2
-
 ## v1.0.11
 
-- Test 1
+- Removed unused button in settings.
 
 ## v1.0.10
 
