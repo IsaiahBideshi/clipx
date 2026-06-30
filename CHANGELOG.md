@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.0.10
+
+- Bug fix: changelog shows changes wrongly
+
 ## v1.0.9
 
 - Changelog now viewable in settings page.
