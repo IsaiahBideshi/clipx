@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.0.9
+
+- Changelog now viewable in settings page.
+
 ## v1.0.8
 
 - What's new section on update screen that shows changes.
