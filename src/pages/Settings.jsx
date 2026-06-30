@@ -6,6 +6,9 @@ import FormGroup from "@mui/material/FormGroup";
 import FormControlLabel from "@mui/material/FormControlLabel";
 import {Checkbox, Switch} from "@mui/material";
 import Button from "@mui/material/Button";
+import ArticleOutlinedIcon from "@mui/icons-material/ArticleOutlined";
+import changelog from "../../CHANGELOG.md?raw";
+import ChangelogModal from "../components/ChangelogModal.jsx";
 import { getCurrentUserId } from "../lib/authSession.js";
 
 const tfSx = {
@@ -132,6 +135,7 @@ export default function Settings() {
   const [loadingGoogleInfo, setLoadingGoogleInfo] = useState(true);
   const [confirmUnlink, setConfirmUnlink] = useState(false);
   const [linking, setLinking] = useState(false);
+  const [showChangelog, setShowChangelog] = useState(false);
   console.log(options);
 
   function updateOption(key, value) {
@@ -298,11 +302,22 @@ export default function Settings() {
             <h2>Settings</h2>
             <p className="hero-copy">Configure your editing defaults and connected services for a smoother workflow.</p>
           </div>
-          {appVersion && (
-            <div className="settings-version" aria-label={`ClipX version ${appVersion}`}>
-              Version {appVersion}
-            </div>
-          )}
+          <div className="settings-version-actions">
+            {appVersion && (
+              <div className="settings-version" aria-label={`ClipX version ${appVersion}`}>
+                Version {appVersion}
+              </div>
+            )}
+            <Button
+              className="settings-changelog-button"
+              variant="outlined"
+              size="small"
+              startIcon={<ArticleOutlinedIcon fontSize="small" />}
+              onClick={() => setShowChangelog(true)}
+            >
+              View changelog
+            </Button>
+          </div>
         </div>
 
         {!options ? (
@@ -410,6 +425,13 @@ export default function Settings() {
           </div>
         )}
       </div>
+      {showChangelog && (
+        <ChangelogModal
+          changelog={changelog}
+          currentVersion={appVersion}
+          onClose={() => setShowChangelog(false)}
+        />
+      )}
     </>
   );
 }

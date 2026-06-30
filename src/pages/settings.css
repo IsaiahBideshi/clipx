@@ -46,14 +46,25 @@
 }
 
 .settings-version {
-  flex: 0 0 auto;
-  margin-top: 6px;
   color: rgba(212, 215, 221, 1);
   font-size: 0.82rem;
   font-weight: 600;
   letter-spacing: 0.04em;
   opacity: 0.35;
   transition: opacity 160ms ease, color 160ms ease;
+}
+
+.settings-version-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: flex-end;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.settings-changelog-button {
+  white-space: nowrap;
 }
 
 
@@ -143,6 +154,14 @@
 }
 
 @media (max-width: 860px) {
+  .settings-hero {
+    flex-direction: column;
+  }
+
+  .settings-version-actions {
+    align-items: flex-start;
+  }
+
   .settings-grid {
     grid-template-columns: 1fr;
   }
