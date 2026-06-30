@@ -6,6 +6,7 @@ import { app } from "electron";
 
 import { uploadClipToYoutube } from "./youtubeService.js";
 import { resolveFfmpegPath } from "../utils/ffmpeg.js";
+import { getIndexedClipData, setIndexedClipMetadata } from "./clipIndexService.js";
 
 ffmpeg.setFfmpegPath(resolveFfmpegPath(ffmpegPath));
 
@@ -111,6 +112,7 @@ async function saveClipData(clipDir, clipEntry) {
   }
 
   await fs.promises.writeFile(clipDataPath, JSON.stringify(clipsData, null, 2), "utf-8");
+  setIndexedClipMetadata(clipEntry.path, clipEntry);
 }
 
 export async function saveClip(options) {
@@ -204,6 +206,11 @@ export async function uploadClip(app, options) {
 export async function getClipData(clipPath) {
   if (typeof clipPath !== "string" || clipPath.length === 0) {
     throw new TypeError("get-clip-data: clipPath must be a non-empty string");
+  }
+
+  const indexedClipData = getIndexedClipData(clipPath);
+  if (indexedClipData) {
+    return indexedClipData;
   }
 
   const clipDir = path.dirname(clipPath);

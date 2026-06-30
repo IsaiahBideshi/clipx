@@ -98,6 +98,10 @@
   transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
 }
 
+.local-files-page .clip-grid-virtual .clip-card {
+  width: auto;
+}
+
 .local-files-page .clip-card:hover {
   transform: translateY(-2px);
   border-color: rgba(144, 202, 249, 0.5);
@@ -122,6 +126,37 @@
 .local-files-empty {
   margin: 14px 0 0;
   color: rgba(255, 255, 255, 0.7);
+}
+
+.local-files-indexing {
+  width: 90%;
+  margin: 0 auto 12px;
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 0.88rem;
+}
+
+.local-files-new-clips {
+  position: sticky;
+  top: 10px;
+  z-index: 4;
+  display: block;
+  margin: 0 auto 12px;
+  padding: 8px 14px;
+  border: 1px solid rgba(144, 202, 249, 0.5);
+  border-radius: 999px;
+  background: rgba(25, 118, 210, 0.28);
+  color: #eef7ff;
+  font: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
+  transition: background 180ms ease, border-color 180ms ease, transform 180ms ease;
+}
+
+.local-files-new-clips:hover {
+  transform: translateY(-1px);
+  border-color: rgba(144, 202, 249, 0.72);
+  background: rgba(25, 118, 210, 0.4);
 }
 
 @media (max-width: 760px) {

@@ -2,8 +2,8 @@ import fallBackThumb from "../assets/thumbnail.png";
 import { useState, useEffect } from "react";
 
 function ClipCard({ clip, baseFolder, onClick }) {
-  const [thumbSrc, setThumbSrc] = useState(fallBackThumb);
-  const [hasThumb, setHasThumb] = useState(false);
+  const [thumbSrc, setThumbSrc] = useState(() => getThumbUrl(clip.thumbnailPath) || fallBackThumb);
+  const [hasThumb, setHasThumb] = useState(Boolean(clip.thumbnailPath));
 
   function getURL() {
     return `clipx://video?path=${encodeURIComponent(clip.path)}`;
@@ -12,19 +12,40 @@ function ClipCard({ clip, baseFolder, onClick }) {
   useEffect(() => {
     let mounted = true;
 
-    window.clipx
-      .getThumbnail(clip.path, baseFolder)
+    const cachedThumbUrl = getThumbUrl(clip.thumbnailPath);
+    if (cachedThumbUrl) {
+      setThumbSrc(cachedThumbUrl);
+      setHasThumb(true);
+      return () => {
+        mounted = false;
+      };
+    }
+
+    setThumbSrc(fallBackThumb);
+    setHasThumb(false);
+
+    const getThumbnail = window.clipx?.getThumbnail;
+    if (typeof getThumbnail !== "function") {
+      return () => {
+        mounted = false;
+      };
+    }
+
+    getThumbnail(clip.path, baseFolder)
       .then((thumbPath) => {
         if (mounted) {
-          setThumbSrc(`clipx://image?path=${thumbPath}`);
+          setThumbSrc(getThumbUrl(thumbPath));
           setHasThumb(true);
         }
+      })
+      .catch((error) => {
+        console.error("Failed to load thumbnail:", error);
       });
 
     return () => {
       mounted = false;
     };
-  }, [clip.path]);
+  }, [baseFolder, clip.path, clip.thumbnailPath]);
 
   return (
     <div className={`clip-card ${hasThumb ? "" : "no-thumb"}`} onClick={onClick}>
@@ -40,6 +61,10 @@ function ClipCard({ clip, baseFolder, onClick }) {
 }
 
 export default ClipCard;
+
+function getThumbUrl(thumbPath) {
+  return thumbPath ? `clipx://image?path=${encodeURIComponent(thumbPath)}` : null;
+}
 
 function formatDate(dateStr) {
   const date = new Date(dateStr);

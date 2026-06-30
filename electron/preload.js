@@ -6,6 +6,24 @@ contextBridge.exposeInMainWorld("clipx", {
   pickFolder: () => ipcRenderer.invoke("pick-folder"),
   pickVideoFile: () => ipcRenderer.invoke("pick-video-file"),
   scanFolder: (folderPath) => ipcRenderer.invoke("scan-folder", folderPath),
+  listLocalClips: (options) => ipcRenderer.invoke("local-clips:list", options),
+  refreshLocalClipIndex: (options) => ipcRenderer.invoke("local-clips:refresh-index", options),
+  onLocalClipIndexChanged: (callback) => {
+    if (typeof callback !== "function") {
+      return () => {};
+    }
+
+    const listener = (_event, payload) => {
+      try {
+        callback(payload);
+      } catch (error) {
+        console.error("ClipX: Local clip index callback failed:", error);
+      }
+    };
+
+    ipcRenderer.on("local-clips:index-changed", listener);
+    return () => ipcRenderer.removeListener("local-clips:index-changed", listener);
+  },
   getThumbnail: (videoPath, thumbsDir) => ipcRenderer.invoke("get-thumbnail", videoPath, thumbsDir),
   getTaglist: () => ipcRenderer.invoke("get-taglist"),
   saveTaglist: (taglist) => ipcRenderer.invoke("save-taglist", taglist),
