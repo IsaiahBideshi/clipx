@@ -7,10 +7,46 @@ import { app } from "electron";
 import { getFastFileId } from "../utils/hashing.js";
 import { getMimeType } from "../utils/mime.js";
 import { resolveFfmpegPath } from "../utils/ffmpeg.js";
+import { isSupportedVideoFile } from "../utils/videoFiles.js";
+import { getCachedThumbnailPath, setCachedThumbnailPath } from "./clipIndexService.js";
 
 ffmpeg.setFfmpegPath(resolveFfmpegPath(ffmpegPath));
 
-const VIDEO_EXTENSIONS = [".mp4", ".mkv", ".mov", ".avi", ".flv", ".wmv", ".webm"];
+const THUMBNAIL_CONCURRENCY = 2;
+const thumbnailQueue = [];
+const inFlightThumbnails = new Map();
+let activeThumbnailJobs = 0;
+
+function runThumbnailQueue() {
+  while (activeThumbnailJobs < THUMBNAIL_CONCURRENCY && thumbnailQueue.length > 0) {
+    const item = thumbnailQueue.shift();
+    activeThumbnailJobs += 1;
+
+    Promise.resolve()
+      .then(item.job)
+      .then(item.resolve, item.reject)
+      .finally(() => {
+        activeThumbnailJobs -= 1;
+        runThumbnailQueue();
+      });
+  }
+}
+
+function enqueueThumbnailJob(key, job) {
+  if (inFlightThumbnails.has(key)) {
+    return inFlightThumbnails.get(key);
+  }
+
+  const promise = new Promise((resolve, reject) => {
+    thumbnailQueue.push({ job, resolve, reject });
+    runThumbnailQueue();
+  }).finally(() => {
+    inFlightThumbnails.delete(key);
+  });
+
+  inFlightThumbnails.set(key, promise);
+  return promise;
+}
 
 export function registerClipxProtocol(protocol) {
   protocol.handle("clipx", async (request) => {
@@ -115,8 +151,7 @@ export async function scanFolder(folderPath) {
           continue;
         }
 
-        const ext = path.extname(entry.name).toLowerCase();
-        if (!VIDEO_EXTENSIONS.includes(ext)) {
+        if (!isSupportedVideoFile(entry.name)) {
           continue;
         }
 
@@ -156,6 +191,11 @@ export async function scanFolder(folderPath) {
 }
 
 export async function generateThumbnail(videoPath) {
+  const cachedThumbPath = getCachedThumbnailPath(videoPath);
+  if (cachedThumbPath) {
+    return cachedThumbPath;
+  }
+
   const clipx = path.join(app.getPath("appData"), "clipx");
   let thumbsDir;
   if (videoPath.toLowerCase().includes("clipx videos")) {
@@ -168,20 +208,31 @@ export async function generateThumbnail(videoPath) {
   const thumbPath = path.join(thumbsDir, `${baseName}.jpg`);
 
   if (fs.existsSync(thumbPath)) {
+    setCachedThumbnailPath(videoPath, thumbPath);
     return thumbPath;
   }
 
   await fs.promises.mkdir(thumbsDir, { recursive: true });
 
-  return new Promise((resolve, reject) => {
-    ffmpeg(videoPath)
-      .screenshots({
-        timestamps: ["1"],
-        filename: `${baseName}.jpg`,
-        folder: thumbsDir,
-        size: "320x180",
-      })
-      .on("end", () => resolve(thumbPath))
-      .on("error", reject);
+  return enqueueThumbnailJob(videoPath, async () => {
+    if (fs.existsSync(thumbPath)) {
+      setCachedThumbnailPath(videoPath, thumbPath);
+      return thumbPath;
+    }
+
+    await new Promise((resolve, reject) => {
+      ffmpeg(videoPath)
+        .screenshots({
+          timestamps: ["1"],
+          filename: `${baseName}.jpg`,
+          folder: thumbsDir,
+          size: "320x180",
+        })
+        .on("end", resolve)
+        .on("error", reject);
+    });
+
+    setCachedThumbnailPath(videoPath, thumbPath);
+    return thumbPath;
   });
 }
