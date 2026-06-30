@@ -28,13 +28,37 @@ function emitUpdateState(state) {
   }
 }
 
+function toReleaseVersion(version) {
+  const value = String(version || "").trim();
+  if (!value) {
+    return null;
+  }
+
+  return `v${value.replace(/^v/i, "")}`;
+}
+
+function toVersionedReleaseNotes(releaseNotes = []) {
+  return releaseNotes
+    .map((note) => {
+      const body = String(note?.note || "").trim();
+      if (!body) {
+        return "";
+      }
+
+      const version = toReleaseVersion(note?.version);
+      return version ? `<h2>${version}</h2>\n${body}` : body;
+    })
+    .filter(Boolean)
+    .join("\n\n");
+}
+
 function toUpdateInfo(updateInfo = {}) {
   return {
     version: updateInfo.version,
     releaseName: updateInfo.releaseName,
     releaseDate: updateInfo.releaseDate,
     releaseNotes: Array.isArray(updateInfo.releaseNotes)
-      ? updateInfo.releaseNotes.map((note) => note.note).filter(Boolean).join("\n\n")
+      ? toVersionedReleaseNotes(updateInfo.releaseNotes)
       : updateInfo.releaseNotes,
   };
 }
@@ -207,6 +231,7 @@ export function scheduleInitialUpdateCheck(delayMs = 5000) {
 export function registerUpdateIpcHandlers() {
   autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = false;
+  autoUpdater.fullChangelog = true;
 
   autoUpdater.on("checking-for-update", () => {
     emitUpdateState({ status: "checking" });

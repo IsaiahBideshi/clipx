@@ -2,7 +2,7 @@
 
 ## v1.0.10
 
-- Test update: Nothing changed
+- Changelog includes gapped updates
 
 ## v1.0.9
 
