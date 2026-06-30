@@ -20,6 +20,11 @@ function decodeHtmlEntities(value) {
     .replace(/&#39;/g, "'");
 }
 
+function hasHtmlMarkup(value) {
+  const text = String(value || "");
+  return /<\/?[a-z][\s\S]*>/i.test(text) || /&lt;\/?[a-z][\s\S]*?&gt;/i.test(text);
+}
+
 function htmlToPlainText(html) {
   return decodeHtmlEntities(String(html || "")
     .replace(/<li[^>]*>\s*/gi, "- ")
@@ -33,7 +38,44 @@ function htmlToPlainText(html) {
     .join("\n");
 }
 
+function isVersionText(value) {
+  return /^v?\d+\.\d+\.\d+(?:[-+][a-z0-9.-]+)?$/i.test(String(value || "").trim());
+}
+
 function parseHtmlChangelogSections(text) {
+  if (typeof document !== "undefined") {
+    const template = document.createElement("template");
+    template.innerHTML = text;
+    const headings = [...template.content.querySelectorAll("h1, h2, h3, h4, h5, h6")]
+      .filter((heading) => isVersionText(heading.textContent));
+
+    if (headings.length) {
+      return headings.map((heading) => {
+        const contentParts = [];
+        let sibling = heading.nextSibling;
+
+        while (sibling) {
+          if (sibling.nodeType === Node.ELEMENT_NODE) {
+            const tagName = sibling.tagName.toLowerCase();
+            if (/^h[1-6]$/.test(tagName) && isVersionText(sibling.textContent)) {
+              break;
+            }
+            contentParts.push(sibling.outerHTML);
+          } else if (sibling.nodeType === Node.TEXT_NODE) {
+            contentParts.push(sibling.textContent);
+          }
+
+          sibling = sibling.nextSibling;
+        }
+
+        return {
+          version: heading.textContent.trim(),
+          content: htmlToPlainText(contentParts.join("\n")),
+        };
+      });
+    }
+  }
+
   const headingPattern = /<h[1-6][^>]*>\s*(v?\d+\.\d+\.\d+(?:[-+][^<\s]+)?)\s*<\/h[1-6]>/gi;
   const headings = [];
   let match;
@@ -94,17 +136,20 @@ function parseMarkdownChangelogSections(text) {
 }
 
 export function parseChangelogSections(changelog, highlightedVersion) {
-  const text = String(changelog || "").trim();
+  const rawText = String(changelog || "").trim();
+  const decodedText = decodeHtmlEntities(rawText).trim();
+  const text = hasHtmlMarkup(rawText) || hasHtmlMarkup(decodedText) ? decodedText : rawText;
   if (!text) {
     return [];
   }
 
-  const parsedSections = parseHtmlChangelogSections(text);
-  const sections = parsedSections.length ? parsedSections : parseMarkdownChangelogSections(text);
+  const isHtml = hasHtmlMarkup(text);
+  const parsedSections = isHtml ? parseHtmlChangelogSections(text) : [];
+  const sections = parsedSections.length ? parsedSections : (isHtml ? [] : parseMarkdownChangelogSections(text));
 
   if (!sections.length) {
     const version = highlightedVersion ? `v${normalizeVersion(highlightedVersion)}` : "Latest update";
-    const content = /<\/?[a-z][\s\S]*>/i.test(text) ? htmlToPlainText(text) : text;
+    const content = isHtml ? htmlToPlainText(text) : text;
     return [{
       version,
       content,

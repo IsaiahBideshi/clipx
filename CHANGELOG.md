@@ -1,16 +1,10 @@
 # Changelog
 
-## v1.0.11
-
-- Bug fix: changelog css fix
-
-## v1.0.10
-
-- Bug fix: changelog shows changes wrongly
 
 ## v1.0.9
 
 - Changelog now viewable in settings page.
+- Bug fixes
 
 ## v1.0.8
 
