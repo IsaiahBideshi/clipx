@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.0.11
+
+- Test 1
+
 ## v1.0.10
 
 - Changelog includes gapped updates
