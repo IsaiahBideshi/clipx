@@ -5,8 +5,9 @@
   "main": "electron/main.js",
   "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "npx electron .",
+    "dev": "concurrently --kill-others --success first -n vite,electron \"npm:dev:vite\" \"npm:dev:electron\"",
+    "dev:vite": "vite --host 127.0.0.1 --port 5173",
+    "dev:electron": "wait-on tcp:127.0.0.1:5173 && cross-env ELECTRON_RENDERER_URL=http://127.0.0.1:5173 electron .",
     "build:react": "vite build",
     "build:electron": "electron-builder build --win --publish never",
     "build": "vite build && electron-builder build --win --publish never",
@@ -39,9 +40,12 @@
   "private": true,
   "devDependencies": {
     "@vitejs/plugin-react": "^5.1.3",
+    "concurrently": "^10.0.3",
+    "cross-env": "^10.1.0",
     "electron": "^41.0.4",
     "electron-builder": "^26.8.1",
-    "vite": "^7.3.1"
+    "vite": "^7.3.1",
+    "wait-on": "^9.0.10"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",

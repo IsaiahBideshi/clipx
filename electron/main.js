@@ -19,6 +19,9 @@ import { registerUpdateIpcHandlers, registerUpdateWindowGuards, scheduleInitialU
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const appIconPath = path.join(__dirname, "assets", "clipx_icon.ico");
 const isDev = !app.isPackaged;
+if (isDev) {
+  app.setPath("userData", path.join(app.getPath("appData"), "clipx-dev"));
+}
 const devServerUrl = process.env.ELECTRON_RENDERER_URL || "http://localhost:5173";
 const distPath = path.join(app.getAppPath(), "dist");
 let rendererServer = null;
