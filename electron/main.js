@@ -29,6 +29,7 @@ let rendererServer = null;
 let mainWindow = null;
 let tray = null;
 let isQuitting = false;
+const hasSingleInstanceLock = app.requestSingleInstanceLock();
 
 const STATIC_MIME_TYPES = {
   ".html": "text/html; charset=UTF-8",
@@ -328,13 +329,26 @@ function registerIpcHandlers() {
 }
 
 app.setAppUserModelId("com.isaiah.clipx");
-app.whenReady().then(async () => {
-  registerClipxProtocol(protocol);
-  registerAppProtocol();
-  registerIpcHandlers();
-  await createWindow();
-  scheduleInitialUpdateCheck();
-});
+if (!hasSingleInstanceLock) {
+  app.quit();
+} else {
+  app.on("second-instance", () => {
+    if (app.isReady()) {
+      showMainWindow();
+      return;
+    }
+
+    app.whenReady().then(() => showMainWindow());
+  });
+
+  app.whenReady().then(async () => {
+    registerClipxProtocol(protocol);
+    registerAppProtocol();
+    registerIpcHandlers();
+    await createWindow();
+    scheduleInitialUpdateCheck();
+  });
+}
 
 app.on("activate", () => {
   showMainWindow();

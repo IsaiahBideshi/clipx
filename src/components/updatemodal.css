@@ -10,7 +10,9 @@
 }
 
 .update-modal {
-  width: min(420px, 100%);
+  width: min(520px, 100%);
+  max-height: calc(100vh - 48px);
+  overflow: auto;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 8px;
   background: #1e1f22;
@@ -26,11 +28,94 @@
   line-height: 1.2;
 }
 
+.update-modal h3 {
+  margin: 0 0 10px;
+  font-size: 1rem;
+  line-height: 1.25;
+}
+
 .update-modal p {
   margin: 0 0 20px;
   color: #d4d7dd;
   font-size: 0.98rem;
   line-height: 1.5;
+}
+
+.update-changelog {
+  margin: 0 0 22px;
+}
+
+.update-changelog-list {
+  max-height: min(260px, 38vh);
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 10px;
+}
+
+.update-changelog-entry {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.035);
+  padding: 12px 14px;
+}
+
+.update-changelog-entry.is-target {
+  border-color: rgba(81, 207, 255, 0.5);
+  background:
+    linear-gradient(135deg, rgba(81, 207, 255, 0.14), rgba(94, 234, 212, 0.06)),
+    rgba(255, 255, 255, 0.045);
+  box-shadow: 0 0 0 1px rgba(81, 207, 255, 0.18), 0 14px 34px rgba(81, 207, 255, 0.08);
+}
+
+.update-changelog-entry.is-target::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: linear-gradient(180deg, #51cfff, #5eead4);
+}
+
+.update-changelog-entry-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 8px;
+  color: #ffffff;
+  font-size: 0.96rem;
+  font-weight: 700;
+}
+
+.update-changelog-entry-header span {
+  min-width: 0;
+}
+
+.update-changelog-entry-header strong {
+  border: 1px solid rgba(94, 234, 212, 0.38);
+  border-radius: 999px;
+  background: rgba(94, 234, 212, 0.12);
+  color: #bff7ee;
+  flex: 0 0 auto;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1;
+  padding: 6px 8px;
+}
+
+.update-changelog-entry-body {
+  color: #d4d7dd;
+  font-size: 0.92rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .update-modal-actions {
@@ -46,4 +131,16 @@
   color: #d4d7dd;
   font-size: 0.9rem;
   text-align: right;
+}
+
+@media (max-width: 520px) {
+  .update-modal-backdrop {
+    align-items: flex-end;
+    padding: 16px;
+  }
+
+  .update-modal {
+    max-height: calc(100vh - 32px);
+    padding: 20px;
+  }
 }

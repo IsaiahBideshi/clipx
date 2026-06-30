@@ -43,11 +43,75 @@ jobs:
 
           "tag=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
 
+      - name: Extract changelog
+        id: release_notes
+        shell: pwsh
+        run: |
+          $tag = "${{ steps.release_tag.outputs.tag }}"
+          $changelogPath = "CHANGELOG.md"
+          $notesPath = Join-Path $env:RUNNER_TEMP "release-notes.md"
+
+          if (-not (Test-Path $changelogPath)) {
+            throw "CHANGELOG.md is required to create release notes for $tag."
+          }
+
+          $lines = Get-Content $changelogPath
+          $targetHeadingPattern = "^##\s+$([regex]::Escape($tag))\s*$"
+          $nextHeadingPattern = "^##\s+"
+          $startIndex = -1
+
+          for ($i = 0; $i -lt $lines.Count; $i++) {
+            if ($lines[$i] -match $targetHeadingPattern) {
+              $startIndex = $i
+              break
+            }
+          }
+
+          if ($startIndex -lt 0) {
+            throw "CHANGELOG.md must include a '## $tag' section before releasing $tag."
+          }
+
+          $endIndex = $lines.Count
+          for ($i = $startIndex + 1; $i -lt $lines.Count; $i++) {
+            if ($lines[$i] -match $nextHeadingPattern) {
+              $endIndex = $i
+              break
+            }
+          }
+
+          $sectionLines = [System.Collections.Generic.List[string]]::new()
+          for ($i = $startIndex + 1; $i -lt $endIndex; $i++) {
+            [void]$sectionLines.Add($lines[$i])
+          }
+
+          $notes = ($sectionLines -join "`n").Trim()
+          if ([string]::IsNullOrWhiteSpace($notes)) {
+            throw "CHANGELOG.md section '## $tag' must include release notes."
+          }
+
+          $firstHeadingIndex = -1
+          for ($i = 0; $i -lt $lines.Count; $i++) {
+            if ($lines[$i] -match $nextHeadingPattern) {
+              $firstHeadingIndex = $i
+              break
+            }
+          }
+
+          $changelogLines = [System.Collections.Generic.List[string]]::new()
+          for ($i = $firstHeadingIndex; $i -lt $lines.Count; $i++) {
+            [void]$changelogLines.Add($lines[$i])
+          }
+
+          $changelog = ($changelogLines -join "`n").Trim()
+          Set-Content -Path $notesPath -Value $changelog -Encoding utf8
+          "path=$notesPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.release_tag.outputs.tag }}
           target_commitish: ${{ github.sha }}
+          body_path: ${{ steps.release_notes.outputs.path }}
           files: |
             dist/ClipX-Setup.exe
             dist/ClipX-Setup.exe.blockmap
