@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.0.11
+
+- Bug fix: changelog css fix
+
 ## v1.0.10
 
 - Bug fix: changelog shows changes wrongly

@@ -10,9 +10,12 @@
 }
 
 .update-modal {
-  width: min(520px, 100%);
-  max-height: calc(100vh - 48px);
-  overflow: auto;
+  box-sizing: border-box;
+  width: min(680px, 100%);
+  max-height: calc(100dvh - 48px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 8px;
   background: #1e1f22;
@@ -35,6 +38,7 @@
 }
 
 .update-modal p {
+  flex: 0 0 auto;
   margin: 0 0 20px;
   color: #d4d7dd;
   font-size: 0.98rem;
@@ -42,12 +46,15 @@
 }
 
 .update-changelog {
+  min-height: 0;
+  flex: 1 1 auto;
   margin: 0 0 22px;
 }
 
 .update-changelog-list {
-  max-height: min(260px, 38vh);
-  overflow: auto;
+  max-height: min(480px, 54dvh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -59,7 +66,7 @@
 
 .update-changelog-entry {
   position: relative;
-  overflow: hidden;
+  overflow: visible;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.035);
@@ -119,6 +126,7 @@
 }
 
 .update-modal-actions {
+  flex: 0 0 auto;
   display: flex;
   justify-content: flex-end;
   gap: 10px;
@@ -140,7 +148,12 @@
   }
 
   .update-modal {
-    max-height: calc(100vh - 32px);
+    width: 100%;
+    max-height: calc(100dvh - 32px);
     padding: 20px;
+  }
+
+  .update-changelog-list {
+    max-height: 48dvh;
   }
 }

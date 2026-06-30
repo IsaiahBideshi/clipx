@@ -43,7 +43,7 @@ jobs:
 
           "tag=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
 
-      - name: Extract changelog
+      - name: Extract release notes
         id: release_notes
         shell: pwsh
         run: |
@@ -89,21 +89,7 @@ jobs:
             throw "CHANGELOG.md section '## $tag' must include release notes."
           }
 
-          $firstHeadingIndex = -1
-          for ($i = 0; $i -lt $lines.Count; $i++) {
-            if ($lines[$i] -match $nextHeadingPattern) {
-              $firstHeadingIndex = $i
-              break
-            }
-          }
-
-          $changelogLines = [System.Collections.Generic.List[string]]::new()
-          for ($i = $firstHeadingIndex; $i -lt $lines.Count; $i++) {
-            [void]$changelogLines.Add($lines[$i])
-          }
-
-          $changelog = ($changelogLines -join "`n").Trim()
-          Set-Content -Path $notesPath -Value $changelog -Encoding utf8
+          Set-Content -Path $notesPath -Value $notes -Encoding utf8
           "path=$notesPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
 
       - name: Create GitHub release

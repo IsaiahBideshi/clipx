@@ -104,9 +104,10 @@ export function parseChangelogSections(changelog, highlightedVersion) {
 
   if (!sections.length) {
     const version = highlightedVersion ? `v${normalizeVersion(highlightedVersion)}` : "Latest update";
+    const content = /<\/?[a-z][\s\S]*>/i.test(text) ? htmlToPlainText(text) : text;
     return [{
       version,
-      content: text,
+      content,
       isHighlighted: true,
     }];
   }
