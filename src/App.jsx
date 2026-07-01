@@ -1,26 +1,78 @@
 import './App.css';
-import ClipGrid from './components/ClipGrid.jsx';
-import ClipEditor from './components/ClipEditor.jsx';
 import ErrorFallback from "./components/errorfallback.jsx";
 import LocalFiles from './pages/LocalFiles.jsx';
 import Settings from './pages/Settings.jsx';
 
 import {useState, useEffect} from 'react';
-import {HashRouter as Router, Routes, Route} from "react-router-dom";
+import {Routes, Route} from "react-router-dom";
 import {ErrorBoundary} from "react-error-boundary";
 
-import Button from '@mui/material/Button';
-import SettingsIcon from '@mui/icons-material/Settings';
 import Library from "./pages/Library.jsx";
 import Profile from "./pages/Profile.jsx";
 import Signup from "./pages/signup.jsx";
 import Login from "./pages/login.jsx";
 import UpdateModal from "./components/UpdateModal.jsx";
+import NavBar from "./components/NavBar.jsx";
+
+const NAV_UPDATE_STATUSES = new Set([
+  "available",
+  "downloading",
+  "cancelling",
+  "downloaded",
+  "installing",
+  "error",
+]);
+
+function hasNavUpdate(updateState) {
+  if (!updateState?.update?.version) {
+    return false;
+  }
+
+  return NAV_UPDATE_STATUSES.has(updateState.status);
+}
 
 
 export default function App() {
+  const [updateState, setUpdateState] = useState(null);
+  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
+  const showUpdateButton = hasNavUpdate(updateState);
+
+  useEffect(() => {
+    if (!window.clipx?.onUpdateState) {
+      return undefined;
+    }
+
+    let mounted = true;
+    window.clipx.getUpdateState?.().then((state) => {
+      if (mounted) {
+        setUpdateState(state);
+      }
+    }).catch((err) => {
+      console.error("Failed to load update state:", err);
+    });
+
+    const unsubscribe = window.clipx.onUpdateState((state) => {
+      setUpdateState(state);
+    });
+
+    return () => {
+      mounted = false;
+      unsubscribe?.();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!showUpdateButton) {
+      setIsUpdateModalOpen(false);
+    }
+  }, [showUpdateButton]);
+
   return (
     <>
+      <NavBar
+        showUpdateButton={showUpdateButton}
+        onUpdateClick={() => setIsUpdateModalOpen(true)}
+      />
       <Routes>
         <Route path="/" element={
           <ErrorBoundary FallbackComponent={ErrorFallback}>
@@ -53,7 +105,11 @@ export default function App() {
           </ErrorBoundary>
         } />
       </Routes>
-      <UpdateModal/>
+      <UpdateModal
+        updateState={updateState}
+        open={isUpdateModalOpen}
+        onClose={() => setIsUpdateModalOpen(false)}
+      />
     </>
   );
 }

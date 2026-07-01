@@ -2,8 +2,11 @@ import { app, ipcMain } from "electron";
 import fs from "fs";
 import path from "path";
 
-function getLoginItemOptions(openAtLogin) {
+const STARTUP_MINIMIZED_ARG = "--clipx-startup-minimized";
+
+function getLoginItemOptions(openAtLogin, { includeStartupArg = true } = {}) {
   const options = {};
+  const startupArgs = includeStartupArg ? [STARTUP_MINIMIZED_ARG] : [];
 
   if (typeof openAtLogin === "boolean") {
     options.openAtLogin = openAtLogin;
@@ -11,10 +14,27 @@ function getLoginItemOptions(openAtLogin) {
 
   if (!app.isPackaged && process.defaultApp) {
     options.path = process.execPath;
-    options.args = [app.getAppPath()];
+    options.args = [app.getAppPath(), ...startupArgs];
+  } else if (startupArgs.length > 0) {
+    options.args = startupArgs;
   }
 
   return options;
+}
+
+function getLaunchAtStartupEnabled() {
+  return (
+    app.getLoginItemSettings(getLoginItemOptions()).openAtLogin ||
+    app.getLoginItemSettings(getLoginItemOptions(undefined, { includeStartupArg: false })).openAtLogin
+  );
+}
+
+function setLaunchAtStartupEnabled(openAtLogin) {
+  if (!openAtLogin) {
+    app.setLoginItemSettings(getLoginItemOptions(false, { includeStartupArg: false }));
+  }
+
+  app.setLoginItemSettings(getLoginItemOptions(openAtLogin));
 }
 
 export function registerSettingsIpcHandlers() {
@@ -157,12 +177,12 @@ export function registerSettingsIpcHandlers() {
   });
 
   ipcMain.handle("get-launch-at-startup", async () => {
-    return app.getLoginItemSettings(getLoginItemOptions()).openAtLogin;
+    return getLaunchAtStartupEnabled();
   });
 
   ipcMain.handle("set-launch-at-startup", async (_event, enabled) => {
     const openAtLogin = Boolean(enabled);
-    app.setLoginItemSettings(getLoginItemOptions(openAtLogin));
-    return app.getLoginItemSettings(getLoginItemOptions()).openAtLogin;
+    setLaunchAtStartupEnabled(openAtLogin);
+    return getLaunchAtStartupEnabled();
   });
 }

@@ -25,10 +25,12 @@ if (isDev) {
 }
 const devServerUrl = process.env.ELECTRON_RENDERER_URL || "http://localhost:5173";
 const distPath = path.join(app.getAppPath(), "dist");
+const STARTUP_MINIMIZED_ARG = "--clipx-startup-minimized";
 let rendererServer = null;
 let mainWindow = null;
 let tray = null;
 let isQuitting = false;
+let shouldMaximizeOnFirstShow = false;
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
 
 const STATIC_MIME_TYPES = {
@@ -192,6 +194,11 @@ async function showMainWindow() {
     mainWindow.restore();
   }
 
+  if (shouldMaximizeOnFirstShow && !mainWindow.isMaximized()) {
+    mainWindow.maximize();
+    shouldMaximizeOnFirstShow = false;
+  }
+
   mainWindow.show();
   mainWindow.focus();
 }
@@ -250,10 +257,11 @@ function registerAppProtocol() {
   });
 }
 
-async function createWindow() {
+async function createWindow({ show = true } = {}) {
   const win = new BrowserWindow({
     width: 1500,
     height: 850,
+    show,
     fullscreenable: true,
     icon: appIconPath,
     webPreferences: {
@@ -266,6 +274,7 @@ async function createWindow() {
   win.on("closed", () => {
     if (mainWindow === win) {
       mainWindow = null;
+      shouldMaximizeOnFirstShow = false;
     }
   });
 
@@ -303,7 +312,12 @@ async function createWindow() {
     return { action: "deny" };
   });
 
-  win.maximize();
+  if (show) {
+    win.maximize();
+  } else {
+    shouldMaximizeOnFirstShow = true;
+  }
+
   if (isDev) {
     try {
       await win.loadURL(devServerUrl);
@@ -342,10 +356,14 @@ if (!hasSingleInstanceLock) {
   });
 
   app.whenReady().then(async () => {
+    const launchMinimized = process.argv.includes(STARTUP_MINIMIZED_ARG);
     registerClipxProtocol(protocol);
     registerAppProtocol();
     registerIpcHandlers();
-    await createWindow();
+    if (launchMinimized) {
+      ensureTray();
+    }
+    await createWindow({ show: !launchMinimized });
     scheduleInitialUpdateCheck();
   });
 }

@@ -174,7 +174,6 @@ export default function ChangelogPanel({ changelog, highlightedVersion, highligh
 
   return (
     <div className="update-changelog">
-      <h3>Changelog</h3>
       <div className="update-changelog-list" aria-label="Release changelog">
         {sections.map((section) => (
           <article

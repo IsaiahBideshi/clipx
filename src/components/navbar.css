@@ -12,14 +12,34 @@
   padding-left: 10px;
   padding-right: 10px
 }
+.left-nav-bar,
+.right-nav-bar {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+
 .nav-icon{
   border: none;
-  width: 50px;
+  width: 54px;
   height: 30px;
+  box-sizing: border-box;
   background-color: transparent;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 54px;
+  min-width: 0;
   z-index: 2;
-  padding: 0 15px;
+  padding: 0;
+}
+
+.nav-update-button.nav-icon.MuiIconButton-root {
+  color: #90caf9 !important;
+  width: 54px;
+  height: 30px;
+  padding: 0;
 }
 
 .settings-container{

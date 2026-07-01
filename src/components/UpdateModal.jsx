@@ -4,49 +4,22 @@ import LinearProgress from "@mui/material/LinearProgress";
 import ChangelogPanel from "./ChangelogPanel.jsx";
 import "./updatemodal.css";
 
-export default function UpdateModal() {
-  const [updateState, setUpdateState] = useState(null);
-  const [dismissedVersion, setDismissedVersion] = useState(null);
+export default function UpdateModal({ updateState, open = false, onClose }) {
   const [userStartedUpdate, setUserStartedUpdate] = useState(false);
   const [pendingAction, setPendingAction] = useState(null);
-
-  useEffect(() => {
-    if (!window.clipx?.onUpdateState) {
-      return undefined;
-    }
-
-    let mounted = true;
-    window.clipx.getUpdateState?.().then((state) => {
-      if (mounted) {
-        setUpdateState(state);
-      }
-    }).catch((err) => {
-      console.error("Failed to load update state:", err);
-    });
-
-    const unsubscribe = window.clipx.onUpdateState((state) => {
-      setUpdateState(state);
-    });
-
-    return () => {
-      mounted = false;
-      unsubscribe?.();
-    };
-  }, []);
 
   useEffect(() => {
     setPendingAction(null);
   }, [updateState?.status]);
 
   const updateVersion = updateState?.update?.version;
-  const isDismissed = updateVersion && dismissedVersion === updateVersion;
   const shouldShow = useMemo(() => {
     if (!updateState) {
       return false;
     }
 
     if (updateState.status === "available") {
-      return !isDismissed;
+      return open;
     }
 
     if (updateState.status === "downloading" || updateState.status === "cancelling" || updateState.status === "installing") {
@@ -54,11 +27,15 @@ export default function UpdateModal() {
     }
 
     if (updateState.status === "downloaded") {
-      return !isDismissed;
+      return open;
     }
 
-    return updateState.status === "error" && userStartedUpdate;
-  }, [isDismissed, updateState, userStartedUpdate]);
+    if (updateState.status === "error") {
+      return open && (userStartedUpdate || Boolean(updateState.update?.version));
+    }
+
+    return false;
+  }, [open, updateState, userStartedUpdate]);
 
   if (!shouldShow) {
     return null;
@@ -86,8 +63,8 @@ export default function UpdateModal() {
   }
 
   function dismiss() {
-    setDismissedVersion(updateVersion || "unknown");
     setUserStartedUpdate(false);
+    onClose?.();
   }
 
   async function cancelDownload() {

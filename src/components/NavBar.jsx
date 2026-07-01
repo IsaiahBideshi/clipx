@@ -7,11 +7,14 @@ import SettingsIcon from '@mui/icons-material/Settings';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import VideoLibraryIcon from '@mui/icons-material/VideoLibrary';
 import FolderIcon from '@mui/icons-material/Folder';
+import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined';
+import IconButton from '@mui/material/IconButton';
+import Tooltip from '@mui/material/Tooltip';
 
-export default function NavBar({ openSettings }) {
+export default function NavBar({ showUpdateButton = false, onUpdateClick }) {
   return (
     <div className="nav-bar">
-      <div className="left-nav-bar" onClick={openSettings}>
+      <div className="left-nav-bar">
         <Link to="/" className="nav-icon" aria-label="Settings">
           <FolderIcon fontSize="medium" />
         </Link>
@@ -24,6 +27,19 @@ export default function NavBar({ openSettings }) {
       <h2>ClipX</h2>
 
       <div className="right-nav-bar">
+        {showUpdateButton && (
+          <Tooltip title="Update available">
+            <IconButton
+              className="nav-icon nav-update-button"
+              aria-label="Update available"
+              onClick={onUpdateClick}
+              size="medium"
+            >
+              <FileDownloadOutlinedIcon fontSize="medium" />
+            </IconButton>
+          </Tooltip>
+        )}
+
         <Link to={"/profile"} className="nav-icon" aria-label="Account">
           <AccountCircleIcon fontSize="medium" />
         </Link>

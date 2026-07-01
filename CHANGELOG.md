@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.0.12
+
+- App now starts minimized when enabled. User must toggle off/on again to fix.
+- New: When update is available, update button appears next to profile icon
+
 ## v1.0.11
 
 - Removed unused button in settings.
