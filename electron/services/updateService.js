@@ -4,6 +4,8 @@ import builderUtilRuntime from "builder-util-runtime";
 
 const { autoUpdater } = electronUpdater;
 const { CancellationError, CancellationToken } = builderUtilRuntime;
+const INITIAL_UPDATE_CHECK_DELAY_MS = 5000;
+const UPDATE_CHECK_INTERVAL_MS = 60 * 60 * 1000;
 
 let latestState = {
   status: "idle",
@@ -16,6 +18,8 @@ let hasAvailableUpdate = false;
 let isDownloading = false;
 let hasDownloadedUpdate = false;
 let isInstalling = false;
+let initialUpdateCheckTimeout = null;
+let recurringUpdateCheckInterval = null;
 
 function emitUpdateState(state) {
   latestState = {
@@ -87,7 +91,7 @@ function clearDownloadState() {
   isDownloading = false;
 }
 
-async function checkForUpdates() {
+export async function checkForUpdates() {
   if (!app.isPackaged) {
     emitUpdateState({
       status: "disabled",
@@ -100,7 +104,7 @@ async function checkForUpdates() {
     return latestState;
   }
 
-  if (isInstalling || isDownloading) {
+  if (isInstalling || isDownloading || hasAvailableUpdate || hasDownloadedUpdate) {
     return latestState;
   }
 
@@ -218,14 +222,28 @@ function installUpdate() {
   return latestState;
 }
 
-export function scheduleInitialUpdateCheck(delayMs = 5000) {
+export function scheduleUpdateChecks({
+  initialDelayMs = INITIAL_UPDATE_CHECK_DELAY_MS,
+  intervalMs = UPDATE_CHECK_INTERVAL_MS,
+} = {}) {
   if (!app.isPackaged) {
     return;
   }
 
-  setTimeout(() => {
-    checkForUpdates();
-  }, delayMs);
+  if (!initialUpdateCheckTimeout) {
+    initialUpdateCheckTimeout = setTimeout(() => {
+      initialUpdateCheckTimeout = null;
+      void checkForUpdates();
+    }, initialDelayMs);
+    initialUpdateCheckTimeout.unref?.();
+  }
+
+  if (!recurringUpdateCheckInterval) {
+    recurringUpdateCheckInterval = setInterval(() => {
+      void checkForUpdates();
+    }, intervalMs);
+    recurringUpdateCheckInterval.unref?.();
+  }
 }
 
 export function registerUpdateIpcHandlers() {

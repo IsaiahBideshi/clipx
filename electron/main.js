@@ -13,7 +13,7 @@ import { registerClipxProtocol } from "./services/fileService.js";
 import { closeClipIndexService } from "./services/clipIndexService.js";
 import { registerGoogleAuthIpcHandlers } from "./ipc/googleAuth.js";
 import { registerAuthStorageIpcHandlers } from "./ipc/authStorage.js";
-import { registerUpdateIpcHandlers, registerUpdateWindowGuards, scheduleInitialUpdateCheck } from "./services/updateService.js";
+import { checkForUpdates, registerUpdateIpcHandlers, registerUpdateWindowGuards, scheduleUpdateChecks } from "./services/updateService.js";
 
 
 
@@ -160,7 +160,7 @@ function ensureTray() {
     {
       label: "Show ClipX",
       click: () => {
-        showMainWindow();
+        showMainWindow({ checkForUpdatesOnShow: true });
       },
     },
     {
@@ -175,13 +175,20 @@ function ensureTray() {
     },
   ]));
   tray.on("click", () => {
-    showMainWindow();
+    showMainWindow({ checkForUpdatesOnShow: true });
   });
 
   return tray;
 }
 
-async function showMainWindow() {
+async function showMainWindow({ checkForUpdatesOnShow = false } = {}) {
+  const shouldCheckForUpdatesOnShow = checkForUpdatesOnShow && (
+    !mainWindow ||
+    mainWindow.isDestroyed() ||
+    !mainWindow.isVisible() ||
+    mainWindow.isMinimized()
+  );
+
   if (!mainWindow || mainWindow.isDestroyed()) {
     await createWindow();
   }
@@ -201,6 +208,10 @@ async function showMainWindow() {
 
   mainWindow.show();
   mainWindow.focus();
+
+  if (shouldCheckForUpdatesOnShow) {
+    void checkForUpdates();
+  }
 }
 
 protocol.registerSchemesAsPrivileged([
@@ -364,7 +375,7 @@ if (!hasSingleInstanceLock) {
       ensureTray();
     }
     await createWindow({ show: !launchMinimized });
-    scheduleInitialUpdateCheck();
+    scheduleUpdateChecks();
   });
 }
 
