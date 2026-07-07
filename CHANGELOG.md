@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.1.1
+
+- Checks for updates when the window shows.
+
 ## v1.1.0
 
 - Added edit profile section on Profile page.
