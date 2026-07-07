@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.1.0
+
+- Added edit profile section on Profile page.
+- Bug Fix: layout issue on Library page.
+
 ## v1.0.12
 
 - App now starts minimized when enabled. User must toggle off/on again to fix.
