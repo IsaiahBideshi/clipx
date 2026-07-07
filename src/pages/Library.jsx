@@ -1,4 +1,5 @@
-import {useEffect, useRef, useState} from "react";
+import {useEffect, useMemo, useRef, useState} from "react";
+import { useQuery } from "@tanstack/react-query";
 import Fuse from "fuse.js";
 import STOREDGAMES from "../data/games.json";
 import { supabase } from '../lib/supabase.js';
@@ -14,6 +15,74 @@ import { OverlayScrollbarsComponent } from "overlayscrollbars-react";
 import "overlayscrollbars/overlayscrollbars.css";
 
 import "./library.css";
+
+const GRID_GAP = 20;
+const MIN_CARD_WIDTH = 270;
+const INITIAL_SKELETON_COUNT = 16;
+
+async function fetchLibraryClips() {
+  const { data, error } = await supabase
+    .from('clips')
+    .select('*')
+    .neq('visibility', 'private')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    throw error;
+  }
+
+  return data || [];
+}
+
+async function fetchFriendsOptions(userId) {
+  if (!userId) {
+    return [];
+  }
+
+  const { data, error } = await supabase
+    .from("friendships")
+    .select("user_id, friend_id")
+    .eq("status", "accepted")
+    .or(`user_id.eq.${userId},friend_id.eq.${userId}`);
+
+  if (error || !data) {
+    throw error || new Error("Failed to load friendships.");
+  }
+
+  const friendIds = data.map((f) => (f.user_id === userId ? f.friend_id : f.user_id));
+  if (friendIds.length === 0) {
+    return [];
+  }
+
+  const { data: friendsData, error: friendsError } = await supabase
+    .from("users")
+    .select("id, username")
+    .in("id", friendIds);
+
+  if (friendsError || !friendsData) {
+    throw friendsError || new Error("Failed to load user records for friends.");
+  }
+
+  return friendIds
+    .map((friendId) => {
+      const friendInfo = friendsData.find((f) => f.id === friendId);
+      if (!friendInfo) return null;
+      return { id: friendId, label: friendInfo.username };
+    })
+    .filter(Boolean);
+}
+
+async function fetchClipTags() {
+  const { data, error } = await supabase
+    .from("clip_tags")
+    .select("*");
+
+  if (error) {
+    throw error;
+  }
+
+  return data || [];
+}
 
 async function checkStoredGames(query) {
   const fuseOptions = {
@@ -46,20 +115,37 @@ async function searchGames(gameName) {
 }
 
 export default function Library() {
-  const [clips, setClips] = useState([]);
   const [selectedClip, setSelectedClip] = useState(null);
-  const [loadingClips, setLoadingClips] = useState(true);
   const [titleQuery, setTitleQuery] = useState("");
   const [game, setGame] = useState(null);
   const [gameOptions, setGameOptions] = useState([]);
   const [gameInput, setGameInput] = useState("");
-  const [friendsOptions, setFriendsOptions] = useState([]);
   const [selectedFriends, setSelectedFriends] = useState([]);
-  const [filteredClips, setFilteredClips] = useState([]);
   const { session, loading: loadingSession } = useAuthSession();
 
   const navigate = useNavigate();
   const userId = session?.user?.id;
+  const clipsQuery = useQuery({
+    queryKey: ["library", "clips"],
+    queryFn: fetchLibraryClips,
+    enabled: Boolean(session),
+  });
+  const friendsOptionsQuery = useQuery({
+    queryKey: ["library", "friendsOptions", userId],
+    queryFn: () => fetchFriendsOptions(userId),
+    enabled: Boolean(userId),
+    placeholderData: [],
+  });
+  const clipTagsQuery = useQuery({
+    queryKey: ["library", "clipTags"],
+    queryFn: fetchClipTags,
+    enabled: Boolean(session),
+    placeholderData: [],
+  });
+  const clips = clipsQuery.data || [];
+  const friendsOptions = friendsOptionsQuery.data || [];
+  const allClipTags = clipTagsQuery.data || [];
+  const loadingClips = clipsQuery.isLoading;
 
 
   const tfSx = {
@@ -117,86 +203,10 @@ export default function Library() {
   }, [clips]);
 
   useEffect(() => {
-    async function loadFriendsOptions() {
-      if (!userId) {
-        setFriendsOptions([]);
-        return;
-      }
-
-      try {
-        const { data, error } = await supabase
-          .from("friendships")
-          .select("user_id, friend_id")
-          .eq("status", "accepted")
-          .or(`user_id.eq.${userId},friend_id.eq.${userId}`);
-
-        if (error || !data) {
-          console.error("Failed to load friendships:", error);
-          return;
-        }
-
-        const friendIds = data.map((f) => (f.user_id === userId ? f.friend_id : f.user_id));
-        if (friendIds.length === 0) {
-          setFriendsOptions([]);
-          return;
-        }
-
-        const { data: friendsData, error: friendsError } = await supabase
-          .from("users")
-          .select("id, username")
-          .in("id", friendIds);
-
-        if (friendsError || !friendsData) {
-          console.error("Failed to load user records for friends:", friendsError);
-          return;
-        }
-
-        const nextOptions = friendIds
-          .map((friendId) => {
-            const friendInfo = friendsData.find((f) => f.id === friendId);
-            if (!friendInfo) return null;
-            return { id: friendId, label: friendInfo.username };
-          })
-          .filter(Boolean);
-
-        setFriendsOptions(nextOptions);
-      } catch (err) {
-        console.error("Unexpected error loading friend options:", err);
-      }
-    }
-
-    loadFriendsOptions();
-  }, [userId]);
-
-  useEffect(() => {
     if (!loadingSession && !session) {
       navigate("/login", { replace: true });
     }
   }, [loadingSession, navigate, session]);
-
-  useEffect(() => {
-    async function fetchClips() {
-      try {
-        const { data, error } = await supabase
-          .from('clips')
-          .select('*')
-          .neq('visibility', 'private')
-          .order('created_at', { ascending: false });
-
-        if (error) {
-          console.error("Error fetching clips:", error);
-        } else {
-          setClips(data || []);
-        }
-      } catch (err) {
-        console.error("Unexpected error fetching clips:", err);
-      } finally {
-        setLoadingClips(false);
-      }
-    }
-
-    fetchClips();
-  }, []);
 
   useEffect(() => {
     async function handleSearchGame() {
@@ -216,79 +226,61 @@ export default function Library() {
     handleSearchGame();
   }, [gameInput]);
 
-  useEffect(() => {
-    let cancelled = false;
+  const filteredClips = useMemo(() => {
+    const normalizedTitle = titleQuery.trim().toLowerCase();
+    const friendIds = new Set(selectedFriends.map((friend) => friend.id));
 
-    async function applyFilters() {
-      const normalizedTitle = titleQuery.trim().toLowerCase();
-      const friendIds = new Set(selectedFriends.map((friend) => friend.id));
-      const { data: allClipTags, error: clipTagsError } = await supabase
-        .from("clip_tags")
-        .select("*");
-
-      const mapped = await Promise.all(
-        clips.map(async (clip) => {
-          if (normalizedTitle && !String(clip.title || "").toLowerCase().includes(normalizedTitle)) {
-            return null;
-          }
-
-          if (game?.id && clip.game_id !== game.id) {
-            return null;
-          }
-
-          if (friendIds.size > 0) {
-            
-
-            if (!clipTagsError && allClipTags) {
-              const clipFriendIds = new Set(allClipTags.map((tag) => {
-                if (tag.user_id && tag.clip_id === clip.id) {
-                  return tag.user_id;
-                }
-              }));
-              const hasFriend = Array.from(friendIds).some((friendId) => clipFriendIds.has(friendId));
-              if (!hasFriend) {
-                return null;
-              }
-            }
-          }
-
-          return clip;
-        })
-      );
-
-      if (!cancelled) {
-        setFilteredClips(mapped.filter(Boolean));
+    return clips.filter((clip) => {
+      if (normalizedTitle && !String(clip.title || "").toLowerCase().includes(normalizedTitle)) {
+        return false;
       }
-    }
 
-    applyFilters();
+      if (game?.id && clip.game_id !== game.id) {
+        return false;
+      }
 
-    return () => {
-      cancelled = true;
-    };
-  }, [clips, game, selectedFriends, titleQuery]);
+      if (friendIds.size > 0) {
+        const clipFriendIds = new Set(
+          allClipTags
+            .filter((tag) => tag.user_id && tag.clip_id === clip.id)
+            .map((tag) => tag.user_id)
+        );
+        return Array.from(friendIds).some((friendId) => clipFriendIds.has(friendId));
+      }
+
+      return true;
+    });
+  }, [allClipTags, clips, game, selectedFriends, titleQuery]);
 
 
-  const GAP = 20;
   const containerRef = useRef(null);
-  const [fillerCount, setFillerCount] = useState(0);
+  const [itemsPerRow, setItemsPerRow] = useState(1);
 
   useEffect(() => {
-    const update = () => {
-      if (!containerRef.current) return;
-      const firstCard = containerRef.current.querySelector(".clip-card:not(.filler)");
-      if (!firstCard) return;
-      const cardWidth = firstCard.offsetWidth;
-      const containerWidth = containerRef.current.offsetWidth;
-      const perRow = Math.round((containerWidth + GAP) / (cardWidth + GAP));
-      const remainder = clips.length % perRow;
-      setFillerCount(remainder === 0 ? 0 : perRow - remainder);
+    const element = containerRef.current;
+    if (!element) return;
+
+    const updateItemsPerRow = () => {
+      const containerWidth = element.getBoundingClientRect().width;
+      const nextItemsPerRow = Math.max(
+        1,
+        Math.floor((containerWidth + GRID_GAP) / (MIN_CARD_WIDTH + GRID_GAP))
+      );
+      setItemsPerRow(nextItemsPerRow);
     };
 
-    update();
-    window.addEventListener("resize", update);
-    return () => window.removeEventListener("resize", update);
-  }, [filteredClips.length]);
+    updateItemsPerRow();
+    const observer = new ResizeObserver(updateItemsPerRow);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
+  const fillerCount = useMemo(() => {
+    if (loadingClips || filteredClips.length === 0) return 0;
+
+    const remainder = filteredClips.length % itemsPerRow;
+    return remainder === 0 ? 0 : itemsPerRow - remainder;
+  }, [filteredClips.length, itemsPerRow, loadingClips]);
 
 
   if (loadingSession || !session) {
@@ -373,9 +365,9 @@ export default function Library() {
         </div>
       </div>
 
-      <div className="clip-grid" ref={containerRef}>
+      <div className="clip-grid library-clip-grid" ref={containerRef}>
         {loadingClips
-          ? Array.from({ length: 16 }).map((_, index) => (
+          ? Array.from({ length: INITIAL_SKELETON_COUNT }).map((_, index) => (
               <ClipCardSkeleton key={`clip-skeleton-${index}`} />
             ))
           : filteredClips.map((clip) => (

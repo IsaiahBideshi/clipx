@@ -1,6 +1,7 @@
-.profile-page {
+.settings-container.profile-page {
   position: relative;
   isolation: isolate;
+  box-sizing: border-box;
   width: min(1024px, 92vw);
   margin-top: 34px;
   padding: 28px;
@@ -14,7 +15,12 @@
     0 18px 42px rgba(0, 0, 0, 0.45),
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
   font-family: "Sora", "Segoe UI", "Trebuchet MS", sans-serif;
-  overflow: hidden;
+  height: calc(100dvh - 8vh - 48px);
+  min-height: 0;
+  justify-content: flex-start;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
 }
 
 .profile-page::before {
@@ -99,6 +105,289 @@
   margin: 0;
   color: #ffffff;
   font-size: 1.02rem;
+}
+
+.account-card {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.account-card-main {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.account-avatar {
+  position: relative;
+  width: 62px;
+  height: 62px;
+  flex: 0 0 62px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 50%;
+  border: 1px solid rgba(144, 202, 249, 0.38);
+  background:
+    linear-gradient(135deg, rgba(144, 202, 249, 0.25), rgba(255, 176, 101, 0.16)),
+    rgba(255, 255, 255, 0.06);
+  color: #f7f8ff;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.account-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.account-card-copy {
+  min-width: 0;
+}
+
+.account-card-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.account-card-heading h4 {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.account-email {
+  margin: 6px 0 8px;
+  color: rgba(255, 255, 255, 0.76);
+  overflow-wrap: anywhere;
+}
+
+.account-status-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.account-status-row span,
+.account-inline-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.055);
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 0.78rem;
+  line-height: 1.2;
+  padding: 6px 9px;
+}
+
+.account-status-row svg,
+.account-inline-note svg {
+  flex: 0 0 auto;
+  color: #90caf9;
+}
+
+.account-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(2, 5, 12, 0.72);
+  backdrop-filter: blur(7px);
+}
+
+.account-modal {
+  box-sizing: border-box;
+  width: min(680px, 94vw);
+  max-height: min(720px, calc(100dvh - 48px));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background:
+    linear-gradient(180deg, rgba(30, 33, 45, 0.98), rgba(18, 20, 28, 0.98));
+  color: #f0f3ff;
+  box-shadow: 0 24px 54px rgba(0, 0, 0, 0.48);
+  text-align: left;
+  animation: confirm-pop 180ms ease-out;
+}
+
+.account-modal-header {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 20px 20px 14px;
+}
+
+.account-modal-header h3 {
+  margin: 8px 0 0;
+  font-size: 1.35rem;
+}
+
+.account-icon-button {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  color: #ffffff;
+  cursor: pointer;
+  transition: background 0.18s ease, border-color 0.18s ease;
+}
+
+.account-icon-button:hover {
+  background: rgba(144, 202, 249, 0.14);
+  border-color: rgba(144, 202, 249, 0.46);
+}
+
+.account-icon-button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.account-modal-tabs {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 8px;
+  padding: 0 20px 14px;
+  overflow-x: auto;
+}
+
+.account-tab {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  flex: 1 1 0;
+  min-width: 120px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.045);
+  color: rgba(255, 255, 255, 0.72);
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+}
+
+.account-tab:hover,
+.account-tab.is-active {
+  background: rgba(144, 202, 249, 0.14);
+  border-color: rgba(144, 202, 249, 0.5);
+  color: #ffffff;
+}
+
+.account-modal-body {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 0 20px 20px;
+}
+
+.account-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.account-avatar-editor {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 16px;
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.account-avatar--large {
+  width: 88px;
+  height: 88px;
+  flex-basis: 88px;
+  font-size: 1.3rem;
+}
+
+.account-avatar-copy {
+  min-width: 0;
+}
+
+.account-avatar-copy h4 {
+  margin: 0 0 6px;
+  color: #ffffff;
+}
+
+.account-avatar-copy p,
+.account-muted-copy {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.account-avatar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.account-file-input {
+  display: none;
+}
+
+.account-inline-note {
+  width: fit-content;
+  max-width: 100%;
+  border-radius: 14px;
+  overflow-wrap: anywhere;
+}
+
+.account-message {
+  margin: 0;
+  border-radius: 12px;
+  padding: 9px 11px;
+  font-size: 0.9rem;
+  line-height: 1.35;
+}
+
+.account-message--error {
+  border: 1px solid rgba(255, 113, 113, 0.55);
+  background: rgba(255, 76, 76, 0.16);
+  color: #ffd7d7;
+}
+
+.account-message--success {
+  border: 1px solid rgba(97, 218, 251, 0.42);
+  background: rgba(41, 181, 232, 0.16);
+  color: #cbf3ff;
+}
+
+.account-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding-top: 4px;
 }
 
 .card-copy {
@@ -382,8 +671,28 @@
   background: rgba(255, 255, 255, 0.24);
 }
 
+.profile-page::-webkit-scrollbar,
+.account-modal-body::-webkit-scrollbar,
+.account-modal-tabs::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.profile-page::-webkit-scrollbar-thumb,
+.account-modal-body::-webkit-scrollbar-thumb,
+.account-modal-tabs::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+}
+
+.profile-page::-webkit-scrollbar-thumb:hover,
+.account-modal-body::-webkit-scrollbar-thumb:hover,
+.account-modal-tabs::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.24);
+}
+
 @media (max-width: 900px) {
-  .profile-page {
+  .settings-container.profile-page {
     padding: 22px;
   }
 
@@ -394,12 +703,22 @@
   .friend-search-card {
     grid-row: auto;
   }
+
+  .account-card {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .account-card > .MuiButton-root {
+    align-self: flex-start;
+  }
 }
 
 @media (max-width: 620px) {
-  .profile-page {
+  .settings-container.profile-page {
     width: 95vw;
     margin-top: 18px;
+    height: calc(100dvh - 8vh - 28px);
     padding: 16px;
     border-radius: 18px;
   }
@@ -416,5 +735,55 @@
 
   .profile-card {
     padding: 14px;
+  }
+
+  .account-card-main,
+  .account-avatar-editor {
+    grid-template-columns: 1fr;
+    justify-items: start;
+  }
+
+  .account-card-main {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .account-status-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .account-status-row span {
+    width: fit-content;
+  }
+
+  .account-overlay {
+    align-items: stretch;
+    padding: 14px;
+  }
+
+  .account-modal {
+    width: 100%;
+    max-height: calc(100dvh - 28px);
+  }
+
+  .account-modal-header,
+  .account-modal-tabs,
+  .account-modal-body {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .account-tab {
+    flex-basis: auto;
+    min-width: 108px;
+  }
+
+  .account-modal-actions {
+    justify-content: stretch;
+  }
+
+  .account-modal-actions .MuiButton-root {
+    flex: 1 1 140px;
   }
 }

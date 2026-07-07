@@ -1,6 +1,7 @@
 import './settings.css';
 
 import {useEffect, useState} from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import CircularProgress from '@mui/material/CircularProgress';
 import FormGroup from "@mui/material/FormGroup";
 import FormControlLabel from "@mui/material/FormControlLabel";
@@ -9,7 +10,7 @@ import Button from "@mui/material/Button";
 import ArticleOutlinedIcon from "@mui/icons-material/ArticleOutlined";
 import changelog from "../../CHANGELOG.md?raw";
 import ChangelogModal from "../components/ChangelogModal.jsx";
-import { getCurrentUserId } from "../lib/authSession.js";
+import { getCurrentUserId, useAuthSession } from "../lib/authSession.js";
 
 const tfSx = {
   "& .MuiInputLabel-root": { color: "#e5e7eb" }, // label
@@ -40,14 +41,17 @@ export async function getOptions() {
   }
 }
 
-async function getGoogleInfo() {
+function googleInfoQueryKey(userId) {
+  return ["settings", "googleInfo", userId || null];
+}
+
+async function getGoogleInfo(userId) {
   if (!window.clipx?.getGoogleInfo) {
     console.log("no getGoogleInfo function");
     return null;
   }
 
   try {
-    const userId = await getCurrentUserId();
     if (!userId) {
       return null;
     }
@@ -126,16 +130,26 @@ async function getLaunchAtStartup() {
 export default function Settings() {
   const [options, setOptions] = useState();
   const [defaultOptions, setDefaultOptions] = useState();
-  const [googleInfo, setGoogleInfo] = useState(null);
   const [appVersion, setAppVersion] = useState(null);
   const [launchAtStartup, setLaunchAtStartup] = useState(false);
   const [loadingLaunchAtStartup, setLoadingLaunchAtStartup] = useState(true);
   const [savingLaunchAtStartup, setSavingLaunchAtStartup] = useState(false);
   const [avatarLoadError, setAvatarLoadError] = useState(false);
-  const [loadingGoogleInfo, setLoadingGoogleInfo] = useState(true);
   const [confirmUnlink, setConfirmUnlink] = useState(false);
   const [linking, setLinking] = useState(false);
   const [showChangelog, setShowChangelog] = useState(false);
+  const { session } = useAuthSession();
+  const userId = session?.user?.id || null;
+  const queryClient = useQueryClient();
+  const googleInfoKey = googleInfoQueryKey(userId);
+  const googleInfoQuery = useQuery({
+    queryKey: googleInfoKey,
+    queryFn: () => getGoogleInfo(userId),
+    enabled: Boolean(userId),
+    placeholderData: null,
+  });
+  const googleInfo = googleInfoQuery.data || null;
+  const loadingGoogleInfo = Boolean(userId) && googleInfoQuery.isFetching && !googleInfo;
   console.log(options);
 
   function updateOption(key, value) {
@@ -188,10 +202,17 @@ export default function Settings() {
 
   const handleLinkYoutube = async () => {
     setLinking(true);
-    const info = await linkYoutube().then(() => {window.location.reload()});
-    setGoogleInfo(info);
-    setLoadingGoogleInfo(false);
-    setLinking(false);
+    try {
+      const info = await linkYoutube();
+      const nextUserId = userId || await getCurrentUserId();
+      const nextGoogleInfoKey = googleInfoQueryKey(nextUserId);
+      if (info) {
+        queryClient.setQueryData(nextGoogleInfoKey, info);
+      }
+      await queryClient.invalidateQueries({ queryKey: nextGoogleInfoKey });
+    } finally {
+      setLinking(false);
+    }
   }
   const handleUnlinkYoutube = async () => {
     if (!confirmUnlink) {
@@ -200,7 +221,7 @@ export default function Settings() {
     }
 
     await unlinkYoutube();
-    setGoogleInfo(null);
+    queryClient.setQueryData(googleInfoKey, null);
     setConfirmUnlink(false);
   }
   console.log(googleInfo);
@@ -217,21 +238,6 @@ export default function Settings() {
       } catch (err) {
         console.error("Failed to load options:", err);
         if (!cancelled) setOptions({});
-      }
-    }
-    async function loadGoogleInfo() {
-      try {
-        const info = await getGoogleInfo();
-        if (!cancelled) {
-          setGoogleInfo(info);
-          setLoadingGoogleInfo(false);
-        };
-      } catch (err) {
-        console.error("Failed to load Google account info:", err);
-        if (!cancelled) {
-          setGoogleInfo(null);
-          setLoadingGoogleInfo(false);
-        };
       }
     }
     async function loadAppVersion() {
@@ -257,7 +263,6 @@ export default function Settings() {
     }
 
     loadOptions();
-    loadGoogleInfo();
     loadAppVersion();
     loadLaunchAtStartup();
     return () => {

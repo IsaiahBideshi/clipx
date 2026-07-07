@@ -193,6 +193,15 @@
   gap: 16px;
 }
 
+.library .library-clip-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(270px, 100%), 1fr));
+  align-items: start;
+  width: 90%;
+  margin: 0 auto;
+  gap: 20px;
+}
+
 .library .clip-card {
   width: min(270px, 100%);
   border: 1px solid rgba(255, 255, 255, 0.12);
@@ -201,6 +210,12 @@
   background: linear-gradient(165deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.02));
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.26);
   transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.library .library-clip-grid .clip-card {
+  box-sizing: border-box;
+  min-width: 0;
+  width: auto;
 }
 
 .library .clip-card:hover {
@@ -213,8 +228,24 @@
   border-radius: 10px;
 }
 
+.library .library-clip-grid .clip-thumb,
+.library .library-clip-grid .skeleton-thumb {
+  aspect-ratio: 16 / 9;
+  height: auto;
+  object-fit: cover;
+}
+
 .library .clip-name {
   color: #f7f8ff;
+}
+
+.library .library-clip-grid .clip-name {
+  display: -webkit-box;
+  min-height: 34px;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .library .clip-date {
@@ -303,6 +334,10 @@
 
   .library .clip-card {
     width: min(360px, 100%);
+  }
+
+  .library .library-clip-grid .clip-card {
+    width: auto;
   }
 
   .filter-options {

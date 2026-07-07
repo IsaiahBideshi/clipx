@@ -5,6 +5,7 @@ import ClipEditor from "../components/ClipEditor.jsx";
 import SavingClipsWidget from "../components/SavingClipsWidget.jsx";
 import UploadingClipsWidget from "../components/UploadingClipsWidget.jsx";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import { Switch } from "@mui/material";
 import { isTextEntryActive } from "../lib/hotkeys.js";
@@ -15,6 +16,29 @@ import "overlayscrollbars/overlayscrollbars.css";
 const PAGE_SIZE = 60;
 const TOP_INSERT_THRESHOLD = 120;
 const LOAD_MORE_SCROLL_THRESHOLD = 700;
+const LOCAL_CLIPS_STALE_MS = 5 * 60 * 1000;
+
+async function fetchLocalOptions() {
+  if (typeof window.clipx?.getOptions !== "function") {
+    throw new Error("window.clipx.getOptions is not available (preload not wired?)");
+  }
+
+  return await window.clipx.getOptions();
+}
+
+function localClipsQueryKey(rootPath, collection, cursor = null) {
+  return ["localFiles", "clips", rootPath, collection, cursor || null, PAGE_SIZE];
+}
+
+function getFreshCachedQueryData(queryClient, queryKey) {
+  const queryState = queryClient.getQueryState(queryKey);
+  const queryData = queryClient.getQueryData(queryKey);
+  if (!queryState || !queryData || queryState.isInvalidated) {
+    return null;
+  }
+
+  return Date.now() - queryState.dataUpdatedAt <= LOCAL_CLIPS_STALE_MS ? queryData : null;
+}
 
 function buildSavedClipsPath(rootPath) {
   if (!rootPath) return "";
@@ -50,7 +74,6 @@ export default function LocalFiles() {
   const [cursor, setCursor] = useState(null);
   const [hasMore, setHasMore] = useState(true);
   const [refreshTick, setRefreshTick] = useState(0);
-  const [options, setOptions] = useState(null);
   const [clip, setClip] = useState(null);
   const [savingClips, setSavingClips] = useState([]);
   const [uploadingClips, setUploadingClips] = useState([]);
@@ -73,6 +96,13 @@ export default function LocalFiles() {
   const scrollElementRef = useRef(null);
 
   const collection = useMemo(() => (showSavedFiles ? "saved" : "source"), [showSavedFiles]);
+  const queryClient = useQueryClient();
+  const optionsQuery = useQuery({
+    queryKey: ["localFiles", "options"],
+    queryFn: fetchLocalOptions,
+    staleTime: 10 * 60 * 1000,
+  });
+  const options = optionsQuery.data || null;
 
   useEffect(() => {
     clipsRef.current = clips;
@@ -130,6 +160,19 @@ export default function LocalFiles() {
     element?.scrollTo?.({ top: 0, behavior: "smooth" });
   }, [scrollElement]);
 
+  const applyClipsPage = useCallback((page, { reset = false } = {}) => {
+    const pageClips = Array.isArray(page?.clips) ? page.clips : [];
+    const nextCursor = page?.nextCursor || null;
+    const nextHasMore = Boolean(page?.hasMore);
+
+    setClips((currentClips) => (reset ? pageClips : mergeClipLists(currentClips, pageClips)));
+    cursorRef.current = nextCursor;
+    hasMoreRef.current = nextHasMore;
+    setCursor(nextCursor);
+    setHasMore(nextHasMore);
+    setLoadingInitial(false);
+  }, []);
+
   const loadPage = useCallback(
     async ({ reset = false } = {}) => {
       if (!rootPath || typeof window.clipx?.listLocalClips !== "function") {
@@ -148,6 +191,14 @@ export default function LocalFiles() {
         return null;
       }
 
+      const pageCursor = reset ? null : cursorRef.current;
+      const pageQueryKey = localClipsQueryKey(rootPath, collection, pageCursor);
+      const cachedPage = getFreshCachedQueryData(queryClient, pageQueryKey);
+      if (cachedPage) {
+        applyClipsPage(cachedPage, { reset });
+        return cachedPage;
+      }
+
       const requestVersion = requestVersionRef.current;
       loadingPageRef.current = true;
       setLoadingPage(true);
@@ -157,18 +208,15 @@ export default function LocalFiles() {
           rootPath,
           collection,
           limit: PAGE_SIZE,
-          cursor: reset ? null : cursorRef.current,
+          cursor: pageCursor,
         });
 
         if (requestVersion !== requestVersionRef.current) {
           return null;
         }
 
-        const pageClips = Array.isArray(page?.clips) ? page.clips : [];
-        setClips((currentClips) => (reset ? pageClips : mergeClipLists(currentClips, pageClips)));
-        setCursor(page?.nextCursor || null);
-        setHasMore(Boolean(page?.hasMore));
-        setLoadingInitial(false);
+        queryClient.setQueryData(pageQueryKey, page);
+        applyClipsPage(page, { reset });
         return page;
       } catch (error) {
         console.error("Failed to load local clips:", error);
@@ -192,7 +240,7 @@ export default function LocalFiles() {
         }
       }
     },
-    [collection, rootPath]
+    [applyClipsPage, collection, queryClient, rootPath]
   );
 
   const loadNextPage = useCallback(() => loadPage(), [loadPage]);
@@ -243,29 +291,23 @@ export default function LocalFiles() {
   }, [clips.length, hasMore, maybeLoadMoreFromScroll]);
 
   useEffect(() => {
-    let cancelled = false;
-
-    async function loadOptions() {
-      if (typeof window.clipx?.getOptions !== "function") {
-        console.error("window.clipx.getOptions is not available (preload not wired?)");
-        setLoadingInitial(false);
-        return;
-      }
-
-      const nextOptions = await window.clipx.getOptions();
-      if (cancelled) return;
-
-      const nextRootPath = String(nextOptions?.clipsFolder || "").replace(/[\\/]+$/, "");
-      setOptions(nextOptions);
-      setRootPath(nextRootPath);
-      setFolderPath(showSavedFiles ? buildSavedClipsPath(nextRootPath) : nextRootPath);
+    if (optionsQuery.isError) {
+      console.error("Failed to load local file options:", optionsQuery.error);
+      setLoadingInitial(false);
+      return;
     }
 
-    loadOptions();
-    return () => {
-      cancelled = true;
-    };
-  }, [showSavedFiles]);
+    if (!options) {
+      if (!optionsQuery.isLoading && !optionsQuery.isFetching) {
+        setLoadingInitial(false);
+      }
+      return;
+    }
+
+    const nextRootPath = String(options?.clipsFolder || "").replace(/[\\/]+$/, "");
+    setRootPath(nextRootPath);
+    setFolderPath(showSavedFiles ? buildSavedClipsPath(nextRootPath) : nextRootPath);
+  }, [options, optionsQuery.error, optionsQuery.isError, optionsQuery.isFetching, optionsQuery.isLoading, showSavedFiles]);
 
   useEffect(() => {
     if (!rootPath) {
@@ -281,6 +323,15 @@ export default function LocalFiles() {
     hasMoreRef.current = true;
     loadingPageRef.current = false;
     pendingResetRef.current = false;
+    const cachedFirstPage = getFreshCachedQueryData(queryClient, localClipsQueryKey(rootPath, collection));
+    if (cachedFirstPage) {
+      applyClipsPage(cachedFirstPage, { reset: true });
+      setLoadingPage(false);
+      setIndexing(false);
+      setNewClipCount(0);
+      return;
+    }
+
     setClips([]);
     setCursor(null);
     setHasMore(true);
@@ -308,7 +359,7 @@ export default function LocalFiles() {
     return () => {
       cancelled = true;
     };
-  }, [collection, loadPage, refreshTick, rootPath]);
+  }, [applyClipsPage, collection, loadPage, queryClient, refreshTick, rootPath]);
 
   useEffect(() => {
     if (typeof window.clipx?.onLocalClipIndexChanged !== "function" || !rootPath) {
@@ -349,6 +400,7 @@ export default function LocalFiles() {
   }, [collection, getScrollTop, loadPage, rootPath]);
 
   const refreshFiles = () => {
+    queryClient.invalidateQueries({ queryKey: ["localFiles", "clips", rootPath, collection] });
     setRefreshTick((tick) => tick + 1);
   };
 
