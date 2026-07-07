@@ -18,7 +18,7 @@ import "./library.css";
 
 const GRID_GAP = 20;
 const MIN_CARD_WIDTH = 270;
-const INITIAL_SKELETON_COUNT = 16;
+const INITIAL_SKELETON_COUNT = 20;
 
 async function fetchLibraryClips() {
   const { data, error } = await supabase
