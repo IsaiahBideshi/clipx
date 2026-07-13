@@ -3,6 +3,7 @@ import path from "path";
 import ffmpeg from "fluent-ffmpeg";
 import ffmpegPath from "ffmpeg-static";
 import { app } from "electron";
+import { rename } from "fs/promises";
 
 import { uploadClipToYoutube } from "./youtubeService.js";
 import { resolveFfmpegPath } from "../utils/ffmpeg.js";
@@ -217,4 +218,46 @@ export async function getClipData(clipPath) {
   const clipsData = await getClipDataFromDir(clipDir);
   const clipEntry = clipsData.clips.find((item) => item.path === clipPath);
   return clipEntry || null;
+}
+
+export async function renameClip(clipPath, newName) {
+  if (typeof clipPath !== "string" || clipPath.length === 0) {
+    throw new TypeError("rename-clip: clipPath must be a non-empty string");
+  }
+  if (typeof newName !== "string" || newName.trim().length === 0) {
+    throw new TypeError("rename-clip: newName must be a non-empty string");
+  }
+
+  const ext = path.extname(clipPath);
+  if (!ext) {
+    throw new Error("rename-clip: clipPath must have a valid file extension");
+  }
+
+  const trimmedName = newName.trim();
+  const baseName = trimmedName.toLowerCase().endsWith(ext.toLowerCase())
+    ? trimmedName.slice(0, -ext.length).trim()
+    : trimmedName;
+
+  if (
+    !baseName ||
+    baseName === "." ||
+    baseName === ".." ||
+    /[<>:"/\\|?*\x00-\x1F]/.test(baseName) ||
+    /[. ]$/.test(baseName) ||
+    /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i.test(baseName)
+  ) {
+    throw new Error("rename-clip: newName contains invalid filename characters");
+  }
+
+  const clipDir = path.dirname(clipPath);
+  const newClipPath = path.join(clipDir, baseName + ext);
+
+
+  try {
+    await rename(clipPath, newClipPath);
+    return { path: newClipPath, name: path.basename(newClipPath) };
+  } catch (error) {
+    console.error(`Failed to rename clip from ${clipPath} to ${newClipPath}:`, error);
+    throw new Error(`Failed to rename clip: ${error.message}`);
+  }
 }

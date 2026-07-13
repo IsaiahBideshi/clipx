@@ -34,6 +34,7 @@ contextBridge.exposeInMainWorld("clipx", {
   setLaunchAtStartup: (enabled) => ipcRenderer.invoke("set-launch-at-startup", enabled),
   saveClip: (clipInfo) => ipcRenderer.invoke("save-clip", clipInfo),
   uploadClip: (clipInfo) => ipcRenderer.invoke("upload-clip", clipInfo),
+  renameClip: (clipPath, newName) => ipcRenderer.invoke("rename-clip", clipPath, newName),
   linkYoutube: (userId) => ipcRenderer.invoke("link-youtube", userId),
   unlinkYoutube: (userId) => ipcRenderer.invoke("unlink-youtube", userId),
   getGoogleInfo: (userId) => ipcRenderer.invoke("get-google-info", userId),

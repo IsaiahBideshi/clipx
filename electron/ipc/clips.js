@@ -1,10 +1,14 @@
 import { app, ipcMain } from "electron";
 
-import { getClipData, saveClip, uploadClip } from "../services/clipService.js";
+import { getClipData, renameClip, saveClip, uploadClip } from "../services/clipService.js";
 
 export function registerClipIpcHandlers() {
   ipcMain.handle("save-clip", async (_event, options) => {
     return await saveClip(options);
+  });
+
+  ipcMain.handle("rename-clip", async (_event, clipPath, newName) => {
+    return await renameClip(clipPath, newName);
   });
 
   ipcMain.handle("upload-clip", async (_event, options) => {

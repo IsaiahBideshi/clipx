@@ -10,9 +10,35 @@ import AutoComplete from '@mui/material/Autocomplete';
 import { supabase } from "../lib/supabase.js";
 import { useAuthSession } from "../lib/authSession.js";
 import { isTextEntryActive } from "../lib/hotkeys.js";
-import { InputLabel, MenuItem, Select, FormControl } from '@mui/material';
+import { InputLabel, MenuItem, Select, FormControl, Typography } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 
+
+function getEditableClipName(fileName) {
+  const name = String(fileName || "");
+  return name.replace(/\.(mp4|webm|mov)$/i, "");
+}
+
+function getClipNameValidationError(value) {
+  const name = String(value || "").trim();
+  if (!name) {
+    return "Enter a clip name.";
+  }
+
+  const baseName = getEditableClipName(name).trim();
+  if (
+    !baseName ||
+    baseName === "." ||
+    baseName === ".." ||
+    /[<>:"/\\|?*\x00-\x1F]/.test(baseName) ||
+    /[. ]$/.test(baseName) ||
+    /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i.test(baseName)
+  ) {
+    return "Clip names cannot contain \\ / : * ? \" < > | or end with a space or period.";
+  }
+
+  return "";
+}
 
 
 export default function ClipEditor({clip, onSaveQueueEvent, onUploadQueueEvent, isSavedClipsView = false, onClose}) {
@@ -30,6 +56,17 @@ export default function ClipEditor({clip, onSaveQueueEvent, onUploadQueueEvent, 
   const [isMuted, setIsMuted] = useState(false);
 
   const [clipData, setClipData] = useState(null);
+
+  const [isEdittingClipName, setIsEdittingClipName] = useState(false);
+  const [clipName, setClipName] = useState(null);
+  const [clipNameError, setClipNameError] = useState("");
+
+  useEffect(() => {
+    if (clip?.name) {
+      setClipName(getEditableClipName(clip.name));
+      setClipNameError("");
+    }
+  }, [clip]);
 
   // When video loads
   function handleLoadedMetadata(e) {
@@ -283,6 +320,65 @@ export default function ClipEditor({clip, onSaveQueueEvent, onUploadQueueEvent, 
           onToggleMute={toggleMute}
           onSetVolume={setVideoVolume}
         />
+
+        {isEdittingClipName ? (
+          <TextField
+            sx={{
+              marginLeft: "auto",
+              marginRight: "auto",
+              width: "92%",
+            }}
+            fullWidth
+            className={"tf-sx"}
+            value={clipName}
+            autoFocus
+            error={Boolean(clipNameError)}
+            helperText={clipNameError}
+            onChange={(e) => {
+              setClipName(e.target.value);
+              setClipNameError("");
+            }}
+            onBlur={() => {
+              const nextName = String(clipName || "").trim();
+              const previousName = getEditableClipName(clip?.name);
+              const validationError = getClipNameValidationError(nextName);
+
+              if (validationError) {
+                setClipNameError(validationError);
+                return;
+              }
+
+              const renameName = getEditableClipName(nextName).trim();
+              setClipName(renameName);
+              setIsEdittingClipName(false);
+              if (renameName !== previousName) {
+                window?.clipx?.renameClip(clip?.path, renameName)
+                  .then(() => {
+                    console.log("Clip renamed successfully");
+                  })
+                  .catch((err) => {
+                    console.error("Failed to rename clip:", err);
+                    setClipName(previousName);
+                  });
+              }
+            }}
+          />
+        ) : (
+          <Typography 
+            variant="h5" 
+            sx={{
+              marginLeft: "auto",
+              marginRight: "auto",
+              width: "92%",
+              textAlign: "left",
+            }}
+            onClick={() => setIsEdittingClipName(true)}
+          >
+            {clipName || "Untitled Clip"}
+          </Typography>
+        )}
+        
+
         {isSavedClipsView && clipData && (
           <div className={"clip-info"}>
             <h2 className="clip-info-title">{clip?.name || "Untitled Clip"}</h2>
@@ -330,9 +426,7 @@ async function checkStoredGames(query) {
 
   const fuse = new Fuse(STOREDGAMES, fuseOptions);
   const results = fuse.search(query);
-  console.log(results);
   const resultItems = results.map(result => result.item);
-  console.log(resultItems);
   return resultItems;
 }
 
@@ -385,7 +479,6 @@ useEffect(() => {
       return;
     }
 
-    console.log("userId", userId);
     const { data, error } = await supabase
       .from("friendships")
       .select("user_id, friend_id")
@@ -397,9 +490,7 @@ useEffect(() => {
       return;
     }
 
-    console.log("friendships", data);
     let friendIds = data.map(f => (f.user_id === userId ? f.friend_id : f.user_id));
-    console.log("friendIds", friendIds);
 
     if (friendIds.length === 0) {
       setFriendsOptions([]);
@@ -411,7 +502,6 @@ useEffect(() => {
       .select("id, username")
       .in("id", friendIds)
 
-    console.log("friends data", friendsData);
 
     let friendsOptionsArr = [];
     for (const friendship of data) {
@@ -534,7 +624,6 @@ useEffect(() => {
       label: game.name + (game.first_release_date ? ` (${new Date(game.first_release_date * 1000).getFullYear()})` : ''),
       image: game?.cover?.url,
     }));
-    console.log(options);
 
     setGameOptions(options);
   }
