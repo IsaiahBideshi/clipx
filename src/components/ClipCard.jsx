@@ -1,9 +1,29 @@
 import fallBackThumb from "../assets/thumbnail.png";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
-function ClipCard({ clip, baseFolder, onClick }) {
+import MoreVertIcon from '@mui/icons-material/MoreVert';
+
+function ClipCard({ clip, baseFolder, onClick, onDelete }) {
   const [thumbSrc, setThumbSrc] = useState(() => getThumbUrl(clip.thumbnailPath) || fallBackThumb);
   const [hasThumb, setHasThumb] = useState(Boolean(clip.thumbnailPath));
+  const [error, setError] = useState(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+
+  const menuRef = useRef(null);
+
+  useEffect(() => {
+    function handleClick(event) {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setMenuOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClick);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+    }; }, [menuRef]);
 
   function getURL() {
     return `clipx://video?path=${encodeURIComponent(clip.path)}`;
@@ -48,14 +68,41 @@ function ClipCard({ clip, baseFolder, onClick }) {
   }, [baseFolder, clip.path, clip.thumbnailPath]);
 
   return (
-    <div className={`clip-card ${hasThumb ? "" : "no-thumb"}`} onClick={onClick}>
-      {hasThumb ? (
-        <img src={thumbSrc} className="clip-thumb" />
-      ) : (
-        <div className="thumb-placeholder" />
-      )}
-      <div className="clip-name">{clip.name}</div>
-      <div className={"clip-date"}>{formatDate(clip.createdAt)}</div>
+    <div className={`clip-card ${hasThumb ? "" : "no-thumb"} ${menuOpen ? "clip-menu-open" : ""}`} onClick={onClick} onContextMenu={(e) => {
+      e.preventDefault();
+      setMenuOpen(!menuOpen);
+    }}>
+        {hasThumb ? (
+          <img src={thumbSrc} className="clip-thumb" />
+        ) : (
+          <div className="thumb-placeholder" />
+        )}
+      <div style={{ flex: 1, display: "flex", flexDirection: "row", justifyContent: "space-between", width: "100%", alignItems: "center", gap: "8px" }}>
+        <div>
+          <div className="clip-name">{clip.name}</div>
+          <div className={"clip-date"}>{formatDate(clip.createdAt)}</div>
+        </div>
+        <div style={{ position: "relative", flexShrink: 0 }} ref={menuRef}>
+          <MoreVertIcon className="clip-options-icon" style={{ flexShrink: 0 }} onClick={(e) => {
+            e.stopPropagation();
+            setMenuOpen(!menuOpen);
+          }} />
+          {menuOpen && (
+          <div className="clip-options-menu">
+            <div className="clip-options-menu-item" onClick={(e) => {
+              e.stopPropagation();
+              onClick();
+              setMenuOpen(false);
+            }}>Edit</div>
+            <div className="clip-options-menu-item" style={{ color: "red" }} onClick={(e) => {
+              e.stopPropagation();
+              onDelete(clip);
+              setMenuOpen(false);
+            }}>Delete</div>
+          </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

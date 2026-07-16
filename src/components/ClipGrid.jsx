@@ -12,6 +12,7 @@ function ClipGrid({
   clips,
   baseFolder,
   onSelect,
+  onDelete,
   loading = false,
   loadingMore = false,
   hasMore = false,
@@ -132,6 +133,7 @@ function ClipGrid({
                         clip={clip}
                         baseFolder={baseFolder}
                         onClick={() => onSelect(clip)}
+                        onDelete={onDelete}
                       />
                     );
                   })}

@@ -7,7 +7,7 @@ import { rename } from "fs/promises";
 
 import { uploadClipToYoutube } from "./youtubeService.js";
 import { resolveFfmpegPath } from "../utils/ffmpeg.js";
-import { getIndexedClipData, setIndexedClipMetadata } from "./clipIndexService.js";
+import { getIndexedClipData, setIndexedClipMetadata, markIndexedClipMissing } from "./clipIndexService.js";
 
 ffmpeg.setFfmpegPath(resolveFfmpegPath(ffmpegPath));
 
@@ -123,8 +123,10 @@ export async function saveClip(options) {
   const endTime = options.end;
   const clipTitle = options.title || `Untitled Clip ${Date.now()}`;
   const tags = options.tags || [];
-  let game = options.game;
-  game.image = game.image.replace("t_thumb", "t_cover_big") || null;
+  let game = options.game || null;
+  if (options.game && typeof options.game === "object") {
+    game.image = game.image.replace("t_thumb", "t_cover_big") || null;
+  }
 
   if (!videoPath || typeof videoPath !== "string") {
     throw new TypeError("save-clip: videoPath must be a non-empty string");
@@ -155,7 +157,7 @@ export async function saveClip(options) {
     endTime,
     duration: endTime - startTime,
     tags,
-    game,
+    game: game ? game : null,
   });
 
   return 200;
@@ -260,4 +262,23 @@ export async function renameClip(clipPath, newName) {
     console.error(`Failed to rename clip from ${clipPath} to ${newClipPath}:`, error);
     throw new Error(`Failed to rename clip: ${error.message}`);
   }
+}
+
+export async function deleteClip(clipPath) {
+  if (typeof clipPath !== "string" || clipPath.length === 0) {
+    throw new TypeError("delete-clip: clipPath must be a non-empty string");
+  }
+
+  try {
+    await fs.promises.unlink(clipPath);
+    const clipDir = path.dirname(clipPath);
+    markIndexedClipMissing(clipPath, { emitChange: true });
+    const clipsData = await getClipDataFromDir(clipDir);
+    const updatedClips = clipsData.clips.filter((item) => item.path !== clipPath);
+    await fs.promises.writeFile(path.join(app.getPath("appData"), CLIPS_DATA_FILE), JSON.stringify({ clips: updatedClips }, null, 2), "utf-8");
+  } catch (error) {
+    console.error(`Failed to delete clip at ${clipPath}:`, error);
+    throw new Error(`Failed to delete clip: ${error.message}`);
+  }
+
 }

@@ -84,7 +84,12 @@ export default function LocalFiles() {
   const [indexing, setIndexing] = useState(false);
   const [newClipCount, setNewClipCount] = useState(0);
   const [scrollElement, setScrollElement] = useState(null);
+  const [deleteClipModalOpen, setDeleteClipModalOpen] = useState(false);
+  const [isDeletingClip, setIsDeletingClip] = useState(false);
+  const [error, setError] = useState(null);
+  const [clipToDelete, setClipToDelete] = useState(null);
 
+  const deleteModalRef = useRef(null);
   const overlayRef = useRef(null);
   const clipsRef = useRef([]);
   const clipRef = useRef(null);
@@ -456,6 +461,7 @@ export default function LocalFiles() {
 
       if (e.code === "Escape") {
         setClip(null);
+        setDeleteClipModalOpen(false);
       }
 
       if (e.ctrlKey && e.code === "ArrowLeft") {
@@ -472,6 +478,17 @@ export default function LocalFiles() {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [moveSelectedClip]);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (deleteModalRef.current && !deleteModalRef.current.contains(event.target)) {
+        setDeleteClipModalOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [deleteClipModalOpen]);
 
   function upsertSavingClip(id, nextValues) {
     setSavingClips((prev) =>
@@ -594,6 +611,10 @@ export default function LocalFiles() {
         hasMore={hasMore}
         onLoadMore={loadNextPage}
         scrollElement={scrollElement}
+        onDelete={(clip) => {
+          setClipToDelete(clip);
+          setDeleteClipModalOpen(true);
+        }}
       />
 
       {!clips.length && !gridLoading && !indexing && (
@@ -610,6 +631,45 @@ export default function LocalFiles() {
         expanded={showUploadingList}
         onToggleExpanded={() => setShowUploadingList((prev) => !prev)}
       />
+      {deleteClipModalOpen && (
+        <div className="delete-modal">
+          <div className="delete-modal-content" ref={deleteModalRef}>
+            {isDeletingClip ? (
+              <p>Deleting clip...</p>
+            ) : (
+              <>
+                <div className="delete-modal-message">
+                  Are you sure you want to delete this clip?
+                </div>
+                <div style={{ display: "flex", marginLeft: "auto", marginRight: "auto", marginTop: "20px", width: "fit-content", gap: "12px" }}>
+                  <button className="cancel-button" onClick={() => setDeleteClipModalOpen(false)}>Cancel</button>
+                  <button className="delete-button" onClick={async () => {
+                      if (window.clipx?.deleteClip) {
+                        try {
+                          setIsDeletingClip(true);
+                          const result = await window.clipx.deleteClip(clipToDelete.path);
+                          queryClient.invalidateQueries({ queryKey: ["localFiles", "clips", rootPath, collection] });
+                          setIsDeletingClip(false);
+                        } catch (error) {
+                          setError(`${error.message}`);
+                          console.error("Failed to delete clip:", error);
+                          setIsDeletingClip(false);
+                        }
+                      }
+                    setDeleteClipModalOpen(false);
+                  }}>Delete</button>
+                </div>
+            </>)}
+          </div>
+        </div>
+      )}
+
+      {error && (
+        <div className="error-modal">
+          <p>{error}</p>
+          <button className="cancel-button" onClick={() => setError(null)}>Ok</button>
+        </div>
+      )}
     </OverlayScrollbarsComponent>
   );
 }

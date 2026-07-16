@@ -76,7 +76,99 @@
   width: 100%;
 }
 
+.clip-options-icon{
+  color: rgba(255, 255, 255, 0.72);
+  border-radius: 999px;
+  transition: color 180ms ease;
+}
+.clip-options-icon:hover{
+  color: rgba(144, 202, 249, 0.72);
+  background: rgba(144, 202, 249, 0.12);
+  cursor: pointer;
+}
+.clip-options-menu{
+  position: absolute;
+  width: 150px;
+  top: 100%;
+  right: 0;
+  background: #1a1d27;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  box-shadow:
+    0 18px 42px rgba(0, 0, 0, 0.42),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  padding: 6px;
+  z-index: 10;
+}
+.clip-options-menu-item{
+  z-index: 100;
+  padding: 6px 10px;
+  border-radius: 6px;
+  transition: background 180ms ease, color 180ms ease;
+}
+.clip-card .clip-options-menu-item:hover{
+  background: rgba(144, 202, 249, 0.12);
+  color: rgba(144, 202, 249, 0.72);
+  cursor: pointer;
+}
+
+.cancel-button{
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #fff;
+  padding: 6px 12px;
+  border-radius: 6px;
+  transition: background 180ms ease, color 180ms ease;
+}
+.cancel-button:hover{
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.3);
+  cursor: pointer;
+}
+
+.delete-button{
+  background: rgba(255, 76, 76, 0.22);
+  border-color: rgba(255, 125, 125, 0.65);
+  color: #fff;
+  padding: 6px 12px;
+  border-radius: 6px;
+  transition: background 180ms ease, color 180ms ease;
+}
+.delete-button:hover{
+  background: rgba(255, 76, 76, 0.32);
+  border-color: rgba(255, 125, 125, 0.75);
+  cursor: pointer;
+}
+
+.delete-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 100vh;
+  background: rgba(4, 7, 14, 0.74);
+  backdrop-filter: blur(5px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 8;
+}
+.delete-modal-content {
+  background:
+    radial-gradient(circle at 10% 8%, rgba(255, 176, 101, 0.14) 0%, rgba(255, 176, 101, 0) 44%),
+    radial-gradient(circle at 90% 100%, rgba(41, 181, 232, 0.14) 0%, rgba(41, 181, 232, 0) 42%),
+    linear-gradient(165deg, #191b21 0%, #121419 58%, #0f1015 100%);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  padding: 2em;
+  border-radius: 22px;
+  box-shadow:
+    0 26px 60px rgba(0, 0, 0, 0.52),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
 .clip-card{
+  position: relative;
   flex-grow: 1;
   width: 270px;
   border: 1px solid #ccc;
@@ -86,8 +178,12 @@
 }
 .clip-card:hover {
   transform: scale(1.03);
+  z-index: 2;
   transition: transform 0.2s;
   cursor: pointer;
+}
+.clip-card.clip-menu-open {
+  z-index: 3;
 }
 .clip-card.filler {
   visibility: hidden;
@@ -592,6 +688,13 @@
   align-items: start;
   width: 100%;
   will-change: transform;
+}
+.clip-grid-row:hover {
+  z-index: 2;
+}
+
+.clip-grid-row:has(.clip-menu-open) {
+  z-index: 3;
 }
 
 .clip-grid-virtual .clip-card {
