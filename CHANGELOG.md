@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.1.2
+
+- New (Local Files): Delete Clips, Rename Clips.
+- Note: Use refresh button to update properly.
+
 ## v1.1.1
 
 - Checks for updates when the window shows.
