@@ -41,7 +41,7 @@ function getClipNameValidationError(value) {
 }
 
 
-export default function ClipEditor({clip, onSaveQueueEvent, onUploadQueueEvent, isSavedClipsView = false, onClose}) {
+export default function ClipEditor({clip, onSaveQueueEvent, onUploadQueueEvent, onDelete, isSavedClipsView = false, onClose}) {
   const videoRef = useRef(null);
   const shellRef = useRef(null);
 
@@ -411,6 +411,7 @@ export default function ClipEditor({clip, onSaveQueueEvent, onUploadQueueEvent, 
             end={outPoint}
             onSaveQueueEvent={onSaveQueueEvent}
             onUploadQueueEvent={onUploadQueueEvent}
+            onDelete={onDelete}
           />
         </div>
       )}
@@ -453,7 +454,7 @@ async function searchGames(gameName) {
 }
 
 
-function UploadMenu({clip, start, end, onSaveQueueEvent, onUploadQueueEvent}) {
+function UploadMenu({clip, start, end, onSaveQueueEvent, onUploadQueueEvent, onDelete}) {
   const [tags, setTags] = useState([]);
   const [friendsInClip, setFriendsInClip] = useState([]);
   const [peopleInput, setPeopleInput] = useState('');
@@ -709,14 +710,14 @@ useEffect(() => {
       <div className="upload-menu-actions">
           {session && (
             <Button
-              sx={{marginRight: "10px"}}
               variant={"contained"}
               onClick={() => {uploadClip(clip, start, end, clipTitle, game, tags)}}
               disabled={uploading}
             >
-            Upload Clip
+            Upload
           </Button>)}
-        <Button variant={session ? "outlined" : "contained"} onClick={() => {saveClip(clip, start, end, clipTitle, game, tags)}} >Save Clip</Button>
+        <Button variant={session ? "outlined" : "contained"} onClick={() => {saveClip(clip, start, end, clipTitle, game, tags)}} >Save</Button>
+        <Button variant={"contained"} color={"error"} onClick={() => {onDelete(clip)}} >Delete</Button>
       </div>
     </div>
   );

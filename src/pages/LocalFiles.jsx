@@ -599,6 +599,10 @@ export default function LocalFiles() {
           onUploadQueueEvent={handleUploadQueueEvent}
           isSavedClipsView={showSavedFiles}
           onClose={() => setClip(null)}
+          onDelete={(clip) => {
+            setClipToDelete(clip);
+            setDeleteClipModalOpen(true);
+          }}
         />
       )}
 
@@ -650,6 +654,8 @@ export default function LocalFiles() {
                           const result = await window.clipx.deleteClip(clipToDelete.path);
                           queryClient.invalidateQueries({ queryKey: ["localFiles", "clips", rootPath, collection] });
                           setIsDeletingClip(false);
+                          setClipToDelete(null);
+                          moveSelectedClip(1);
                         } catch (error) {
                           setError(`${error.message}`);
                           console.error("Failed to delete clip:", error);
