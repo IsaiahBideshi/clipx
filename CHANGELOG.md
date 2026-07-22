@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.1.3
+
+- New: Near instant trimming for saving clips.
+- New: Delete Button on upload menu.
+- Fix: Rename text box more visible in clip editor.
+
 ## v1.1.2
 
 - New (Local Files): Delete Clips, Rename Clips.
