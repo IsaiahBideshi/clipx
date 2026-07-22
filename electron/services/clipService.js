@@ -26,6 +26,7 @@ async function renderClipSegment(videoPath, startTime, endTime, outputPath) {
       .setStartTime(startTime)
       .setDuration(endTime - startTime)
       .output(outputPath)
+      .outputOptions("-c copy")
       .on("end", resolve)
       .on("error", reject)
       .run();
