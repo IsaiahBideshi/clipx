@@ -367,10 +367,18 @@ export default function ClipEditor({clip, onSaveQueueEvent, onUploadQueueEvent, 
           <Typography 
             variant="h5" 
             sx={{
-              marginLeft: "auto",
-              marginRight: "auto",
-              width: "92%",
+              borderRadius: "2px",
+              fontSize: "1.2rem",
+              margin: "4px auto 4px auto",
+              padding: "10px",
+              width: "90%",
               textAlign: "left",
+              cursor: "pointer",
+              outline: "dashed 1px #888",
+              "&:hover": {
+                outline: "dashed 1px #fff",
+                backgroundColor: "rgba(255, 255, 255, 0.1)",
+              }
             }}
             onClick={() => setIsEdittingClipName(true)}
           >

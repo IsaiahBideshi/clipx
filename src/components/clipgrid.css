@@ -726,6 +726,16 @@
   opacity: 0.82;
 }
 
+.inline-editable-text {
+  margin-left: "auto";
+  margin-right: "auto";
+  padding: "0px 8px",;
+  width: "90%",
+  textAlign: "left",
+  cursor: "pointer",
+  outline: "dashed 1px #888",
+}
+
 .skeleton-thumb,
 .skeleton-line {
   background: linear-gradient(
