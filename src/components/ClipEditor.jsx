@@ -368,7 +368,6 @@ export default function ClipEditor({clip, onSaveQueueEvent, onUploadQueueEvent, 
             variant="h5" 
             sx={{
               borderRadius: "2px",
-              fontSize: "1.2rem",
               margin: "4px auto 4px auto",
               padding: "10px",
               width: "90%",
@@ -389,9 +388,8 @@ export default function ClipEditor({clip, onSaveQueueEvent, onUploadQueueEvent, 
 
         {isSavedClipsView && clipData && (
           <div className={"clip-info"}>
-            <h2 className="clip-info-title">{clip?.name || "Untitled Clip"}</h2>
             <div className="clip-info-game-row">
-              <img className="clip-info-game-image" src={`https:${clipData?.game?.image}`} alt="game"/>
+              <img className="clip-info-game-image" src={`https:${clipData?.game?.image}`} />
               <div className="clip-info-game-label">{clipData?.game?.label || "Unknown Game"}</div>
             </div>
             <div className="clip-info-date">{new Date(clipData?.createdAt).toLocaleString() || "Unknown Date"}</div>
