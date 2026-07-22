@@ -655,7 +655,9 @@ export default function LocalFiles() {
                           queryClient.invalidateQueries({ queryKey: ["localFiles", "clips", rootPath, collection] });
                           setIsDeletingClip(false);
                           setClipToDelete(null);
-                          moveSelectedClip(1);
+                          if (clip){
+                            moveSelectedClip(1);
+                          }
                         } catch (error) {
                           setError(`${error.message}`);
                           console.error("Failed to delete clip:", error);
