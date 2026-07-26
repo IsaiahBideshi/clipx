@@ -86,9 +86,9 @@
   background: rgba(144, 202, 249, 0.12);
   cursor: pointer;
 }
-.clip-options-menu{
+.clip-context-menu{
   position: absolute;
-  width: 150px;
+  width: max-content;
   top: 100%;
   right: 0;
   background: #1a1d27;
@@ -99,14 +99,17 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
   padding: 6px;
   z-index: 10;
+  transition: background 180ms ease, transform 180ms ease;
 }
-.clip-options-menu-item{
+.clip-context-menu-item{
+  display: flex;
+  gap: 5px;
   z-index: 100;
   padding: 6px 10px;
   border-radius: 6px;
   transition: background 180ms ease, color 180ms ease;
 }
-.clip-card .clip-options-menu-item:hover{
+.clip-context-menu-item:hover{
   background: rgba(144, 202, 249, 0.12);
   color: rgba(144, 202, 249, 0.72);
   cursor: pointer;
@@ -138,6 +141,10 @@
   background: rgba(255, 76, 76, 0.32);
   border-color: rgba(255, 125, 125, 0.75);
   cursor: pointer;
+}
+
+.delete-modal .rename {
+  width: min(400px, 90vw);
 }
 
 .delete-modal {
@@ -346,6 +353,26 @@
 .clip-date{
   font-size: 12px;
   color: #888;
+}
+
+.video-loader {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.1);
+}
+.spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid rgba(255, 255, 255, 0.25);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 .video-preview-shell {

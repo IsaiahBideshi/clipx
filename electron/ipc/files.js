@@ -1,6 +1,6 @@
 import { BrowserWindow, dialog, ipcMain } from "electron";
 
-import { generateThumbnail, scanFolder } from "../services/fileService.js";
+import { generateThumbnail, scanFolder, openInExplorer } from "../services/fileService.js";
 import { clipIndexEvents, listLocalClips, refreshLocalClipIndex } from "../services/clipIndexService.js";
 
 let clipIndexForwarderRegistered = false;
@@ -51,7 +51,9 @@ export function registerFileIpcHandlers() {
     return result.filePaths[0];
   });
 
-
+  ipcMain.handle("open-in-explorer", async (_event, filePath) => {
+    return await openInExplorer(filePath);
+  });
 
   ipcMain.handle("scan-folder", async (_event, folderPath) => {
     return await scanFolder(folderPath);

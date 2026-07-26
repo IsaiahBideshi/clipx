@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import ffmpeg from "fluent-ffmpeg";
 import ffmpegPath from "ffmpeg-static";
-import { app } from "electron";
+import { app, shell } from "electron";
 
 import { getFastFileId } from "../utils/hashing.js";
 import { getMimeType } from "../utils/mime.js";
@@ -235,4 +235,14 @@ export async function generateThumbnail(videoPath) {
     setCachedThumbnailPath(videoPath, thumbPath);
     return thumbPath;
   });
+}
+
+export async function openInExplorer(filePath) {
+  try {
+    await shell.showItemInFolder(filePath);
+    return true;
+  } catch (error) {
+    console.error("ClipX: Failed to open in explorer", filePath, error);
+    return false;
+  }
 }

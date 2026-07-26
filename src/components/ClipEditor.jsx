@@ -41,9 +41,11 @@ function getClipNameValidationError(value) {
 }
 
 
-export default function ClipEditor({clip, onSaveQueueEvent, onUploadQueueEvent, onDelete, isSavedClipsView = false, onClose}) {
+export default function ClipEditor({clip, onSaveQueueEvent, onUploadQueueEvent, onDelete, isSavedClipsView = false, onClose, baseFolder}) {
   const videoRef = useRef(null);
   const shellRef = useRef(null);
+  const editorRef = useRef(null);
+  const uploadMenuRef = useRef(null);
 
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
@@ -67,6 +69,19 @@ export default function ClipEditor({clip, onSaveQueueEvent, onUploadQueueEvent, 
       setClipNameError("");
     }
   }, [clip]);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (editorRef.current && !editorRef.current.contains(event.target) && uploadMenuRef.current && !uploadMenuRef.current.contains(event.target)) {
+        onClose();
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   // When video loads
   function handleLoadedMetadata(e) {
@@ -299,7 +314,7 @@ export default function ClipEditor({clip, onSaveQueueEvent, onUploadQueueEvent, 
   return (
     <div className="clip-editor-container">
       
-      <div className={"clip-editor"} tabIndex={-1}>
+      <div className={"clip-editor"} tabIndex={-1} ref={editorRef}>
         <button className={"close-preview-btn"} onClick={onClose}>
           <CloseIcon fontSize={"large"} />
         </button>
@@ -319,71 +334,21 @@ export default function ClipEditor({clip, onSaveQueueEvent, onUploadQueueEvent, 
           isMuted={isMuted}
           onToggleMute={toggleMute}
           onSetVolume={setVideoVolume}
+          baseFolder={baseFolder}
         />
 
-        {isEdittingClipName ? (
-          <TextField
-            sx={{
-              marginLeft: "auto",
-              marginRight: "auto",
-              width: "92%",
-            }}
-            fullWidth
-            className={"tf-sx"}
-            value={clipName}
-            autoFocus
-            error={Boolean(clipNameError)}
-            helperText={clipNameError}
-            onChange={(e) => {
-              setClipName(e.target.value);
-              setClipNameError("");
-            }}
-            onBlur={() => {
-              const nextName = String(clipName || "").trim();
-              const previousName = getEditableClipName(clip?.name);
-              const validationError = getClipNameValidationError(nextName);
-
-              if (validationError) {
-                setClipNameError(validationError);
-                return;
-              }
-
-              const renameName = getEditableClipName(nextName).trim();
-              setClipName(renameName);
-              setIsEdittingClipName(false);
-              if (renameName !== previousName) {
-                window?.clipx?.renameClip(clip?.path, renameName)
-                  .then(() => {
-                    console.log("Clip renamed successfully");
-                  })
-                  .catch((err) => {
-                    console.error("Failed to rename clip:", err);
-                    setClipName(previousName);
-                  });
-              }
-            }}
-          />
-        ) : (
-          <Typography 
-            variant="h5" 
-            sx={{
-              borderRadius: "2px",
-              margin: "4px auto 4px auto",
-              padding: "10px",
-              width: "90%",
-              textAlign: "left",
-              cursor: "pointer",
-              outline: "dashed 1px #888",
-              "&:hover": {
-                outline: "dashed 1px #fff",
-                backgroundColor: "rgba(255, 255, 255, 0.1)",
-              }
-            }}
-            onClick={() => setIsEdittingClipName(true)}
-          >
-            {clipName || "Untitled Clip"}
-          </Typography>
-        )}
+        <Typography 
+          variant="h5" 
+          sx={{
+            margin: "0 auto",
+            width: "92%",
+            textAlign: "left",
+            fontWeight: "bold",
+          }}
+          onClick={() => setIsEdittingClipName(true)}
+        >
+          {clipName || "Untitled Clip"}
+        </Typography>
         
 
         {isSavedClipsView && clipData && (
@@ -410,7 +375,7 @@ export default function ClipEditor({clip, onSaveQueueEvent, onUploadQueueEvent, 
       </div>
 
       {!isSavedClipsView && (
-        <div className="upload-container">
+        <div className="upload-container" ref={uploadMenuRef}>
           <UploadMenu
             clip={clip}
             start={inPoint}
@@ -646,6 +611,7 @@ useEffect(() => {
         <div className="upload-menu-game-row" >
           <AutoComplete
             fullWidth
+            disablePortal
             options={gameOptions}
             filterOptions={(options) => options}
             freeSolo
@@ -679,6 +645,7 @@ useEffect(() => {
         </div>
         <AutoComplete
           className={"tf-sx"}
+          disablePortal
           multiple
           id="tags-outlined"
           options={friendsOptions}

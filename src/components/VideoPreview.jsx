@@ -7,6 +7,8 @@ import VolumeDownIcon from "@mui/icons-material/VolumeDown";
 import FullscreenIcon from "@mui/icons-material/Fullscreen";
 import FullscreenExitIcon from "@mui/icons-material/FullscreenExit";
 import { isTextEntryActive } from "../lib/hotkeys.js";
+import fallBackThumb from "../assets/thumbnail.png";
+
 
 function formatTime(timeInSeconds) {
   if (!Number.isFinite(timeInSeconds) || timeInSeconds < 0) return "0:00";
@@ -31,11 +33,15 @@ export default function VideoPreview({
   isMuted,
   onToggleMute,
   onSetVolume,
+  baseFolder
 }) {
   const shellRef = useRef(null);
   const idleTimerRef = useRef(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isMouseIdle, setIsMouseIdle] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [thumbSrc, setThumbSrc] = useState(null);
+  const [hasThumb, setHasThumb] = useState(false);
 
 
   const IDLE_HIDE_MS = 1200;
@@ -96,6 +102,58 @@ export default function VideoPreview({
     };
   }, []);
 
+  useEffect(() => {
+    videoRef.current.addEventListener("waiting", () => setLoading(true));
+    videoRef.current.addEventListener("canplay", () => setLoading(false));
+
+    return () => {
+      videoRef?.current?.removeEventListener("waiting", () => setLoading(true));
+      videoRef?.current?.removeEventListener("canplay", () => setLoading(false));
+    }
+  }, []);
+
+    useEffect(() => {
+      let mounted = true;
+  
+      const cachedThumbUrl = getThumbUrl(clip.thumbnailPath);
+      if (cachedThumbUrl) {
+        setThumbSrc(cachedThumbUrl);
+        setHasThumb(true);
+        return () => {
+          mounted = false;
+        };
+      }
+  
+      setThumbSrc(fallBackThumb);
+      setHasThumb(false);
+  
+      const getThumbnail = window.clipx?.getThumbnail;
+      if (typeof getThumbnail !== "function") {
+        return () => {
+          mounted = false;
+        };
+      }
+  
+      getThumbnail(clip.path, baseFolder)
+        .then((thumbPath) => {
+          if (mounted) {
+            setThumbSrc(getThumbUrl(thumbPath));
+            setHasThumb(true);
+          }
+        })
+        .catch((error) => {
+          console.error("Failed to load thumbnail:", error);
+        });
+  
+      return () => {
+        mounted = false;
+      };
+    }, [clip]);
+
+  function getThumbUrl(thumbPath) {
+    return thumbPath ? `clipx://image?path=${encodeURIComponent(thumbPath)}` : null;
+  }
+
   function scheduleIdle() {
     if (!isFullscreen) return;
 
@@ -134,6 +192,7 @@ export default function VideoPreview({
     await shell.requestFullscreen();
   }
 
+
   return (
     <div
       className="video-preview-shell"
@@ -143,13 +202,27 @@ export default function VideoPreview({
       onMouseDown={handlePointerActivity}
       onMouseLeave={scheduleIdle}
     >
+      {loading && (
+        <div className="video-loader">
+          <div className="spinner"></div>
+        </div>
+      )}
       <video
         ref={videoRef}
         src={src}
         onLoadedMetadata={onLoadedMetadata}
         onTimeUpdate={onTimeUpdate}
         onClick={onTogglePlay}
+        onCanPlay={() => setLoading(false)}
+        onError={(e) => {
+          console.error("VideoPreview: Video playback error", e);
+          setLoading(false);
+        }}
+        autoPlay={true}
+        preload="auto"
         className="video-preview-player"
+        onDoubleClick={toggleFullscreen}
+        poster={thumbSrc}
       />
 
       <div className={`video-preview-controls ${shouldUseIdleUi ? "controls-hidden" : ""}`} onClick={(e) => e.stopPropagation()}>

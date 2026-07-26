@@ -25,6 +25,7 @@ contextBridge.exposeInMainWorld("clipx", {
     return () => ipcRenderer.removeListener("local-clips:index-changed", listener);
   },
   getThumbnail: (videoPath, thumbsDir) => ipcRenderer.invoke("get-thumbnail", videoPath, thumbsDir),
+  openInExplorer: (filePath) => ipcRenderer.invoke("open-in-explorer", filePath),
   getTaglist: () => ipcRenderer.invoke("get-taglist"),
   saveTaglist: (taglist) => ipcRenderer.invoke("save-taglist", taglist),
   searchGames: (query) => ipcRenderer.invoke("search-games", query),

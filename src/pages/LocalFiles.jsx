@@ -4,10 +4,11 @@ import ClipGrid from "../components/ClipGrid.jsx";
 import ClipEditor from "../components/ClipEditor.jsx";
 import SavingClipsWidget from "../components/SavingClipsWidget.jsx";
 import UploadingClipsWidget from "../components/UploadingClipsWidget.jsx";
+import ClipContextMenu from "../components/ClipContextMenu.jsx";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import RefreshIcon from "@mui/icons-material/Refresh";
-import { Switch } from "@mui/material";
+import { Switch, TextField } from "@mui/material";
 import { isTextEntryActive } from "../lib/hotkeys.js";
 
 import { OverlayScrollbarsComponent } from "overlayscrollbars-react";
@@ -88,7 +89,14 @@ export default function LocalFiles() {
   const [isDeletingClip, setIsDeletingClip] = useState(false);
   const [error, setError] = useState(null);
   const [clipToDelete, setClipToDelete] = useState(null);
+  const [clipToRename, setClipToRename] = useState(null);
+  const [contextMenu, setContextMenu] = useState(null);
+  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+  const [renameModalOpen, setRenameModalOpen] = useState(false);
+  const [renameValue, setRenameValue] = useState("");
 
+  const renameModalRef = useRef(null);
+  const contextMenuRef = useRef(null);
   const deleteModalRef = useRef(null);
   const overlayRef = useRef(null);
   const clipsRef = useRef([]);
@@ -484,11 +492,53 @@ export default function LocalFiles() {
       if (deleteModalRef.current && !deleteModalRef.current.contains(event.target)) {
         setDeleteClipModalOpen(false);
       }
+      if (contextMenuRef.current && !contextMenuRef.current.contains(event.target)) {
+        setContextMenu(null);
+      }
     }
 
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [deleteClipModalOpen]);
+
+  
+  function getEditableClipName(fileName) {
+    const name = String(fileName || "");
+    return name.replace(/\.(mp4|webm|mov)$/i, "");
+  }
+
+  function handleRenameClip() {
+    if (!renameValue.trim()) {
+      console.log("return")
+      return;
+    }
+    const newName = renameValue.trim();
+    if (!window.clipx?.renameClip) {
+      console.error("window.clipx.renameClip is not available (preload not wired?)");
+      return;
+    }
+
+    if (newName === clipToRename?.name) {
+      setRenameModalOpen(false);
+      return;
+    }
+
+    const invalidChars = /[<>:"/\\|?*\x00-\x1F]/;
+    if (invalidChars.test(newName)) {
+      setRenameModalOpen(false);
+      setError("Invalid characters in filename. Please avoid using: < > : \" / \\ | ? *");
+      return;
+    }
+    console.log("Renaming clip:", clipToRename?.path, "to new name:", newName);
+
+    const promise = window.clipx.renameClip(clipToRename?.path, newName)
+      .then(() => {
+        setRenameModalOpen(false);
+      })
+      .catch((error) => {
+        console.error("Failed to rename clip:", error);
+      });
+  }
 
   function upsertSavingClip(id, nextValues) {
     setSavingClips((prev) =>
@@ -599,6 +649,7 @@ export default function LocalFiles() {
           onUploadQueueEvent={handleUploadQueueEvent}
           isSavedClipsView={showSavedFiles}
           onClose={() => setClip(null)}
+          baseFolder={folderPath}
           onDelete={(clip) => {
             setClipToDelete(clip);
             setDeleteClipModalOpen(true);
@@ -615,6 +666,10 @@ export default function LocalFiles() {
         hasMore={hasMore}
         onLoadMore={loadNextPage}
         scrollElement={scrollElement}
+        onContextMenuAction={(clip, rect) => {
+          clip ? setContextMenu(clip): setContextMenu(null);
+          setMousePosition({ x: rect.x, y: rect.y });
+        }}
         onDelete={(clip) => {
           setClipToDelete(clip);
           setDeleteClipModalOpen(true);
@@ -670,6 +725,69 @@ export default function LocalFiles() {
             </>)}
           </div>
         </div>
+      )}
+
+      {renameModalOpen && (
+        <div className="delete-modal">
+          <div className="delete-modal-content rename" ref={renameModalRef}>
+            <div className="delete-modal-message">
+              Rename clip:
+            </div>
+            <TextField
+              className="tf-sx"
+              value={renameValue}
+              onChange={(e) => setRenameValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  handleRenameClip();
+                }
+                if (e.key === "Escape") {
+                  setRenameModalOpen(false);
+                }
+              }}
+              autoFocus
+              fullWidth
+              margin="normal"
+            />
+            <div style={{ display: "flex", marginLeft: "auto", marginRight: "auto", marginTop: "20px", width: "fit-content", gap: "12px" }}>
+              <button className="cancel-button" onClick={() => setRenameModalOpen(false)}>Cancel</button>
+              <button className="rename-button" onClick={handleRenameClip}>Rename</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {contextMenu && (
+        <ClipContextMenu
+          ref={contextMenuRef}
+          clip={contextMenu}
+          position={mousePosition}
+          onOpen={() => {
+            setClip(contextMenu);
+            setContextMenu(null);
+          }}
+          onDelete={() => {
+            setClipToDelete(contextMenu);
+            setDeleteClipModalOpen(true);
+            setContextMenu(null);
+          }}
+          onRename={() => { 
+            setClipToRename(contextMenu);
+            setRenameModalOpen(true);
+            setRenameValue(getEditableClipName(contextMenu.name || ""));
+            setContextMenu(null);
+          }}
+          onOpenInExplorer={async () => {
+            setContextMenu(null);
+            let response = null;
+            if (window.clipx?.openInExplorer) {
+              response = await window.clipx.openInExplorer(contextMenu.path);
+            }
+            if (!response) {
+              setError("Failed to open in Explorer. Please check if the file exists and try again.");
+            }
+          }}
+        />
       )}
 
       {error && (
