@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.1.4
+
+- New: Clip buffering now shows loading icon.
+- New: Open in explorer button on clip context menu.
+- New: Moved rename clip function to clip context menu.
+
 ## v1.1.3
 
 - New: Near instant trimming for saving clips.
