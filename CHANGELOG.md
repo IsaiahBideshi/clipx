@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.1.5
+
+- Fix: Less "not responding" freezes.
+
 ## v1.1.4
 
 - New: Clip buffering now shows loading icon.
