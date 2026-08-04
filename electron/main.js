@@ -235,38 +235,7 @@ protocol.registerSchemesAsPrivileged([
   },
 ]);
 
-function registerAppProtocol() {
-  protocol.registerFileProtocol("clipx", (request, callback) => {
-    try {
-      const url = new URL(request.url);
-      let pathname = decodeURIComponent(url.pathname || "");
 
-      if (!pathname || pathname === "/") {
-        pathname = "/index.html";
-      }
-
-      const relativePath = pathname.replace(/^\/+/, "");
-      let filePath = path.normalize(path.join(distPath, relativePath));
-
-      if (!filePath.startsWith(distPath)) {
-        filePath = path.join(distPath, "index.html");
-      }
-
-      if (!fs.existsSync(filePath)) {
-        filePath = path.join(distPath, "index.html");
-      }
-
-      if (fs.existsSync(filePath) && fs.statSync(filePath).isDirectory()) {
-        filePath = path.join(filePath, "index.html");
-      }
-
-      callback({ path: filePath });
-    } catch (error) {
-      console.error("ClipX: Failed to resolve app:// URL", error);
-      callback({ path: path.join(app.getAppPath(), "dist", "index.html") });
-    }
-  });
-}
 
 async function createWindow({ show = true } = {}) {
   const win = new BrowserWindow({
@@ -369,7 +338,6 @@ if (!hasSingleInstanceLock) {
   app.whenReady().then(async () => {
     const launchMinimized = process.argv.includes(STARTUP_MINIMIZED_ARG);
     registerClipxProtocol(protocol);
-    registerAppProtocol();
     registerIpcHandlers();
     if (launchMinimized) {
       ensureTray();
