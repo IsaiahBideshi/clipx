@@ -3,6 +3,7 @@ import path from "path";
 import ffmpeg from "fluent-ffmpeg";
 import ffmpegPath from "ffmpeg-static";
 import { app, shell } from "electron";
+import { Readable } from "stream";
 
 import { getFastFileId } from "../utils/hashing.js";
 import { getMimeType } from "../utils/mime.js";
@@ -58,7 +59,7 @@ export function registerClipxProtocol(protocol) {
       return new Response("Missing path", { status: 400 });
     }
 
-    const fileStat = fs.statSync(filePath);
+    const fileStat = await fs.promises.stat(filePath);
     const range = request.headers.get("range");
     let start = 0;
     let end = fileStat.size - 1;
@@ -76,20 +77,11 @@ export function registerClipxProtocol(protocol) {
     const stream = fs.createReadStream(filePath, { start, end });
 
     stream.on('error', (err) => {
+      if (err.code === 'ABORT_ERR' || err.name === 'AbortError') return; // expected on seek
       console.error('Stream error:', err);
       stream.destroy();
     });
-
-    const webStream = new ReadableStream({
-      start(controller) {
-        stream.on('data', (chunk) => controller.enqueue(chunk));
-        stream.on('end', () => controller.close());
-        stream.on('error', (err) => controller.error(err));
-      },
-      cancel() {
-        stream.destroy(); // clean destroy on seek/cancel
-      }
-    });
+    const webStream = Readable.toWeb(stream);
 
     return new Response(webStream, {
       status: range ? 206 : 200,
