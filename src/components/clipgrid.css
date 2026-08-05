@@ -143,6 +143,20 @@
   cursor: pointer;
 }
 
+.rename-button{
+  background: rgba(144, 202, 249, 0.12);
+  border-color: rgba(144, 202, 249, 0.56);
+  color: #fff;
+  padding: 6px 12px;
+  border-radius: 6px;
+  transition: background 180ms ease, color 180ms ease;
+}
+.rename-button:hover{
+  background: rgba(144, 202, 249, 0.22);
+  border-color: rgba(144, 202, 249, 0.66);
+  cursor: pointer;
+}
+
 .delete-modal .rename {
   width: min(400px, 90vw);
 }
