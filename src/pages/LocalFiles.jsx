@@ -654,6 +654,8 @@ export default function LocalFiles() {
             setClipToDelete(clip);
             setDeleteClipModalOpen(true);
           }}
+          onNextClip={() => moveSelectedClip(1)}
+          onPrevClip={() => moveSelectedClip(-1)}
         />
       )}
 

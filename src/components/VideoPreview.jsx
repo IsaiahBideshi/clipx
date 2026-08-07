@@ -1,6 +1,8 @@
 import {useEffect, useRef, useState} from "react";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import PauseIcon from "@mui/icons-material/Pause";
+import SkipPreviousIcon from '@mui/icons-material/SkipPrevious';
+import SkipNextIcon from '@mui/icons-material/SkipNext';
 import VolumeOffIcon from "@mui/icons-material/VolumeOff";
 import VolumeUpIcon from "@mui/icons-material/VolumeUp";
 import VolumeDownIcon from "@mui/icons-material/VolumeDown";
@@ -33,7 +35,9 @@ export default function VideoPreview({
   isMuted,
   onToggleMute,
   onSetVolume,
-  baseFolder
+  baseFolder,
+  onNextClip,
+  onPrevClip
 }) {
   const shellRef = useRef(null);
   const idleTimerRef = useRef(null);
@@ -70,11 +74,15 @@ export default function VideoPreview({
         e.preventDefault();
         toggleFullscreen();
       }
+      if (e.code === "KeyM") {
+        e.preventDefault();
+        onToggleMute();
+      }
     }
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
+  }, [isMuted]);
 
   useEffect(() => {
     function onFullscreenChange() {
@@ -243,12 +251,20 @@ export default function VideoPreview({
         </div>
 
         <div className="video-actions-row">
-          <button className={"play-button"} type="button" onClick={onTogglePlay} aria-label={isPlaying ? "Pause" : "Play"}>
-            {isPlaying ? <PauseIcon/> : <PlayArrowIcon/>}
-          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <button className={"play-button"} title="Previous (ctrl + ←)" type="button" onClick={onPrevClip} aria-label={"Prev"}>
+              <SkipPreviousIcon/>
+            </button>
+            <button className={"play-button"} title={isPlaying ? "Pause (Spacebar)" : "Play (Spacebar)"} type="button" onClick={onTogglePlay} aria-label={isPlaying ? "Pause" : "Play"}>
+              {isPlaying ? <PauseIcon/> : <PlayArrowIcon/>}
+            </button>
+            <button className={"play-button"} title="Next (ctrl + →)" type="button" onClick={onNextClip} aria-label={"Next"}>
+              <SkipNextIcon/>
+            </button>
+          </div>
 
           <div className="video-volume-group">
-            <button className={"mute-button"} type="button" onClick={onToggleMute} aria-label={isMuted ? "Unmute" : "Mute"}>
+            <button className={"mute-button"} title={isMuted ? "Unmute" : "Mute"} type="button" onClick={onToggleMute} aria-label={isMuted ? "Unmute" : "Mute"}>
               {isMuted || volume === 0 ? (<VolumeOffIcon/>) :
                 volume < 0.5 ? (<VolumeDownIcon/>) : (<VolumeUpIcon/>)
               }
@@ -265,7 +281,7 @@ export default function VideoPreview({
               className="video-volume-slider"
             />
 
-            <button className={"play-button"} type="button" onClick={toggleFullscreen} aria-label={isFullscreen ? "Exit fullscreen" : "Fullscreen"}>
+            <button className={"play-button"} title="Fullscreen (F)" type="button" onClick={toggleFullscreen} aria-label={isFullscreen ? "Exit fullscreen" : "Fullscreen"}>
               {isFullscreen ? <FullscreenExitIcon/> : <FullscreenIcon/>}
             </button>
           </div>

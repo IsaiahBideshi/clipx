@@ -41,7 +41,16 @@ function getClipNameValidationError(value) {
 }
 
 
-export default function ClipEditor({clip, onSaveQueueEvent, onUploadQueueEvent, onDelete, isSavedClipsView = false, onClose, baseFolder}) {
+export default function ClipEditor({
+  clip, 
+  onNextClip,
+  onPrevClip,
+  onSaveQueueEvent, 
+  onUploadQueueEvent, 
+  onDelete, 
+  isSavedClipsView = false, 
+  onClose, baseFolder
+}) {
   const videoRef = useRef(null);
   const shellRef = useRef(null);
   const editorRef = useRef(null);
@@ -335,6 +344,8 @@ export default function ClipEditor({clip, onSaveQueueEvent, onUploadQueueEvent, 
           onToggleMute={toggleMute}
           onSetVolume={setVideoVolume}
           baseFolder={baseFolder}
+          onNextClip={onNextClip}
+          onPrevClip={onPrevClip}
         />
 
         <Typography 
