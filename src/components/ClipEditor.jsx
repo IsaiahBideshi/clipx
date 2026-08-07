@@ -278,7 +278,7 @@ export default function ClipEditor({
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [currentTime, duration, inPoint, outPoint]);
+  }, [currentTime, duration, inPoint, outPoint, volume, isMuted]);
 
   useEffect(() => {
     const el = videoRef.current;
