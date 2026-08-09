@@ -194,18 +194,31 @@ function getRowByPath(filePath) {
 export function listLocalClips(options = {}) {
   const rootPath = normalizeStoredPath(options.rootPath);
   const collection = options.collection === "saved" ? "saved" : "source";
-  const limit = Math.min(Math.max(Number(options.limit) || DEFAULT_PAGE_SIZE, 1), MAX_PAGE_SIZE);
+  const limit = Math.min(
+    Math.max(Number(options.limit) || DEFAULT_PAGE_SIZE, 1),
+    MAX_PAGE_SIZE
+  );
   const cursor = options.cursor || null;
 
   if (!rootPath) {
     return { clips: [], nextCursor: null, hasMore: false };
   }
 
-  const params = [rootPath, collection];
+  const params = [rootPath];
+  let collectionClause = "";
   let cursorClause = "";
+
+  if (collection === "saved") {
+    collectionClause = "AND collection = ?";
+    params.push("saved");
+  } else {
+    collectionClause = "AND collection IN (?, ?)";
+    params.push("saved", "source");
+  }
 
   if (cursor?.createdAtMs != null && cursor?.id) {
     const cursorCreatedAt = Number(cursor.createdAtMs);
+
     if (Number.isFinite(cursorCreatedAt)) {
       cursorClause = "AND (created_at_ms < ? OR (created_at_ms = ? AND id < ?))";
       params.push(cursorCreatedAt, cursorCreatedAt, String(cursor.id));
@@ -213,12 +226,13 @@ export function listLocalClips(options = {}) {
   }
 
   params.push(limit + 1);
+
   const rows = getDb()
     .prepare(`
       SELECT *
       FROM clips
       WHERE root_path = ?
-        AND collection = ?
+        ${collectionClause}
         AND missing = 0
         ${cursorClause}
       ORDER BY created_at_ms DESC, id DESC

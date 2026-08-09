@@ -413,6 +413,7 @@ export default function LocalFiles() {
   }, [collection, getScrollTop, loadPage, rootPath]);
 
   const refreshFiles = () => {
+    setClip(null);
     queryClient.invalidateQueries({ queryKey: ["localFiles", "clips", rootPath, collection] });
     setRefreshTick((tick) => tick + 1);
   };
@@ -656,6 +657,7 @@ export default function LocalFiles() {
           }}
           onNextClip={() => moveSelectedClip(1)}
           onPrevClip={() => moveSelectedClip(-1)}
+          triggerClipIndexRefresh={() => refreshFiles()}
         />
       )}
 

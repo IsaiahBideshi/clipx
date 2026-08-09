@@ -49,7 +49,9 @@ export default function ClipEditor({
   onUploadQueueEvent, 
   onDelete, 
   isSavedClipsView = false, 
-  onClose, baseFolder
+  onClose, 
+  baseFolder,
+  triggerClipIndexRefresh
 }) {
   const videoRef = useRef(null);
   const shellRef = useRef(null);
@@ -394,6 +396,7 @@ export default function ClipEditor({
             onSaveQueueEvent={onSaveQueueEvent}
             onUploadQueueEvent={onUploadQueueEvent}
             onDelete={onDelete}
+            onRefreshIndex={triggerClipIndexRefresh}
           />
         </div>
       )}
@@ -436,7 +439,7 @@ async function searchGames(gameName) {
 }
 
 
-function UploadMenu({clip, start, end, onSaveQueueEvent, onUploadQueueEvent, onDelete}) {
+function UploadMenu({clip, start, end, onRefreshIndex, onSaveQueueEvent, onUploadQueueEvent, onDelete}) {
   const [tags, setTags] = useState([]);
   const [friendsInClip, setFriendsInClip] = useState([]);
   const [peopleInput, setPeopleInput] = useState('');
@@ -518,6 +521,10 @@ useEffect(() => {
       const response = await window.clipx.saveClip({clip, start, end, title, game, tags});
       if (response === 200){
         onSaveQueueEvent?.({ type: "success", id: saveId });
+        const renameResponse = await window.clipx.renameClip(clip?.path, "[UNCUT] " + displayName);
+        if (renameResponse !== 200) {
+          console.error("Failed to rename clip after saving:", renameResponse);
+        }
         return;
       }
       onSaveQueueEvent?.({ type: "failed", id: saveId });
