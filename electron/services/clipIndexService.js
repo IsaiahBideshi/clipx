@@ -34,6 +34,17 @@ function getClipxDataDir() {
   return clipxDir;
 }
 
+export function getWatchedRootForPath(filePath) {
+  const normalizedFilePath = normalizeStoredPath(filePath);
+  let matchedRoot = null;
+  for (const rootPath of watcherByRootPath.keys()) {
+    if (isInsideRoot(rootPath, normalizedFilePath) && (!matchedRoot || rootPath.length > matchedRoot.length)) {
+      matchedRoot = rootPath;
+    }
+  }
+  return matchedRoot;
+}
+
 function getDb() {
   if (db) {
     return db;

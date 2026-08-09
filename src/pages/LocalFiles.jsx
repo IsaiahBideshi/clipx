@@ -392,7 +392,7 @@ export default function LocalFiles() {
         return;
       }
 
-      if (event.collection !== collection) {
+      if (event.collection !== collection && !(collection === "source" && event.collection === "saved")) {
         return;
       }
 
@@ -628,7 +628,10 @@ export default function LocalFiles() {
           <Switch
             className="local-files-toggle"
             checked={showSavedFiles}
-            onChange={(e) => setShowSavedFiles(e.target.checked)}
+            onChange={(e) => {
+              setShowSavedFiles(e.target.checked);
+              queryClient.invalidateQueries({ queryKey: ["localFiles", "clips", rootPath] });
+            }}
           />
         </div>
       )}

@@ -7,7 +7,7 @@ import { rename } from "fs/promises";
 
 import { uploadClipToYoutube } from "./youtubeService.js";
 import { resolveFfmpegPath } from "../utils/ffmpeg.js";
-import { getIndexedClipData, setIndexedClipMetadata, markIndexedClipMissing } from "./clipIndexService.js";
+import { getIndexedClipData, setIndexedClipMetadata, markIndexedClipMissing, getWatchedRootForPath, upsertIndexedClip } from "./clipIndexService.js";
 
 ffmpeg.setFfmpegPath(resolveFfmpegPath(ffmpegPath));
 
@@ -161,6 +161,9 @@ export async function saveClip(options) {
     game: game ? game : null,
   });
 
+  const root = getWatchedRootForPath(outputPath) || sourceDir;
+  await upsertIndexedClip(root, outputPath, { emitChange: true });
+
   return 200;
 }
 
@@ -258,6 +261,11 @@ export async function renameClip(clipPath, newName) {
 
   try {
     await rename(clipPath, newClipPath);
+    
+    const root = getWatchedRootForPath(newClipPath) || clipDir;
+    markIndexedClipMissing(clipPath, { emitChange: true });
+    await upsertIndexedClip(root, newClipPath, { emitChange: true });
+
     return { path: newClipPath, name: path.basename(newClipPath) };
   } catch (error) {
     console.error(`Failed to rename clip from ${clipPath} to ${newClipPath}:`, error);
