@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.1.6
+
+- Feat: Saved clips show up on local files page.
+- Fix: State of clips between localfiles and saved more synced.
+
 ## v1.1.5
 
 - Fix: Less "not responding" freezes.
