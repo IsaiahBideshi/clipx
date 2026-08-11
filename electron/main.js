@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Menu, protocol, Tray } from "electron";
+import { app, BrowserWindow, Menu, protocol, Tray, ipcMain } from "electron";
 import http from "http";
 import fs from "fs";
 import path from "path";
@@ -14,6 +14,7 @@ import { closeClipIndexService } from "./services/clipIndexService.js";
 import { registerGoogleAuthIpcHandlers } from "./ipc/googleAuth.js";
 import { registerAuthStorageIpcHandlers } from "./ipc/authStorage.js";
 import { checkForUpdates, registerUpdateIpcHandlers, registerUpdateWindowGuards, scheduleUpdateChecks } from "./services/updateService.js";
+import { registerWindowControlIpcHandlers } from "./services/menuBarService.js";
 
 
 
@@ -27,7 +28,7 @@ const devServerUrl = process.env.ELECTRON_RENDERER_URL || "http://localhost:5173
 const distPath = path.join(app.getAppPath(), "dist");
 const STARTUP_MINIMIZED_ARG = "--clipx-startup-minimized";
 let rendererServer = null;
-let mainWindow = null;
+export let mainWindow = null;
 let tray = null;
 let isQuitting = false;
 let shouldMaximizeOnFirstShow = false;
@@ -244,6 +245,7 @@ async function createWindow({ show = true } = {}) {
     show,
     fullscreenable: true,
     icon: appIconPath,
+    frame: false,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -251,6 +253,23 @@ async function createWindow({ show = true } = {}) {
     },
   });
   mainWindow = win;
+
+  const sendWindowState = () => {
+    if (win.isDestroyed()) {
+      return;
+    }
+
+    win.webContents.send("window:state-changed", {
+      maximized: win.isMaximized(),
+      fullscreen: win.isFullScreen(),
+    });
+  };
+
+  win.on("maximize", sendWindowState);
+  win.on("unmaximize", sendWindowState);
+  win.on("enter-full-screen", sendWindowState);
+  win.on("leave-full-screen", sendWindowState);
+
   win.on("closed", () => {
     if (mainWindow === win) {
       mainWindow = null;
@@ -313,6 +332,7 @@ async function createWindow({ show = true } = {}) {
 }
 
 function registerIpcHandlers() {
+  registerWindowControlIpcHandlers();
   registerAuthStorageIpcHandlers();
   registerFileIpcHandlers();
   registerSettingsIpcHandlers();

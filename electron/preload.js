@@ -51,6 +51,28 @@ contextBridge.exposeInMainWorld("clipx", {
   downloadUpdate: () => ipcRenderer.invoke("updates:download"),
   cancelUpdateDownload: () => ipcRenderer.invoke("updates:cancel-download"),
   installUpdate: () => ipcRenderer.invoke("updates:install"),
+  windowControls: {
+    getState: () => ipcRenderer.invoke("window:get-state"),
+    minimize: () => ipcRenderer.invoke("window:minimize"),
+    toggleMaximize: () => ipcRenderer.invoke("window:toggle-maximize"),
+    toggleFullScreen: () => ipcRenderer.invoke("window:toggle-fullscreen"),
+    close: () => ipcRenderer.invoke("window:close"),
+    onStateChanged: (callback) => {
+      if (typeof callback !== "function") {
+        return () => {};
+      }
+
+      const listener = (_event, state) => {
+        try {
+          callback(state);
+        } catch (error) {
+          console.error("ClipX: Window state callback failed:", error);
+        }
+      };
+      ipcRenderer.on("window:state-changed", listener);
+      return () => ipcRenderer.removeListener("window:state-changed", listener);
+    },
+  },
   onUpdateState: (callback) => {
     if (typeof callback !== "function") {
       return () => {};

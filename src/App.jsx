@@ -13,6 +13,7 @@ import Signup from "./pages/signup.jsx";
 import Login from "./pages/login.jsx";
 import UpdateModal from "./components/UpdateModal.jsx";
 import NavBar from "./components/NavBar.jsx";
+import MenuBar from "./components/MenuBar.jsx";
 
 const NAV_UPDATE_STATUSES = new Set([
   "available",
@@ -69,6 +70,7 @@ export default function App() {
 
   return (
     <>
+      <MenuBar />
       <NavBar
         showUpdateButton={showUpdateButton}
         onUpdateClick={() => setIsUpdateModalOpen(true)}
