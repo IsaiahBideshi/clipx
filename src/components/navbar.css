@@ -14,6 +14,7 @@
 }
 .left-nav-bar,
 .right-nav-bar {
+  height: 100%;
   display: flex;
   align-items: center;
   gap: 0;
@@ -22,7 +23,9 @@
 .nav-icon{
   border: none;
   width: 54px;
-  height: 30px;
+  height: 54px;
+  margin: 5px 0;
+  border-radius: 100px;
   box-sizing: border-box;
   background-color: transparent;
   cursor: pointer;
@@ -32,6 +35,10 @@
   flex: 0 0 54px;
   min-width: 0;
   padding: 0;
+}
+
+.nav-icon:hover {
+  background-color: #1e1f22;
 }
 
 .nav-update-button.nav-icon.MuiIconButton-root {
@@ -56,4 +63,16 @@
 }
 .nav-icon{
   color: white !important;
+}
+
+.nav-bar__app-name{
+  color: #ffffff;
+  transition: filter 0.1s ease-in-out;
+}
+
+.nav-bar__app-name:hover {
+  /* text-shadow: 0 0 10px #90caf9, 0 0 20px #90caf9, 0 0 30px #90caf9; */
+  filter: 
+    drop-shadow(-8px 0px 12px rgb(255, 160, 70)) 
+    drop-shadow(8px 0px 12px rgba(41, 181, 232, 0.685));
 }

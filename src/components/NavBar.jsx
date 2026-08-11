@@ -15,16 +15,16 @@ export default function NavBar({ showUpdateButton = false, onUpdateClick }) {
   return (
     <div className="nav-bar">
       <div className="left-nav-bar">
-        <Link to="/" className="nav-icon" aria-label="Settings">
+        <Link to="/" className="nav-icon" aria-label="Local Files" title="Local Files">
           <FolderIcon fontSize="medium" />
         </Link>
 
-        <Link to="/library" className="nav-icon" aria-label="Library">
+        <Link to="/library" className="nav-icon" aria-label="Library" title="Library">
           <VideoLibraryIcon fontSize="medium" />
         </Link>
       </div>
 
-      <h2>ClipX</h2>
+      <h2 className="nav-bar__app-name">ClipX</h2>
 
       <div className="right-nav-bar">
         {showUpdateButton && (
@@ -40,11 +40,11 @@ export default function NavBar({ showUpdateButton = false, onUpdateClick }) {
           </Tooltip>
         )}
 
-        <Link to={"/profile"} className="nav-icon" aria-label="Account">
+        <Link to={"/profile"} className="nav-icon" aria-label="Account" title="Account">
           <AccountCircleIcon fontSize="medium" />
         </Link>
 
-        <Link to="/settings" className="nav-icon" aria-label="Settings">
+        <Link to="/settings" className="nav-icon" aria-label="Settings" title="Settings">
           <SettingsIcon fontSize="medium" />
         </Link>
       </div>
