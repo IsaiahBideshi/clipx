@@ -78,7 +78,7 @@ export default function MenuBar() {
       />
 
       <div className="menu-items" role="menubar" aria-label="Application menu">
-        <Link to="/" className="menu-item" aria-label="ClipX home">
+        <Link to="/" className="menu-item" aria-label="ClipX home" title="Home">
           <img src="assets/clipx_icon.svg" alt="ClipX" className="app-icon" />
           <span className="app-name">ClipX</span>
         </Link>
