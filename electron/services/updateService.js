@@ -13,7 +13,7 @@ let isChecking = false;
 let isDownloading = false;
 let hasDownloadedUpdate = false;
 let downloadCancellationToken = null;
-let autoInstallOnDownload = false;
+let autoInstallOnDownload = true;
 let recurringCheckInterval = null;
 
 function emitUpdateState(state) {
