@@ -1,34 +1,32 @@
-import { app, BrowserWindow, dialog, ipcMain } from "electron";
+import { app, BrowserWindow } from "electron";
 import electronUpdater from "electron-updater";
 import builderUtilRuntime from "builder-util-runtime";
 
 const { autoUpdater } = electronUpdater;
-const { CancellationError, CancellationToken } = builderUtilRuntime;
-const INITIAL_UPDATE_CHECK_DELAY_MS = 5000;
+const { CancellationToken, CancellationError } = builderUtilRuntime;
+
 const UPDATE_CHECK_INTERVAL_MS = 60 * 60 * 1000;
 
-let latestState = {
-  status: "idle",
-  currentVersion: app.getVersion(),
-};
-let availableUpdateInfo = null;
-let currentDownloadCancellationToken = null;
+let latestState = { status: "idle", currentVersion: app.getVersion() };
+let availableUpdate = null;
 let isChecking = false;
-let hasAvailableUpdate = false;
 let isDownloading = false;
 let hasDownloadedUpdate = false;
-let isInstalling = false;
-let initialUpdateCheckTimeout = null;
-let recurringUpdateCheckInterval = null;
+let downloadCancellationToken = null;
+let autoInstallOnDownload = false;
+let recurringCheckInterval = null;
 
 function emitUpdateState(state) {
   latestState = {
     currentVersion: app.getVersion(),
+    update: availableUpdate,
     ...state,
   };
 
   for (const window of BrowserWindow.getAllWindows()) {
-    window.webContents.send("updates:state", latestState);
+    if (!window.isDestroyed()) {
+      window.webContents.send("updates:state", latestState);
+    }
   }
 }
 
@@ -83,46 +81,22 @@ function isCancellationError(error) {
   return error instanceof CancellationError || error?.message === "cancelled";
 }
 
-function clearDownloadState() {
-  if (currentDownloadCancellationToken) {
-    currentDownloadCancellationToken.dispose();
-    currentDownloadCancellationToken = null;
-  }
-  isDownloading = false;
+export function getUpdateState() {
+  return latestState;
 }
 
 export async function checkForUpdates() {
-  if (!app.isPackaged) {
-    emitUpdateState({
-      status: "disabled",
-      message: "Update checks run only in the packaged app.",
-    });
-    return latestState;
-  }
-
-  if (isChecking) {
-    return latestState;
-  }
-
-  if (isInstalling || isDownloading || hasAvailableUpdate || hasDownloadedUpdate) {
+  if (!app.isPackaged || isChecking || isDownloading || hasDownloadedUpdate) {
     return latestState;
   }
 
   isChecking = true;
+  emitUpdateState({ status: "checking" });
 
   try {
-    const result = await autoUpdater.checkForUpdates();
-    if (!result) {
-      emitUpdateState({
-        status: "disabled",
-        message: "Update checks are not available in this environment.",
-      });
-    }
+    await autoUpdater.checkForUpdates();
   } catch (error) {
-    emitUpdateState({
-      status: "error",
-      message: toErrorMessage(error),
-    });
+    emitUpdateState({ status: "error", message: toErrorMessage(error) });
   } finally {
     isChecking = false;
   }
@@ -130,125 +104,58 @@ export async function checkForUpdates() {
   return latestState;
 }
 
-async function downloadUpdate() {
-  if (!hasAvailableUpdate) {
-    emitUpdateState({
-      ...latestState,
-      status: "error",
-      message: "No update is available to download.",
-    });
-    return latestState;
-  }
-
-  if (isDownloading || hasDownloadedUpdate) {
+export async function downloadUpdate() {
+  if (!availableUpdate || isDownloading || hasDownloadedUpdate) {
     return latestState;
   }
 
   isDownloading = true;
-  currentDownloadCancellationToken = new CancellationToken();
+  downloadCancellationToken = new CancellationToken();
+  emitUpdateState({ status: "downloading", progress: 0 });
 
   try {
-    emitUpdateState({
-      ...latestState,
-      status: "downloading",
-      progress: 0,
-    });
-    await autoUpdater.downloadUpdate(currentDownloadCancellationToken);
+    await autoUpdater.downloadUpdate(downloadCancellationToken);
   } catch (error) {
     if (isCancellationError(error)) {
-      if (latestState.status === "cancelling" || latestState.status === "downloading") {
-        emitUpdateState({
-          status: hasAvailableUpdate ? "available" : "cancelled",
-          update: availableUpdateInfo,
-          message: "Update download cancelled.",
-        });
-      }
-      return latestState;
+      emitUpdateState({ status: "available", message: "Update download cancelled." });
+    } else {
+      emitUpdateState({ status: "error", message: toErrorMessage(error) });
     }
-
-    emitUpdateState({
-      status: "error",
-      update: availableUpdateInfo,
-      message: toErrorMessage(error),
-    });
   } finally {
-    clearDownloadState();
+    isDownloading = false;
+    downloadCancellationToken = null;
   }
 
   return latestState;
 }
 
-function cancelDownload() {
-  if (!isDownloading || !currentDownloadCancellationToken) {
+export function cancelDownload() {
+  if (!isDownloading || !downloadCancellationToken) {
     return latestState;
   }
 
-  emitUpdateState({
-    ...latestState,
-    status: "cancelling",
-    message: "Cancelling update download...",
-  });
-  currentDownloadCancellationToken.cancel();
+  emitUpdateState({ status: "cancelling", message: "Cancelling update download..." });
+  downloadCancellationToken.cancel();
   return latestState;
 }
 
-function installUpdate() {
+export function installUpdate() {
   if (!hasDownloadedUpdate) {
-    emitUpdateState({
-      ...latestState,
-      status: "error",
-      message: "No downloaded update is ready to install.",
-    });
+    emitUpdateState({ status: "error", message: "No downloaded update is ready to install." });
     return latestState;
   }
 
-  try {
-    isInstalling = true;
-    emitUpdateState({
-      ...latestState,
-      status: "installing",
-      message: "Restarting to install the update...",
-    });
-    autoUpdater.quitAndInstall(false, true);
-  } catch (error) {
-    isInstalling = false;
-    emitUpdateState({
-      status: "error",
-      update: availableUpdateInfo,
-      message: toErrorMessage(error),
-    });
-  }
-
+  emitUpdateState({ status: "installing", message: "Restarting to install the update..." });
+  autoUpdater.quitAndInstall(false, true);
   return latestState;
 }
 
-export function scheduleUpdateChecks({
-  initialDelayMs = INITIAL_UPDATE_CHECK_DELAY_MS,
-  intervalMs = UPDATE_CHECK_INTERVAL_MS,
-} = {}) {
+export function initializeUpdates() {
   if (!app.isPackaged) {
     return;
   }
-
-  if (!initialUpdateCheckTimeout) {
-    initialUpdateCheckTimeout = setTimeout(() => {
-      initialUpdateCheckTimeout = null;
-      void checkForUpdates();
-    }, initialDelayMs);
-    initialUpdateCheckTimeout.unref?.();
-  }
-
-  if (!recurringUpdateCheckInterval) {
-    recurringUpdateCheckInterval = setInterval(() => {
-      void checkForUpdates();
-    }, intervalMs);
-    recurringUpdateCheckInterval.unref?.();
-  }
-}
-
-export function registerUpdateIpcHandlers() {
   autoUpdater.autoDownload = false;
-  autoUpdater.autoInstallOnAppQuit = false;
+  autoUpdater.autoInstallOnAppQuit = true;
   autoUpdater.fullChangelog = true;
 
   autoUpdater.on("checking-for-update", () => {
@@ -256,93 +163,49 @@ export function registerUpdateIpcHandlers() {
   });
 
   autoUpdater.on("update-available", (info) => {
-    availableUpdateInfo = toUpdateInfo(info);
-    hasAvailableUpdate = true;
+    availableUpdate = toUpdateInfo(info);
     hasDownloadedUpdate = false;
-    emitUpdateState({
-      status: "available",
-      update: availableUpdateInfo,
-    });
+    void downloadUpdate();
   });
 
   autoUpdater.on("update-not-available", () => {
-    availableUpdateInfo = null;
-    hasAvailableUpdate = false;
+    availableUpdate = null;
     hasDownloadedUpdate = false;
+    autoInstallOnDownload = false;
     emitUpdateState({ status: "not-available" });
   });
 
   autoUpdater.on("download-progress", (progress) => {
-    emitUpdateState({
-      ...latestState,
-      status: "downloading",
-      progress: Math.round(progress.percent || 0),
-    });
+    emitUpdateState({ status: "downloading", progress: Math.round(progress.percent || 0) });
   });
 
   autoUpdater.on("update-downloaded", (info) => {
-    availableUpdateInfo = toUpdateInfo(info);
-    clearDownloadState();
+    availableUpdate = toUpdateInfo(info);
     hasDownloadedUpdate = true;
-    emitUpdateState({
-      status: "downloaded",
-      update: availableUpdateInfo,
-    });
-  });
+    emitUpdateState({ status: "downloaded" });
 
-  autoUpdater.on("update-cancelled", () => {
-    clearDownloadState();
-    emitUpdateState({
-      status: hasAvailableUpdate ? "available" : "cancelled",
-      update: availableUpdateInfo,
-      message: "Update download cancelled.",
-    });
+    if (autoInstallOnDownload) {
+      autoInstallOnDownload = false;
+      installUpdate();
+    }
   });
 
   autoUpdater.on("error", (error) => {
+    autoInstallOnDownload = false;
     isChecking = false;
-    isInstalling = false;
-    clearDownloadState();
-    emitUpdateState({
-      status: "error",
-      update: availableUpdateInfo,
-      message: toErrorMessage(error),
-    });
+    emitUpdateState({ status: "error", message: toErrorMessage(error) });
   });
 
-  ipcMain.handle("updates:get-state", () => latestState);
-  ipcMain.handle("updates:check", () => checkForUpdates());
-  ipcMain.handle("updates:download", () => downloadUpdate());
-  ipcMain.handle("updates:cancel-download", () => cancelDownload());
-  ipcMain.handle("updates:install", () => installUpdate());
+  void checkForUpdates();
 }
 
-export function registerUpdateWindowGuards(window) {
-  window.on("close", (event) => {
-    if (event.defaultPrevented || event.clipxMinimizedToTray) {
-      return;
-    }
+export function scheduleUpdateChecks({ intervalMs = UPDATE_CHECK_INTERVAL_MS } = {}) {
+  if (!app.isPackaged || recurringCheckInterval) {
+    return;
+  }
 
-    if (!isDownloading || isInstalling) {
-      return;
-    }
-
-    const choice = dialog.showMessageBoxSync(window, {
-      type: "warning",
-      buttons: ["Keep downloading", "Quit"],
-      defaultId: 0,
-      cancelId: 0,
-      title: "Update download in progress",
-      message: "ClipX is downloading an update.",
-      detail: "If you quit now, the download will be cancelled. You can download the update again next time.",
-      noLink: true,
-    });
-
-    if (choice === 0) {
-      event.preventDefault();
-      return;
-    }
-
-    cancelDownload();
-  });
+  recurringCheckInterval = setInterval(() => {
+    void checkForUpdates();
+  }, intervalMs);
+  recurringCheckInterval.unref?.();
 }

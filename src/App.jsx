@@ -38,6 +38,15 @@ export default function App() {
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
   const showUpdateButton = hasNavUpdate(updateState);
 
+  function handleUpdateClick() {
+    if (updateState?.status === "downloaded") {
+      window.clipx?.installUpdate?.();
+      return;
+    }
+
+    setIsUpdateModalOpen(true);
+  }
+
   useEffect(() => {
     if (!window.clipx?.onUpdateState) {
       return undefined;
@@ -73,7 +82,8 @@ export default function App() {
       <MenuBar />
       <NavBar
         showUpdateButton={showUpdateButton}
-        onUpdateClick={() => setIsUpdateModalOpen(true)}
+        updateStatus={updateState?.status}
+        onUpdateClick={handleUpdateClick}
       />
       <Routes>
         <Route path="/" element={

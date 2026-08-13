@@ -23,7 +23,7 @@ export default function UpdateModal({ updateState, open = false, onClose }) {
     }
 
     if (updateState.status === "downloading" || updateState.status === "cancelling" || updateState.status === "installing") {
-      return true;
+      return open;
     }
 
     if (updateState.status === "downloaded") {

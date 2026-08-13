@@ -13,7 +13,8 @@ import { registerClipxProtocol } from "./services/fileService.js";
 import { closeClipIndexService } from "./services/clipIndexService.js";
 import { registerGoogleAuthIpcHandlers } from "./ipc/googleAuth.js";
 import { registerAuthStorageIpcHandlers } from "./ipc/authStorage.js";
-import { checkForUpdates, registerUpdateIpcHandlers, registerUpdateWindowGuards, scheduleUpdateChecks } from "./services/updateService.js";
+import { initializeUpdates, scheduleUpdateChecks } from "./services/updateService.js";
+import { registerUpdateIpcHandlers } from "./ipc/update.js";
 import { registerWindowControlIpcHandlers } from "./services/menuBarService.js";
 
 
@@ -161,7 +162,7 @@ function ensureTray() {
     {
       label: "Show ClipX",
       click: () => {
-        showMainWindow({ checkForUpdatesOnShow: true });
+        showMainWindow();
       },
     },
     {
@@ -176,20 +177,13 @@ function ensureTray() {
     },
   ]));
   tray.on("click", () => {
-    showMainWindow({ checkForUpdatesOnShow: true });
+    showMainWindow();
   });
 
   return tray;
 }
 
-async function showMainWindow({ checkForUpdatesOnShow = false } = {}) {
-  const shouldCheckForUpdatesOnShow = checkForUpdatesOnShow && (
-    !mainWindow ||
-    mainWindow.isDestroyed() ||
-    !mainWindow.isVisible() ||
-    mainWindow.isMinimized()
-  );
-
+async function showMainWindow() {
   if (!mainWindow || mainWindow.isDestroyed()) {
     await createWindow();
   }
@@ -209,10 +203,6 @@ async function showMainWindow({ checkForUpdatesOnShow = false } = {}) {
 
   mainWindow.show();
   mainWindow.focus();
-
-  if (shouldCheckForUpdatesOnShow) {
-    void checkForUpdates();
-  }
 }
 
 protocol.registerSchemesAsPrivileged([
@@ -296,7 +286,6 @@ async function createWindow({ show = true } = {}) {
     ensureTray();
     win.hide();
   });
-  registerUpdateWindowGuards(win);
 
   // Support the browser Fullscreen API (used by YouTube's fullscreen button)
   win.webContents.on("enter-html-full-screen", () => {
@@ -359,6 +348,7 @@ if (!hasSingleInstanceLock) {
     const launchMinimized = process.argv.includes(STARTUP_MINIMIZED_ARG);
     registerClipxProtocol(protocol);
     registerIpcHandlers();
+    initializeUpdates();
     if (launchMinimized) {
       ensureTray();
     }
