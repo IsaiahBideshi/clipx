@@ -13,8 +13,8 @@ import CircularProgress from '@mui/material/CircularProgress';
 import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 
-export default function NavBar({ showUpdateButton = true, updateStatus = null, onUpdateClick }) {
-  const isDownloading = updateStatus === "downloading" || updateStatus === "cancelling";
+export default function NavBar({ showUpdateButton = true, updateStatus = null, updateErrorMessage = null, onUpdateClick }) {
+  const isDownloading = updateStatus === "downloading";
 
   return (
     <div className="nav-bar">
@@ -51,6 +51,20 @@ export default function NavBar({ showUpdateButton = true, updateStatus = null, o
                 onClick={onUpdateClick}
                 startIcon={<DownloadIcon />}
               />
+            </Tooltip>
+          ) : updateStatus === "error" ? (
+            <Tooltip
+              title={updateErrorMessage || "Update failed"}
+              componentsProps={{ tooltip: { sx: { color: "red" } } }}
+            >
+              <IconButton
+                className="nav-icon nav-update-button"
+                aria-label="Update failed"
+                onClick={onUpdateClick}
+                size="medium"
+              >
+                <DownloadIcon fontSize="medium" />
+              </IconButton>
             </Tooltip>
           ) : (
             <Tooltip title="Update available">

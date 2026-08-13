@@ -1,18 +1,14 @@
 import { app, BrowserWindow } from "electron";
 import electronUpdater from "electron-updater";
-import builderUtilRuntime from "builder-util-runtime";
 
 const { autoUpdater } = electronUpdater;
-const { CancellationToken, CancellationError } = builderUtilRuntime;
 
 const UPDATE_CHECK_INTERVAL_MS = 60 * 60 * 1000;
 
 let latestState = { status: "idle", currentVersion: app.getVersion() };
 let availableUpdate = null;
 let isChecking = false;
-let isDownloading = false;
 let hasDownloadedUpdate = false;
-let downloadCancellationToken = null;
 let autoInstallOnDownload = true;
 let recurringCheckInterval = null;
 
@@ -77,16 +73,12 @@ function toErrorMessage(error) {
   return error.message || "The update could not be completed.";
 }
 
-function isCancellationError(error) {
-  return error instanceof CancellationError || error?.message === "cancelled";
-}
-
 export function getUpdateState() {
   return latestState;
 }
 
 export async function checkForUpdates() {
-  if (!app.isPackaged || isChecking || isDownloading || hasDownloadedUpdate) {
+  if (!app.isPackaged || isChecking || hasDownloadedUpdate) {
     return latestState;
   }
 
@@ -101,41 +93,6 @@ export async function checkForUpdates() {
     isChecking = false;
   }
 
-  return latestState;
-}
-
-export async function downloadUpdate() {
-  if (!availableUpdate || isDownloading || hasDownloadedUpdate) {
-    return latestState;
-  }
-
-  isDownloading = true;
-  downloadCancellationToken = new CancellationToken();
-  emitUpdateState({ status: "downloading", progress: 0 });
-
-  try {
-    await autoUpdater.downloadUpdate(downloadCancellationToken);
-  } catch (error) {
-    if (isCancellationError(error)) {
-      emitUpdateState({ status: "available", message: "Update download cancelled." });
-    } else {
-      emitUpdateState({ status: "error", message: toErrorMessage(error) });
-    }
-  } finally {
-    isDownloading = false;
-    downloadCancellationToken = null;
-  }
-
-  return latestState;
-}
-
-export function cancelDownload() {
-  if (!isDownloading || !downloadCancellationToken) {
-    return latestState;
-  }
-
-  emitUpdateState({ status: "cancelling", message: "Cancelling update download..." });
-  downloadCancellationToken.cancel();
   return latestState;
 }
 
@@ -165,7 +122,8 @@ export function initializeUpdates() {
   autoUpdater.on("update-available", (info) => {
     availableUpdate = toUpdateInfo(info);
     hasDownloadedUpdate = false;
-    void downloadUpdate();
+    emitUpdateState({ status: "available" });
+    void autoUpdater.downloadUpdate();
   });
 
   autoUpdater.on("update-not-available", () => {

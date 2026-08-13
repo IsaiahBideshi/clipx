@@ -48,8 +48,6 @@ contextBridge.exposeInMainWorld("clipx", {
   authStorageRemove: (key) => ipcRenderer.invoke("auth-storage-remove", key),
   getUpdateState: () => ipcRenderer.invoke("updates:get-state"),
   checkForUpdates: () => ipcRenderer.invoke("updates:check"),
-  downloadUpdate: () => ipcRenderer.invoke("updates:download"),
-  cancelUpdateDownload: () => ipcRenderer.invoke("updates:cancel-download"),
   installUpdate: () => ipcRenderer.invoke("updates:install"),
   windowControls: {
     getState: () => ipcRenderer.invoke("window:get-state"),
