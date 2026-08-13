@@ -4,12 +4,10 @@ import electronUpdater from "electron-updater";
 const { autoUpdater } = electronUpdater;
 
 const UPDATE_CHECK_INTERVAL_MS = 60 * 60 * 1000;
-
 let latestState = { status: "idle", currentVersion: app.getVersion() };
 let availableUpdate = null;
 let isChecking = false;
 let hasDownloadedUpdate = false;
-let autoInstallOnDownload = true;
 let recurringCheckInterval = null;
 
 function emitUpdateState(state) {
@@ -96,6 +94,79 @@ export async function checkForUpdates() {
   return latestState;
 }
 
+export function checkForUpdatesAndInstall({ checkTimeoutMs = 10000, downloadTimeoutMs = 10 * 60 * 1000 } = {}) {
+  if (!app.isPackaged || isChecking || hasDownloadedUpdate) {
+    return Promise.resolve(false);
+  }
+
+  return new Promise((resolve) => {
+    let downloadStarted = false;
+    let settled = false;
+
+    const settle = (result) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      cleanup();
+      resolve(result);
+    };
+
+    const checkTimer = setTimeout(() => {
+      if (!downloadStarted) {
+        emitUpdateState({ status: "error", message: "Update check timed out." });
+        settle(false);
+      }
+    }, checkTimeoutMs);
+
+    const downloadTimer = setTimeout(() => {
+      if (downloadStarted) {
+        emitUpdateState({ status: "error", message: "Update download timed out." });
+        settle(false);
+      }
+    }, downloadTimeoutMs);
+
+    const onAvailable = () => {
+      downloadStarted = true;
+      clearTimeout(checkTimer);
+    };
+
+    const onDownloaded = (info) => {
+      availableUpdate = toUpdateInfo(info);
+      hasDownloadedUpdate = true;
+      emitUpdateState({ status: "downloaded" });
+      settle(true);
+      autoUpdater.quitAndInstall(false, true);
+    };
+
+    const onError = (error) => {
+      emitUpdateState({ status: "error", message: toErrorMessage(error) });
+      settle(false);
+    };
+
+    const onNotAvailable = () => {
+      emitUpdateState({ status: "not-available" });
+      settle(false);
+    };
+
+    function cleanup() {
+      clearTimeout(checkTimer);
+      clearTimeout(downloadTimer);
+      autoUpdater.removeListener("update-available", onAvailable);
+      autoUpdater.removeListener("update-downloaded", onDownloaded);
+      autoUpdater.removeListener("error", onError);
+      autoUpdater.removeListener("update-not-available", onNotAvailable);
+    }
+
+    autoUpdater.on("update-available", onAvailable);
+    autoUpdater.on("update-downloaded", onDownloaded);
+    autoUpdater.on("error", onError);
+    autoUpdater.on("update-not-available", onNotAvailable);
+
+    void checkForUpdates();
+  });
+}
+
 export function installUpdate() {
   if (!hasDownloadedUpdate) {
     emitUpdateState({ status: "error", message: "No downloaded update is ready to install." });
@@ -129,7 +200,6 @@ export function initializeUpdates() {
   autoUpdater.on("update-not-available", () => {
     availableUpdate = null;
     hasDownloadedUpdate = false;
-    autoInstallOnDownload = false;
     emitUpdateState({ status: "not-available" });
   });
 
@@ -141,20 +211,12 @@ export function initializeUpdates() {
     availableUpdate = toUpdateInfo(info);
     hasDownloadedUpdate = true;
     emitUpdateState({ status: "downloaded" });
-
-    if (autoInstallOnDownload) {
-      autoInstallOnDownload = false;
-      installUpdate();
-    }
   });
 
   autoUpdater.on("error", (error) => {
-    autoInstallOnDownload = false;
     isChecking = false;
     emitUpdateState({ status: "error", message: toErrorMessage(error) });
   });
-
-  void checkForUpdates();
 }
 
 export function scheduleUpdateChecks({ intervalMs = UPDATE_CHECK_INTERVAL_MS } = {}) {
