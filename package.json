@@ -10,7 +10,7 @@
     "dev:electron": "wait-on tcp:127.0.0.1:5173 && cross-env ELECTRON_RENDERER_URL=http://127.0.0.1:5173 electron .",
     "build:react": "vite build",
     "build:electron": "electron-builder build --win --publish never",
-    "build": "vite build && electron-builder build --win --publish never",
+    "build": "node scripts/build.js",
     "preview": "vite preview"
   },
   "build": {
@@ -44,6 +44,7 @@
     "cross-env": "^10.1.0",
     "electron": "^41.0.4",
     "electron-builder": "^26.8.1",
+    "node-notifier": "^10.0.1",
     "vite": "^7.3.1",
     "wait-on": "^9.0.10"
   },

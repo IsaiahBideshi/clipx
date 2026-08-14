@@ -46,6 +46,26 @@
   width: 54px;
   height: 30px;
   padding: 0;
+  margin: 0;
+}
+
+.nav-update-ready.MuiButton-root {
+  color: #90caf9 !important;
+  text-transform: none;
+  font-size: 13px;
+  padding: 5px 12px;
+  border-radius: 100px;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.nav-update-ready.MuiButton-root .MuiButton-startIcon {
+  margin-right: 0;
+  margin-left: 0;
+}
+
+.nav-update-ready.MuiButton-root:hover {
+  background-color: #1e1f22;
 }
 
 .settings-container{

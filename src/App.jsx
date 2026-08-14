@@ -11,14 +11,12 @@ import Library from "./pages/Library.jsx";
 import Profile from "./pages/Profile.jsx";
 import Signup from "./pages/signup.jsx";
 import Login from "./pages/login.jsx";
-import UpdateModal from "./components/UpdateModal.jsx";
 import NavBar from "./components/NavBar.jsx";
 import MenuBar from "./components/MenuBar.jsx";
 
 const NAV_UPDATE_STATUSES = new Set([
   "available",
   "downloading",
-  "cancelling",
   "downloaded",
   "installing",
   "error",
@@ -35,8 +33,18 @@ function hasNavUpdate(updateState) {
 
 export default function App() {
   const [updateState, setUpdateState] = useState(null);
-  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
   const showUpdateButton = hasNavUpdate(updateState);
+
+  function handleUpdateClick() {
+    if (updateState?.status === "downloaded") {
+      window.clipx?.installUpdate?.();
+      return;
+    }
+
+    if (updateState?.status === "error") {
+      window.clipx?.checkForUpdates?.();
+    }
+  }
 
   useEffect(() => {
     if (!window.clipx?.onUpdateState) {
@@ -62,18 +70,14 @@ export default function App() {
     };
   }, []);
 
-  useEffect(() => {
-    if (!showUpdateButton) {
-      setIsUpdateModalOpen(false);
-    }
-  }, [showUpdateButton]);
-
   return (
     <>
       <MenuBar />
       <NavBar
         showUpdateButton={showUpdateButton}
-        onUpdateClick={() => setIsUpdateModalOpen(true)}
+        updateStatus={updateState?.status}
+        updateErrorMessage={updateState?.message}
+        onUpdateClick={handleUpdateClick}
       />
       <Routes>
         <Route path="/" element={
@@ -107,11 +111,6 @@ export default function App() {
           </ErrorBoundary>
         } />
       </Routes>
-      <UpdateModal
-        updateState={updateState}
-        open={isUpdateModalOpen}
-        onClose={() => setIsUpdateModalOpen(false)}
-      />
     </>
   );
 }
