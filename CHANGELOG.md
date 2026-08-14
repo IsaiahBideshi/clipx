@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.1.7
+
+- Feat: Automatically download and install updates on first launch.
+- Feat: Just a app restart is needed for an update.
+- Feat: Menu bar redesign.
+- Feat: Navigation bar updates.
+
 ## v1.1.6
 
 - Feat: Saved clips show up on local files page.
