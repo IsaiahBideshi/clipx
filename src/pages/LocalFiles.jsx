@@ -510,7 +510,6 @@ export default function LocalFiles() {
 
   function handleRenameClip() {
     if (!renameValue.trim()) {
-      console.log("return")
       return;
     }
     const newName = renameValue.trim();
@@ -530,7 +529,6 @@ export default function LocalFiles() {
       setError("Invalid characters in filename. Please avoid using: < > : \" / \\ | ? *");
       return;
     }
-    console.log("Renaming clip:", clipToRename?.path, "to new name:", newName);
 
     const promise = window.clipx.renameClip(clipToRename?.path, newName)
       .then(() => {

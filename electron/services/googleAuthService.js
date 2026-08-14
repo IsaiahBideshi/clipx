@@ -76,8 +76,6 @@ export async function signInWithGoogle(shell) {
           server.removeAllListeners("request");
           server.close();
 
-          console.log("Received auth code from Google:", queryObject.code);
-
           const oauth2Client = new google.auth.OAuth2(clientId, clientSecret, redirectUri);
           const { tokens } = await oauth2Client.getToken({code: queryObject.code, codeVerifier: verifier});
           const { data, error } = await supabase.auth.signInWithIdToken({
@@ -100,7 +98,6 @@ export async function signInWithGoogle(shell) {
         server.removeAllListeners("request");
         server.close();
         clearTimeout(timeoutId);
-        console.error(error);
         reject(error);
       }
     });

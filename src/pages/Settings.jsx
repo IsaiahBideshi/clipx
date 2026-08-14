@@ -27,13 +27,11 @@ const tfSx = {
 
 export async function getOptions() {
   if (!window.clipx?.getOptions) {
-    console.log("no getOptions function");
     return {};
   }
 
   try {
     const storedOptions = await window.clipx.getOptions();
-    console.log(storedOptions);
     return storedOptions || {};
   } catch (err) {
     console.error("Failed to load options:", err);
@@ -47,7 +45,6 @@ function googleInfoQueryKey(userId) {
 
 async function getGoogleInfo(userId) {
   if (!window.clipx?.getGoogleInfo) {
-    console.log("no getGoogleInfo function");
     return null;
   }
 
@@ -65,7 +62,6 @@ async function getGoogleInfo(userId) {
 
 export async function linkYoutube() {
     if (!window.clipx?.linkYoutube) {
-      console.log("no linkYoutube function");
       return null;
     }
 
@@ -83,7 +79,6 @@ export async function linkYoutube() {
 
 async function unlinkYoutube() {
     if (!window.clipx?.unlinkYoutube) {
-      console.log("no unlinkYoutube function");
       return;
     }
 
@@ -115,7 +110,6 @@ async function getAppVersion() {
 
 async function getLaunchAtStartup() {
   if (!window.clipx?.getLaunchAtStartup) {
-    console.log("no getLaunchAtStartup function");
     return false;
   }
 
@@ -150,7 +144,6 @@ export default function Settings() {
   });
   const googleInfo = googleInfoQuery.data || null;
   const loadingGoogleInfo = Boolean(userId) && googleInfoQuery.isFetching && !googleInfo;
-  console.log(options);
 
   function updateOption(key, value) {
     setOptions((prevOptions) => ({
@@ -161,7 +154,6 @@ export default function Settings() {
 
   function pickFolder() {
     if (!window.clipx?.pickFolder) {
-      console.log("no pickFolder function");
       return;
     }
 
@@ -182,7 +174,6 @@ export default function Settings() {
     setLaunchAtStartup(nextLaunchAtStartup);
 
     if (!window.clipx?.setLaunchAtStartup) {
-      console.log("no setLaunchAtStartup function");
       return;
     }
 
@@ -197,8 +188,6 @@ export default function Settings() {
       setSavingLaunchAtStartup(false);
     }
   }
-
-  console.log(googleInfo);
 
   const handleLinkYoutube = async () => {
     setLinking(true);
@@ -224,8 +213,6 @@ export default function Settings() {
     queryClient.setQueryData(googleInfoKey, null);
     setConfirmUnlink(false);
   }
-  console.log(googleInfo);
-  console.log(loadingGoogleInfo);
 
   useEffect(() => {
     let cancelled = false;
@@ -275,7 +262,6 @@ export default function Settings() {
       if (!options) return;
       if (typeof options !== "object") return;
       if (!window.clipx?.saveOptions) {
-        console.log("no saveOptions function");
         return;
       }
       try {

@@ -93,8 +93,6 @@ async function startRendererServer() {
       filePath = path.join(filePath, "index.html");
     }
 
-    console.log(`Serving ${filePath} for request ${req.url}`);
-
     const contentType = getContentType(filePath);
     res.writeHead(200, { "Content-Type": contentType });
 

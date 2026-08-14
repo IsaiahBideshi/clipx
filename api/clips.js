@@ -45,7 +45,6 @@ export default async function handler(req, res) {
       }
       
       if (req.query.userId) {
-        console.log('Fetching clips for user ID:', req.query.userId)
         const { data, error } = await supabase
           .from('clips')
           .select('*')

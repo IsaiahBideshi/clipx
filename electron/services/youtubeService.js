@@ -263,7 +263,6 @@ export async function linkYoutube(shell, userId) {
           await exchangeCodeForTokens(queryObject.code, normalizedUserId);
           const accessToken = await getAccessToken(normalizedUserId);
           const userInfo = await getGoogleUserInfo(accessToken);
-          console.log("Linked YouTube account:", userInfo);
           resolve(userInfo);
         } else if (queryObject.error) {
           res.end("Authorization failed.");
@@ -274,7 +273,6 @@ export async function linkYoutube(shell, userId) {
       } catch (error) {
         server.removeAllListeners("request");
         server.close();
-        console.error(error);
         reject(error);
       }
     });
@@ -368,10 +366,8 @@ export async function getGoogleInfo(userId) {
 }
 
 export async function uploadClipToYoutube({ videoPath, title, tags, game, userId }) {
-  console.log("Starting YouTube upload with userId:", userId);
   const refreshToken = await getRefreshToken(userId);
   if (!refreshToken) {
-    console.log("No refresh token found for user, cannot upload to YouTube");
     throw new Error("No linked YouTube account. Link your account in settings first.");
   }
 

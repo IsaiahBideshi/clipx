@@ -168,14 +168,11 @@ export default function Profile() {
 
   async function searchFriends(name) {
     if (!name || !userId) return;
-    console.log("Searching for: ", name);
 
     const { data, error } = await supabase
       .from("users")
       .select("*")
       .ilike("username", `%${name}%`);
-
-    console.log(data);
 
     if (error) {
       console.error("Error searching for friends:", error);
@@ -409,7 +406,6 @@ export default function Profile() {
 
   async function handleSendRequest(friendId) {
     const userId = session.user.id;
-    console.log("Sending friend request from", userId, "to", friendId);
     const { data, error } = await supabase
     .from("friendships")
     .insert({
@@ -421,7 +417,6 @@ export default function Profile() {
     if (error) {
       console.error("Error sending friend request:", error);
     } else {
-      console.log("Friend request sent:", data);
       getFriendships();
     }
   }
@@ -464,7 +459,6 @@ export default function Profile() {
         .eq("status", "pending");
     }
     
-    console.log("Confirm response:", response);
     setConfirmingAction(false);
     if (response.error) {
       console.error("Error handling friendship action:", response.error);

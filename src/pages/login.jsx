@@ -32,7 +32,6 @@ export default function Login() {
       setLoading(true);
       setError("");
       const user = await loginWithEmail(email.trim(), password);
-      console.log("User logged in:", user);
       navigate("/");
     } catch (err) {
       setError(getAuthMessage(err));

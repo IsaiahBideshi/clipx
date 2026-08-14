@@ -159,8 +159,6 @@ export default function Library() {
     width: "100%",
   };
 
-  console.log(clips)
-
   useEffect(() => {
     function moveSelectedClip(direction) {
       if (!clips.length) return;
@@ -420,7 +418,6 @@ export function VideoPreview({clip, onClose}){
     async function getGameImage(){
       try {
         const response = await window?.clipx?.getGameData(clip.game_id);
-        console.log("Game data response:", response);
         if (response) {
           setGamesSrc(response);
         }

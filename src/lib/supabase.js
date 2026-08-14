@@ -52,8 +52,6 @@ export const supabase = createClient(
 const auth = supabase.auth;
 let autoRefreshStarted = false;
 
-console.log("Supabase client initialized:", auth);
-
 function startAuthAutoRefresh() {
     if (autoRefreshStarted || typeof auth.startAutoRefresh !== "function") {
         return;
@@ -108,7 +106,6 @@ export async function updateDisplayName(newDisplayName) {
     if (!id) {
         throw new Error("No authenticated user found");
     }
-    console.log(id);
 
     const { data, error } = await supabase
         .from('users')
@@ -119,7 +116,6 @@ export async function updateDisplayName(newDisplayName) {
         console.error("Error updating display name:", error);
         throw error;
     }
-    console.log("Display name updated successfully:", data, newDisplayName);
     return data;
 }
 

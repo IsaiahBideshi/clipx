@@ -49,7 +49,6 @@ export function registerSettingsIpcHandlers() {
         const appDataDir = path.dirname(taglistPath);
         await fs.promises.mkdir(appDataDir, { recursive: true });
         await fs.promises.writeFile(taglistPath, "", "utf-8");
-        console.log("ClipX: Created new taglist.json at", taglistPath);
         return [];
       }
 

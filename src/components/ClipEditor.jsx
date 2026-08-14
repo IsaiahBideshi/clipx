@@ -104,7 +104,6 @@ export default function ClipEditor({
   // When video plays
   function handleTimeUpdate(e) {
     const time = e.target.currentTime;
-    // console.log(time);
 
     setCurrentTime(time);
   }
@@ -122,10 +121,8 @@ export default function ClipEditor({
     if (!el) return;
 
     if (el.paused || el.ended) {
-      console.log("play");
       el.play();
     } else {
-      console.log("pause");
       el.pause();
     }
   }
@@ -422,7 +419,6 @@ async function searchGames(gameName) {
 
 
   const localGames = await checkStoredGames(gameName);
-  console.log(localGames.length);
   if (localGames.length > 5) return localGames;
 
   const api = window?.clipx?.searchGames;
@@ -589,7 +585,6 @@ useEffect(() => {
           userId,
         });
         if (error) console.error("Failed to save clip record to database:", error);
-        else console.log("Clip record saved");
         return;
       }
 
