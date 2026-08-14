@@ -13,7 +13,7 @@ import { registerClipxProtocol } from "./services/fileService.js";
 import { closeClipIndexService } from "./services/clipIndexService.js";
 import { registerGoogleAuthIpcHandlers } from "./ipc/googleAuth.js";
 import { registerAuthStorageIpcHandlers } from "./ipc/authStorage.js";
-import { initializeUpdates, scheduleUpdateChecks, checkForUpdatesAndInstall } from "./services/updateService.js";
+import { initializeUpdates, scheduleUpdateChecks, startVersionPolling, checkForUpdatesAndInstall } from "./services/updateService.js";
 import { registerUpdateIpcHandlers } from "./ipc/update.js";
 import { registerWindowControlIpcHandlers } from "./services/menuBarService.js";
 
@@ -358,6 +358,7 @@ if (!hasSingleInstanceLock) {
     }
     await createWindow({ show: !launchMinimized });
     scheduleUpdateChecks();
+    startVersionPolling();
   });
 }
 

@@ -1,15 +1,20 @@
 import { app, BrowserWindow } from "electron";
 import electronUpdater from "electron-updater";
+import semver from "semver";
 
 const { autoUpdater } = electronUpdater;
 
 const UPDATE_CHECK_INTERVAL_MS = 60 * 60 * 1000;
+const VERSION_POLL_INTERVAL_MS = 20 * 1000;
+const VERSION_POLL_TIMEOUT_MS = 5000;
+const POLL_SKIP_STATUSES = new Set(["available", "downloading", "downloaded", "installing", "error"]);
+
 let latestState = { status: "idle", currentVersion: app.getVersion() };
 let availableUpdate = null;
 let isChecking = false;
 let hasDownloadedUpdate = false;
 let recurringCheckInterval = null;
-
+let versionPollInterval = null;
 function emitUpdateState(state) {
   latestState = {
     currentVersion: app.getVersion(),
@@ -228,4 +233,51 @@ export function scheduleUpdateChecks({ intervalMs = UPDATE_CHECK_INTERVAL_MS } =
     void checkForUpdates();
   }, intervalMs);
   recurringCheckInterval.unref?.();
+}
+
+function getApiBaseUrl() {
+  return (process.env.VITE_DATABASE_URL || "https://clipx.bideshi.tech").replace(/\/+$/, "");
+}
+
+async function pollLatestVersion() {
+  if (!app.isPackaged || isChecking || hasDownloadedUpdate || POLL_SKIP_STATUSES.has(latestState.status)) {
+    return;
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), VERSION_POLL_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(`${getApiBaseUrl()}/api/latest-version`, { signal: controller.signal });
+    if (!response.ok) {
+      return;
+    }
+
+    const body = await response.json();
+    const remoteVersion = body?.data?.version;
+    if (!remoteVersion) {
+      return;
+    }
+
+    if (semver.gt(remoteVersion, app.getVersion())) {
+      void checkForUpdates();
+    }
+  } catch {
+    // Silent — the next poll will retry.
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+export function startVersionPolling({ intervalMs = VERSION_POLL_INTERVAL_MS } = {}) {
+  if (!app.isPackaged || versionPollInterval) {
+    return;
+  }
+
+  versionPollInterval = setInterval(() => {
+    void pollLatestVersion();
+  }, intervalMs);
+  versionPollInterval.unref?.();
+
+  void pollLatestVersion();
 }
