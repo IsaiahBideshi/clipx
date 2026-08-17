@@ -13,7 +13,6 @@ dotenv.config();
 const SERVICE = "ClipX";
 const ACCOUNT = "youtube_refresh_token";
 let clientId = null;
-let clientSecret = null;
 const redirectPort = 51723;
 const redirectUri = `http://127.0.0.1:${redirectPort}`;
 const OAUTH_TIMEOUT_MS = 90_000;
@@ -37,18 +36,16 @@ async function fetchKeys() {
   }
   if (data) {
     clientId = data.googleClientId;
-    clientSecret = data.googleClientSecret;
   }
 }
 
 (await fetchKeys().then(() => {
-  if (!clientId || !clientSecret) {
-    throw new Error("Missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET in .env.local");
+  if (!clientId) {
+    throw new Error("Missing GOOGLE_CLIENT_ID in .env.local");
   }
 }).catch((err) => {
   console.error("Failed to fetch API keys on startup:", err);
   clientId = null;
-  clientSecret = null;
 }));
 
 
@@ -141,25 +138,23 @@ export async function deleteRefreshToken(userId) {
 }
 
 async function exchangeCodeForTokens(code, userId) {
-  const response = await fetch("https://oauth2.googleapis.com/token", {
+  const response = await fetch(`${baseUrl}/api/google/token`, {
     method: "POST",
     headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
+      "Content-Type": "application/json",
     },
-    body: new URLSearchParams({
-      client_id: clientId,
-      client_secret: clientSecret,
-      redirect_uri: redirectUri,
+    body: JSON.stringify({
       grant_type: "authorization_code",
       code,
       code_verifier: verifier,
     }),
   });
 
-  const data = await response.json();
-  if (data.error) {
-    throw new Error(`Failed OAuth token exchange: ${data.error_description || data.error}`);
+  const payload = response ? await response.json() : { data: null, error: "Failed to exchange code for tokens" };
+  if (!response.ok || payload.error) {
+    throw new Error(`Failed OAuth token exchange: ${payload.error}`);
   }
+  const data = payload.data;
   if (!data.refresh_token) {
     throw new Error("Failed to get refresh token from Google OAuth response");
   }
@@ -172,28 +167,27 @@ export async function getAccessToken(userId) {
     throw new Error("No refresh token found");
   }
 
-  const response = await fetch("https://oauth2.googleapis.com/token", {
+  const response = await fetch(`${baseUrl}/api/google/token`, {
     method: "POST",
     headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
+      "Content-Type": "application/json",
     },
-    body: new URLSearchParams({
-      refresh_token: refreshToken,
-      client_id: clientId,
-      client_secret: clientSecret,
+    body: JSON.stringify({
       grant_type: "refresh_token",
+      refresh_token: refreshToken,
     }),
   });
 
-  const data = await response.json();
-  if (data.error) {
-    if (data.error === "invalid_grant") {
+  const payload = response ? await response.json() : { data: null, error: "Failed to refresh access token" };
+  if (!response.ok || payload.error) {
+    const error = payload.error;
+    if (error === "invalid_grant") {
       await deleteRefreshToken(userId);
       throw new Error("Stored YouTube login expired or was revoked. Please link your YouTube account again.");
     }
-    throw new Error(`Failed to refresh access token: ${data.error_description || data.error}`);
+    throw new Error(`Failed to refresh access token: ${error}`);
   }
-  return data.access_token;
+  return payload.data.access_token;
 }
 
 export async function getGoogleUserInfo(accessToken) {
@@ -372,7 +366,7 @@ export async function uploadClipToYoutube({ videoPath, title, tags, game, userId
   }
 
   const accessToken = await getAccessToken(userId);
-  const oauth2Client = new google.auth.OAuth2(clientId, clientSecret, redirectUri);
+  const oauth2Client = new google.auth.OAuth2(clientId, "", redirectUri);
   oauth2Client.setCredentials({ access_token: accessToken });
 
   const youtube = google.youtube({ version: "v3", auth: oauth2Client });

@@ -14,9 +14,8 @@ export default async function handler(req, res) {
   if (req.method === 'GET') {
     const keys = {
       googleClientId: process.env.GOOGLE_CLIENT_ID || null,
-      googleClientSecret: process.env.GOOGLE_CLIENT_SECRET || null,
     }
-    if (!keys.googleClientId || !keys.googleClientSecret) {
+    if (!keys.googleClientId) {
       return res.status(500).json({ data: null, error: 'Missing Google API keys in environment variables', ok: false })
     }
     return res.status(200).json({ data: keys, error: null, ok: true })

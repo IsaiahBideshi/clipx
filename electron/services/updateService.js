@@ -247,6 +247,7 @@ async function pollLatestVersion() {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), VERSION_POLL_TIMEOUT_MS);
 
+
   try {
     const response = await fetch(`${getApiBaseUrl()}/api/latest-version`, { signal: controller.signal });
     if (!response.ok) {

@@ -24,7 +24,6 @@ const supabase = createClient(
 
 const SERVICE = "ClipX";
 let clientId = null;
-let clientSecret = null;
 const redirectPort = 51723;
 const redirectUri = `http://127.0.0.1:${redirectPort}`;
 const OAUTH_TIMEOUT_MS = 90_000;
@@ -47,7 +46,6 @@ async function fetchKeys() {
   }
   if (data) {
     clientId = data.googleClientId;
-    clientSecret = data.googleClientSecret;
   }
 }
 
@@ -55,15 +53,33 @@ async function fetchKeys() {
   throw new Error(`Failed to load Google OAuth credentials on startup: ${err.message}`);
   console.error("Failed to load Google OAuth credentials on startup:", err);
   clientId = null;
-  clientSecret = null;
 }));
 
 const { verifier, challenge } = generatePKCE();
 
+async function exchangeCodeForTokens(code) {
+  const response = await fetch(`${baseUrl}/api/google/token`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      grant_type: "authorization_code",
+      code,
+      code_verifier: verifier,
+    }),
+  });
+  const payload = response ? await response.json() : { data: null, error: "Failed to exchange code for tokens" };
+  if (!response.ok || payload.error) {
+    throw new Error(payload.error || `Token exchange failed with status ${response.status}`);
+  }
+  return payload.data;
+}
+
 export async function signInWithGoogle(shell) {
-  if (!clientId || !clientSecret) {
+  if (!clientId) {
     throw new Error(
-      "Google sign-in is not configured in this build. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in the packaged app environment, or point CLIPX_ENV_PATH to a file that contains them."
+      "Google sign-in is not configured in this build. Set GOOGLE_CLIENT_ID in the packaged app environment, or point CLIPX_ENV_PATH to a file that contains it."
     );
   }
 
@@ -76,8 +92,8 @@ export async function signInWithGoogle(shell) {
           server.removeAllListeners("request");
           server.close();
 
-          const oauth2Client = new google.auth.OAuth2(clientId, clientSecret, redirectUri);
-          const { tokens } = await oauth2Client.getToken({code: queryObject.code, codeVerifier: verifier});
+          const oauth2Client = new google.auth.OAuth2(clientId, "", redirectUri);
+          const tokens = await exchangeCodeForTokens(queryObject.code);
           const { data, error } = await supabase.auth.signInWithIdToken({
             provider: 'google',
             token: tokens.id_token,
@@ -118,7 +134,7 @@ export async function signInWithGoogle(shell) {
 
     server.listen(redirectPort);
 
-    const oauth2Client = new google.auth.OAuth2(clientId, clientSecret, redirectUri);
+    const oauth2Client = new google.auth.OAuth2(clientId, "", redirectUri);
 
     const authUrl = oauth2Client.generateAuthUrl({
       scope: [
