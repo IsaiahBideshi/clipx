@@ -516,8 +516,7 @@ export default function Profile() {
         </section>
 
         <section className="profile-card friend-search-card">
-          <h4>Add Friends</h4>
-          <p className="card-copy">Search by username and send requests instantly.</p>
+          <h4 style={{margin: "0 0 16px 0"}}>Add Friends</h4>
           <div className="friend-search-shell" ref={displayResults}>
             <div className={"add-friend"}>
               <TextField
@@ -583,7 +582,6 @@ export default function Profile() {
 
         <section className={"profile-card"}>
           <h4>Friends List</h4>
-          <p className="card-copy">People currently connected to your account.</p>
           <div className="stacked-list">
             {loadingFriendships ? (
               <div className="result search-loading result-row">
@@ -613,7 +611,6 @@ export default function Profile() {
 
         <section className={"profile-card"}>
           <h4>Incoming Requests</h4>
-          <p className="card-copy">Approve requests from people who want to connect.</p>
           <div className="stacked-list">
             {loadingFriendships ? (
               <div className="result search-loading result-row">
@@ -652,7 +649,6 @@ export default function Profile() {
 
         <section className={"profile-card"}>
           <h4>Outgoing Requests</h4>
-          <p className="card-copy">Pending invites you have already sent.</p>
           <div className="stacked-list">
             {loadingFriendships ? (
               <div className="result search-loading result-row">

@@ -291,7 +291,6 @@ export default function Settings() {
           <div>
             <p className="eyebrow">Preferences</p>
             <h2>Settings</h2>
-            <p className="hero-copy">Configure your editing defaults and connected services for a smoother workflow.</p>
           </div>
           <div className="settings-version-actions">
             {appVersion && (
@@ -318,8 +317,7 @@ export default function Settings() {
         ) : (
           <div className="settings-grid">
             <section className="settings-card">
-              <h4>General Options</h4>
-              <p className="card-copy">Choose how ClipX behaves while you edit and save clips.</p>
+              <h4 className="settings-header">General Options</h4>
               {options && defaultOptions && (
                 <FormGroup className={"options-form"}>
                   {/* <FormControlLabel
@@ -359,8 +357,7 @@ export default function Settings() {
             </section>
 
             <section className="settings-card">
-              <h4>Storage</h4>
-              <p className="card-copy">Pick where your rendered clips are stored on this device.</p>
+              <h4 className="settings-header">Storage</h4>
               <div className="folder-row">
                 <span className="folder-path">{options.clipsFolder || "Not Set"}</span>
                 <Button id={"pick-folder"} variant={"contained"} onClick={pickFolder}>Choose Folder</Button>
@@ -368,7 +365,7 @@ export default function Settings() {
             </section>
 
             <section className="settings-card yt-card">
-              <h4>YouTube</h4>
+              <h4 className="settings-header">YouTube</h4>
               <p className="card-copy">Link your YouTube account to upload clips directly from ClipX.</p>
 
               <div className={"yt"}>

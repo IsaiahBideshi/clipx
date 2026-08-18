@@ -67,6 +67,10 @@
   white-space: nowrap;
 }
 
+.settings-header{
+  margin: 0 0 8px 0 !important;
+}
+
 
 
 .settings-grid {
@@ -97,7 +101,6 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 15px;
   width: auto;
   margin-left: 0;
   margin-right: 0;
