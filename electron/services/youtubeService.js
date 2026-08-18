@@ -196,7 +196,21 @@ export async function getGoogleUserInfo(accessToken) {
       Authorization: `Bearer ${accessToken}`,
     },
   });
-  return await response.json();
+  const text = await response.text();
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    throw new Error(
+      `Google userinfo returned a non-JSON response (status ${response.status}): ${text.slice(0, 200)}`
+    );
+  }
+  if (!response.ok) {
+    throw new Error(
+      `Google userinfo request failed with status ${response.status}: ${text.slice(0, 200)}`
+    );
+  }
+  return data;
 }
 
 async function getGoogleProfileImageDataUrl(accessToken, pictureUrl) {
