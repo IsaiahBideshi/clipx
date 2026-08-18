@@ -83,7 +83,13 @@ export default function ClipEditor({
 
   useEffect(() => {
     function handleClickOutside(event) {
-      if (editorRef.current && !editorRef.current.contains(event.target) && uploadMenuRef.current && !uploadMenuRef.current.contains(event.target)) {
+      if (
+          editorRef.current && 
+          !editorRef.current.contains(event.target) && 
+          uploadMenuRef.current && 
+          !uploadMenuRef.current.contains(event.target) &&
+          !event.target.closest?.(".MuiPopover-root, .MuiPopper-root")
+      ) {
         onClose();
       }
     }
