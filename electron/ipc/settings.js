@@ -1,4 +1,4 @@
-import { app, ipcMain } from "electron";
+import { app, BrowserWindow, ipcMain } from "electron";
 import fs from "fs";
 import path from "path";
 
@@ -166,9 +166,27 @@ export function registerSettingsIpcHandlers() {
     const optionsPath = path.join(app.getPath("appData"), "clipx", "options.json");
 
     try {
+      let previousClipsFolder = null;
+      try {
+        const previousData = await fs.promises.readFile(optionsPath, "utf-8");
+        previousClipsFolder = previousData ? JSON.parse(previousData).clipsFolder : null;
+      } catch (error) {
+        if (error && error.code !== "ENOENT") {
+          console.error("ClipX: Failed to read previous options.json:", error);
+        }
+      }
+
       const appDataDir = path.dirname(optionsPath);
       await fs.promises.mkdir(appDataDir, { recursive: true });
       await fs.promises.writeFile(optionsPath, JSON.stringify(options, null, 2), "utf-8");
+
+      if ((previousClipsFolder || "") !== (options?.clipsFolder || "")) {
+        for (const window of BrowserWindow.getAllWindows()) {
+          if (!window.isDestroyed()) {
+            window.webContents.send("options:changed", { clipsFolder: options?.clipsFolder || null });
+          }
+        }
+      }
     } catch (error) {
       console.error("ClipX: Failed to save options.json:", error);
       throw error;

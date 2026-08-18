@@ -412,6 +412,20 @@ export default function LocalFiles() {
     });
   }, [collection, getScrollTop, loadPage, rootPath]);
 
+  useEffect(() => {
+    if (typeof window.clipx?.onOptionsChanged !== "function") {
+      return undefined;
+    }
+
+    return window.clipx.onOptionsChanged((event) => {
+      if (!event || typeof event.clipsFolder !== "string") {
+        return;
+      }
+
+      queryClient.refetchQueries({ queryKey: ["localFiles", "options"] });
+    });
+  }, [queryClient]);
+
   const refreshFiles = () => {
     setClip(null);
     queryClient.invalidateQueries({ queryKey: ["localFiles", "clips", rootPath, collection] });

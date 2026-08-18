@@ -275,6 +275,20 @@ export default function Settings() {
   }, [options]);
 
   useEffect(() => {
+    if (typeof window.clipx?.onOptionsChanged !== "function") {
+      return undefined;
+    }
+
+    return window.clipx.onOptionsChanged((event) => {
+      if (!event || typeof event.clipsFolder !== "string") {
+        return;
+      }
+
+      queryClient.refetchQueries({ queryKey: ["localFiles", "options"] });
+    });
+  }, [queryClient]);
+
+  useEffect(() => {
     if (!googleInfo) {
       setConfirmUnlink(false);
     }
