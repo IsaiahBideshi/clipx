@@ -8,6 +8,7 @@ import ClipContextMenu from "../components/ClipContextMenu.jsx";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import RefreshIcon from "@mui/icons-material/Refresh";
+import FolderOffIcon from "@mui/icons-material/FolderOff";
 import { Switch, TextField } from "@mui/material";
 import { isTextEntryActive } from "../lib/hotkeys.js";
 
@@ -88,6 +89,7 @@ export default function LocalFiles() {
   const [deleteClipModalOpen, setDeleteClipModalOpen] = useState(false);
   const [isDeletingClip, setIsDeletingClip] = useState(false);
   const [error, setError] = useState(null);
+  const [loadError, setLoadError] = useState(null);
   const [clipToDelete, setClipToDelete] = useState(null);
   const [clipToRename, setClipToRename] = useState(null);
   const [contextMenu, setContextMenu] = useState(null);
@@ -184,6 +186,7 @@ export default function LocalFiles() {
     setCursor(nextCursor);
     setHasMore(nextHasMore);
     setLoadingInitial(false);
+    setLoadError(null);
   }, []);
 
   const loadPage = useCallback(
@@ -236,6 +239,8 @@ export default function LocalFiles() {
         if (requestVersion === requestVersionRef.current) {
           if (reset) {
             setClips([]);
+            setLoadError("Something went wrong reading this folder.");
+            setIndexing(false);
           }
           setHasMore(false);
           setLoadingInitial(false);
@@ -325,7 +330,6 @@ export default function LocalFiles() {
   useEffect(() => {
     if (!rootPath) {
       setClips([]);
-      setLoadingInitial(false);
       return;
     }
 
@@ -619,7 +623,8 @@ export default function LocalFiles() {
     }
   }
 
-  const gridLoading = loadingInitial || (indexing && clips.length === 0);
+  const gridLoading =
+    loadingInitial || ((loadingPage || indexing) && clips.length === 0);
 
   return (
     <OverlayScrollbarsComponent
@@ -695,8 +700,16 @@ export default function LocalFiles() {
         }}
       />
 
-      {!clips.length && !gridLoading && !indexing && (
-        <p className="local-files-empty">No clips found in the selected folder.</p>
+      {!clips.length && !gridLoading && rootPath && (
+        <div className="local-files-empty-state">
+          <FolderOffIcon className="local-files-empty-icon" fontSize="large" />
+          <h3>{loadError ? "Couldn't load clips" : "No clips found"}</h3>
+          <p>
+            {loadError
+              ? "Something went wrong reading this folder. Try refreshing."
+              : "Clips saved or added to this folder will show up here."}
+          </p>
+        </div>
       )}
 
       <SavingClipsWidget
