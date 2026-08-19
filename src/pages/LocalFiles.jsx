@@ -7,6 +7,7 @@ import UploadingClipsWidget from "../components/UploadingClipsWidget.jsx";
 import ClipContextMenu from "../components/ClipContextMenu.jsx";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import FolderOffIcon from "@mui/icons-material/FolderOff";
 import { Switch, TextField } from "@mui/material";
@@ -69,6 +70,7 @@ function upsertClipInList(currentClips, clip) {
 }
 
 export default function LocalFiles() {
+  const navigate = useNavigate();
   const [rootPath, setRootPath] = useState("");
   const [folderPath, setFolderPath] = useState("");
   const [showSavedFiles, setShowSavedFiles] = useState(false);
@@ -118,6 +120,8 @@ export default function LocalFiles() {
     staleTime: 10 * 60 * 1000,
   });
   const options = optionsQuery.data || null;
+  const gridLoading =
+  loadingInitial || ((loadingPage || indexing) && clips.length === 0);
 
   useEffect(() => {
     clipsRef.current = clips;
@@ -324,6 +328,9 @@ export default function LocalFiles() {
 
     const nextRootPath = String(options?.clipsFolder || "").replace(/[\\/]+$/, "");
     setRootPath(nextRootPath);
+    if (!nextRootPath) {
+      setLoadingInitial(false);
+    }
     setFolderPath(showSavedFiles ? buildSavedClipsPath(nextRootPath) : nextRootPath);
   }, [options, optionsQuery.error, optionsQuery.isError, optionsQuery.isFetching, optionsQuery.isLoading, showSavedFiles]);
 
@@ -623,8 +630,6 @@ export default function LocalFiles() {
     }
   }
 
-  const gridLoading =
-    loadingInitial || ((loadingPage || indexing) && clips.length === 0);
 
   return (
     <OverlayScrollbarsComponent
@@ -633,7 +638,7 @@ export default function LocalFiles() {
       defer
       options={{ scrollbars: { autoHide: "scroll", theme: "os-theme-dark" } }}
     >
-      {options && (
+      {options && rootPath && (
         <div className="local-files-header">
           <RefreshIcon
             className="local-files-refresh"
@@ -647,7 +652,6 @@ export default function LocalFiles() {
             checked={showSavedFiles}
             onChange={(e) => {
               setShowSavedFiles(e.target.checked);
-              queryClient.invalidateQueries({ queryKey: ["localFiles", "clips", rootPath] });
             }}
           />
         </div>
@@ -655,7 +659,17 @@ export default function LocalFiles() {
 
       {folderPath && <pre className="local-files-path">Folder: {folderPath}</pre>}
 
-      {newClipCount > 0 && (
+      {options && !rootPath && (
+        <div className="local-files-empty-state">
+          <FolderOffIcon className="local-files-empty-icon" fontSize="large" />
+          <h3>No clips folder set</h3>
+          <button type="button" className="local-files-gate-button" onClick={() => navigate("/settings")}>
+            Go to Settings
+          </button>
+        </div>
+      )}
+
+      {rootPath && newClipCount > 0 && (
         <button type="button" className="local-files-new-clips" onClick={showNewClips}>
           {newClipCount === 1 ? "1 new clip" : `${newClipCount} new clips`}
         </button>
@@ -663,7 +677,7 @@ export default function LocalFiles() {
 
       {/* {indexing && <p className="local-files-indexing">Indexing clips...</p>} */}
 
-      {clip && (
+      {clip && rootPath && (
         <ClipEditor
           clip={clip}
           onSaveQueueEvent={handleSaveQueueEvent}
@@ -681,24 +695,26 @@ export default function LocalFiles() {
         />
       )}
 
-      <ClipGrid
-        clips={clips}
-        baseFolder={folderPath}
-        onSelect={(selectedClip) => setClip(selectedClip)}
-        loading={gridLoading}
-        loadingMore={loadingPage && clips.length > 0}
-        hasMore={hasMore}
-        onLoadMore={loadNextPage}
-        scrollElement={scrollElement}
-        onContextMenuAction={(clip, rect) => {
-          clip ? setContextMenu(clip): setContextMenu(null);
-          setMousePosition({ x: rect.x, y: rect.y });
-        }}
-        onDelete={(clip) => {
-          setClipToDelete(clip);
-          setDeleteClipModalOpen(true);
-        }}
-      />
+      {rootPath && (
+        <ClipGrid
+          clips={clips}
+          baseFolder={folderPath}
+          onSelect={(selectedClip) => setClip(selectedClip)}
+          loading={gridLoading}
+          loadingMore={loadingPage && clips.length > 0}
+          hasMore={hasMore}
+          onLoadMore={loadNextPage}
+          scrollElement={scrollElement}
+          onContextMenuAction={(clip, rect) => {
+            clip ? setContextMenu(clip) : setContextMenu(null);
+            setMousePosition({ x: rect.x, y: rect.y });
+          }}
+          onDelete={(clip) => {
+            setClipToDelete(clip);
+            setDeleteClipModalOpen(true);
+          }}
+        />
+      )}
 
       {!clips.length && !gridLoading && rootPath && (
         <div className="local-files-empty-state">
