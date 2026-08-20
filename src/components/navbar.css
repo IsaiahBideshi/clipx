@@ -35,6 +35,7 @@
   flex: 0 0 54px;
   min-width: 0;
   padding: 0;
+  color: white !important;
 }
 
 .nav-icon:hover {
@@ -66,23 +67,6 @@
 
 .nav-update-ready.MuiButton-root:hover {
   background-color: #1e1f22;
-}
-
-.settings-container{
-  border-radius: 20px;
-  width: 60vw;
-  background: #1e1f22;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  z-index: 1;
-  padding: 20px;
-  margin-left: auto;
-  margin-right: auto;
-  margin-top: 50px;
-}
-.nav-icon{
-  color: white !important;
 }
 
 .nav-bar__app-name{

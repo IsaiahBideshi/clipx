@@ -1,7 +1,7 @@
-.saving-clips-widget {
+.saving-clips-widget,
+.uploading-clips-widget {
   position: fixed;
   right: 16px;
-  bottom: 16px;
   width: min(320px, calc(100vw - 32px));
   background: rgba(30, 31, 34, 0.96);
   border: 1px solid rgba(255, 255, 255, 0.15);
@@ -10,7 +10,16 @@
   z-index: 25;
 }
 
-.saving-clips-header {
+.saving-clips-widget {
+  bottom: 16px;
+}
+
+.uploading-clips-widget {
+  bottom: 128px;
+}
+
+.saving-clips-header,
+.uploading-clips-header {
   width: 100%;
   border: none;
   background: transparent;
@@ -23,24 +32,27 @@
   cursor: pointer;
 }
 
-.saving-clips-header-left {
+.saving-clips-header-left,
+.uploading-clips-header-left {
   display: flex;
   align-items: center;
   gap: 8px;
   min-width: 0;
 }
 
-.saving-spinner {
+.saving-spinner,
+.uploading-spinner {
   width: 14px;
   height: 14px;
   border-radius: 50%;
   border: 2px solid rgba(255, 255, 255, 0.25);
   border-top-color: #90caf9;
-  animation: saving-spin 0.8s linear infinite;
+  animation: widget-spin 0.8s linear infinite;
   flex: 0 0 auto;
 }
 
-.saving-clips-title {
+.saving-clips-title,
+.uploading-clips-title {
   font-size: 13px;
   font-weight: 600;
   white-space: nowrap;
@@ -48,19 +60,29 @@
   text-overflow: ellipsis;
 }
 
-.saving-clips-toggle {
+.saving-clips-toggle,
+.uploading-clips-toggle {
   font-size: 11px;
   color: #b0bec5;
   flex: 0 0 auto;
 }
 
-.saving-clips-list {
+.saving-clips-list,
+.uploading-clips-list {
   border-top: 1px solid rgba(255, 255, 255, 0.1);
-  max-height: 180px;
   overflow-y: auto;
 }
 
-.saving-clip-item {
+.saving-clips-list {
+  max-height: 180px;
+}
+
+.uploading-clips-list {
+  max-height: 220px;
+}
+
+.saving-clip-item,
+.uploading-clip-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -69,24 +91,48 @@
   color: #fff;
 }
 
-.saving-clip-name {
+.uploading-clip-main {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.saving-clip-name,
+.uploading-clip-name {
   font-size: 12px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.saving-clip-status {
+.uploading-clip-link {
+  color: #90caf9;
+  text-decoration: none;
+  font-size: 11px;
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.saving-clip-status,
+.uploading-clip-status {
   font-size: 11px;
   color: #90caf9;
   text-transform: lowercase;
 }
 
-.saving-clip-status.failed {
+.uploading-clip-status {
+  flex: 0 0 auto;
+}
+
+.saving-clip-status.failed,
+.uploading-clip-status.failed {
   color: #ef9a9a;
 }
 
-@keyframes saving-spin {
+@keyframes widget-spin {
   to {
     transform: rotate(360deg);
   }

@@ -12,18 +12,6 @@ import changelog from "../../CHANGELOG.md?raw";
 import ChangelogModal from "../components/ChangelogModal.jsx";
 import { getCurrentUserId, useAuthSession } from "../lib/authSession.js";
 
-const tfSx = {
-  "& .MuiInputLabel-root": { color: "#e5e7eb" }, // label
-  "& .MuiInputBase-input": { color: "#ffffff" }, // typed text
-  "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.35)" },
-  "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.6)" },
-  "& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: "#90caf9" },
-  "& .MuiInputLabel-root.Mui-focused": { color: "#90caf9" },
-  marginBottom: '10px',
-  textColor: 'white',
-  marginTop: '10px',
-};
-
 
 export async function getOptions() {
   if (!window.clipx?.getOptions) {
@@ -331,7 +319,7 @@ export default function Settings() {
         ) : (
           <div className="settings-grid">
             <section className="settings-card">
-              <h4 className="settings-header">General Options</h4>
+              <h4>General Options</h4>
               {options && defaultOptions && (
                 <FormGroup className={"options-form"}>
                   {/* <FormControlLabel
@@ -371,7 +359,7 @@ export default function Settings() {
             </section>
 
             <section className="settings-card">
-              <h4 className="settings-header">Storage</h4>
+              <h4>Storage</h4>
               <div className="folder-row">
                 <span className="folder-path">{options.clipsFolder || "Not Set"}</span>
                 <Button id={"pick-folder"} variant={"contained"} onClick={pickFolder}>Choose Folder</Button>
@@ -379,7 +367,7 @@ export default function Settings() {
             </section>
 
             <section className="settings-card yt-card">
-              <h4 className="settings-header">YouTube</h4>
+              <h4>YouTube</h4>
               <p className="card-copy">Link your YouTube account to upload clips directly from ClipX.</p>
 
               <div className={"yt"}>

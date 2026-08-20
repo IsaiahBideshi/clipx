@@ -1,4 +1,4 @@
-import "./uploadingclips.css";
+import "./widgets.css";
 
 export default function UploadingClips({clips}) {
 

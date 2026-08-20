@@ -60,7 +60,6 @@ export default function Signup() {
         <TextField
           placeholder="Username"
           type="text"
-          className="tf-sx"
           value={username}
           onChange={(e) => setUsername(e.target.value)}
           required
@@ -68,7 +67,6 @@ export default function Signup() {
         <TextField
           placeholder="Email"
           type="email"
-          className="tf-sx"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
@@ -76,7 +74,6 @@ export default function Signup() {
         <TextField
           placeholder="Password"
           type="password"
-          className="tf-sx"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required

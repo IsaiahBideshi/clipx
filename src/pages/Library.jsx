@@ -148,17 +148,6 @@ export default function Library() {
   const loadingClips = clipsQuery.isLoading;
 
 
-  const tfSx = {
-    "& .MuiInputLabel-root": { color: "#e5e7eb" },
-    "& .MuiInputBase-input": { color: "#ffffff" },
-    "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.35)" },
-    "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.6)" },
-    "& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: "#90caf9" },
-    "& .MuiInputLabel-root.Mui-focused": { color: "#90caf9" },
-    marginBottom: '10px',
-    width: "100%",
-  };
-
   useEffect(() => {
     function moveSelectedClip(direction) {
       if (!clips.length) return;
@@ -304,7 +293,7 @@ export default function Library() {
       <div className="filtering-container">
         <div className="search-bar">
           <TextField
-            sx={tfSx}
+            fullWidth
             label="Clip title"
             placeholder="Search by clip title"
             value={titleQuery}
@@ -338,7 +327,7 @@ export default function Library() {
             renderInput={(params) => (
               <TextField
                 {...params}
-                sx={tfSx}
+                fullWidth
                 label="Game"
                 placeholder="Search game"
               />
@@ -354,7 +343,7 @@ export default function Library() {
             renderInput={(params) => (
               <TextField
                 {...params}
-                sx={tfSx}
+                fullWidth
                 label="Friends"
                 placeholder="Search friends"
               />

@@ -1,4 +1,3 @@
-import "../App.css";
 import "./localfiles.css";
 import ClipGrid from "../components/ClipGrid.jsx";
 import ClipEditor from "../components/ClipEditor.jsx";
@@ -782,7 +781,6 @@ export default function LocalFiles() {
               Rename clip:
             </div>
             <TextField
-              className="tf-sx"
               value={renameValue}
               onChange={(e) => setRenameValue(e.target.value)}
               onKeyDown={(e) => {

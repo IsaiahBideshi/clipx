@@ -59,7 +59,6 @@ export default function Login() {
         <TextField
           placeholder="Email"
           type="email"
-          className="tf-sx"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
@@ -67,7 +66,6 @@ export default function Login() {
         <TextField
           placeholder="Password"
           type="password"
-          className="tf-sx"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
