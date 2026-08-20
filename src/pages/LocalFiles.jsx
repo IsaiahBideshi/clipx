@@ -85,6 +85,7 @@ export default function LocalFiles() {
   const [loadingInitial, setLoadingInitial] = useState(true);
   const [loadingPage, setLoadingPage] = useState(false);
   const [indexing, setIndexing] = useState(false);
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
   const [newClipCount, setNewClipCount] = useState(0);
   const [scrollElement, setScrollElement] = useState(null);
   const [deleteClipModalOpen, setDeleteClipModalOpen] = useState(false);
@@ -120,7 +121,8 @@ export default function LocalFiles() {
   });
   const options = optionsQuery.data || null;
   const gridLoading =
-  loadingInitial || ((loadingPage || indexing) && clips.length === 0);
+    loadingInitial ||
+    (rootPath && clips.length === 0 && (!initialLoadComplete || loadingPage || indexing));
 
   useEffect(() => {
     clipsRef.current = clips;
@@ -189,12 +191,17 @@ export default function LocalFiles() {
     setCursor(nextCursor);
     setHasMore(nextHasMore);
     setLoadingInitial(false);
+    setInitialLoadComplete(true);
     setLoadError(null);
   }, []);
 
   const loadPage = useCallback(
     async ({ reset = false } = {}) => {
-      if (!rootPath || typeof window.clipx?.listLocalClips !== "function") {
+      if (!rootPath) {
+        return null;
+      }
+
+      if (typeof window.clipx?.listLocalClips !== "function") {
         setLoadingInitial(false);
         return null;
       }
@@ -244,6 +251,7 @@ export default function LocalFiles() {
             setClips([]);
             setLoadError("Something went wrong reading this folder.");
             setIndexing(false);
+            setInitialLoadComplete(true);
           }
           setHasMore(false);
           setLoadingInitial(false);
@@ -319,7 +327,7 @@ export default function LocalFiles() {
     }
 
     if (!options) {
-      if (!optionsQuery.isLoading && !optionsQuery.isFetching) {
+      if (optionsQuery.isSuccess) {
         setLoadingInitial(false);
       }
       return;
@@ -331,11 +339,12 @@ export default function LocalFiles() {
       setLoadingInitial(false);
     }
     setFolderPath(showSavedFiles ? buildSavedClipsPath(nextRootPath) : nextRootPath);
-  }, [options, optionsQuery.error, optionsQuery.isError, optionsQuery.isFetching, optionsQuery.isLoading, showSavedFiles]);
+  }, [options, optionsQuery.isError, optionsQuery.isSuccess, showSavedFiles]);
 
   useEffect(() => {
     if (!rootPath) {
       setClips([]);
+      setInitialLoadComplete(false);
       return;
     }
 
@@ -346,6 +355,7 @@ export default function LocalFiles() {
     hasMoreRef.current = true;
     loadingPageRef.current = false;
     pendingResetRef.current = false;
+    setInitialLoadComplete(false);
     const cachedFirstPage = getFreshCachedQueryData(queryClient, localClipsQueryKey(rootPath, collection));
     if (cachedFirstPage) {
       applyClipsPage(cachedFirstPage, { reset: true });
@@ -637,7 +647,7 @@ export default function LocalFiles() {
       defer
       options={{ scrollbars: { autoHide: "scroll", theme: "os-theme-dark" } }}
     >
-      {options && rootPath && (
+      {(rootPath || loadingInitial) && (
         <div className="local-files-header">
           <RefreshIcon
             className="local-files-refresh"
@@ -656,9 +666,9 @@ export default function LocalFiles() {
         </div>
       )}
 
-      {folderPath && <pre className="local-files-path">Folder: {folderPath}</pre>}
+      {(folderPath || loadingInitial) && <pre className="local-files-path">Folder: {folderPath}</pre>}
 
-      {options && !rootPath && (
+      {options && !options?.clipsFolder && (
         <div className="local-files-empty-state">
           <FolderOffIcon className="local-files-empty-icon" fontSize="large" />
           <h3>No clips folder set</h3>
@@ -694,7 +704,7 @@ export default function LocalFiles() {
         />
       )}
 
-      {rootPath && (
+      {(rootPath || loadingInitial) && (
         <ClipGrid
           clips={clips}
           baseFolder={folderPath}
@@ -715,7 +725,7 @@ export default function LocalFiles() {
         />
       )}
 
-      {!clips.length && !gridLoading && rootPath && (
+      {!clips.length && !gridLoading && rootPath && initialLoadComplete && (
         <div className="local-files-empty-state">
           <FolderOffIcon className="local-files-empty-icon" fontSize="large" />
           <h3>{loadError ? "Couldn't load clips" : "No clips found"}</h3>
