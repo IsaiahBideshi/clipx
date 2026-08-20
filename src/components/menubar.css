@@ -37,6 +37,7 @@
   cursor: pointer;
   position: relative;
   padding: 0 12px;
+  text-decoration: none;
 }
 
 .menu-item:hover,
