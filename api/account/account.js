@@ -1,15 +1,4 @@
-import { createClient } from '@supabase/supabase-js'
-
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY,
-  {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  }
-)
+import { supabase, getAuthenticatedUser } from '../auth.js'
 
 const AVATAR_BUCKET = process.env.SUPABASE_AVATAR_BUCKET || 'Avatars'
 const MAX_AVATAR_FILE_BYTES = 1500 * 1024
@@ -25,15 +14,6 @@ function setCorsHeaders(res) {
   res.setHeader('Access-Control-Allow-Origin', allowedOrigin)
   res.setHeader('Access-Control-Allow-Methods', 'GET,PATCH,OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
-}
-
-function getBearerToken(req) {
-  const authorization = req.headers.authorization || ''
-  const [scheme, token] = authorization.split(' ')
-  if (scheme?.toLowerCase() !== 'bearer' || !token) {
-    return null
-  }
-  return token
 }
 
 function getProviders(user) {
@@ -65,20 +45,6 @@ function isStoredAvatarUrl(value, metadata) {
 
 function isProviderAvatarUrl(value, metadata) {
   return Boolean(value && !metadata.avatar_url && metadata.picture && value === metadata.picture)
-}
-
-async function getAuthenticatedUser(req) {
-  const token = getBearerToken(req)
-  if (!token) {
-    return { user: null, error: 'Missing authorization token' }
-  }
-
-  const { data, error } = await supabase.auth.getUser(token)
-  if (error || !data?.user) {
-    return { user: null, error: 'Invalid or expired session' }
-  }
-
-  return { user: data.user, error: null }
 }
 
 async function getPublicProfile(userId) {
@@ -239,14 +205,7 @@ async function verifyCurrentPassword(user, currentPassword) {
     return { ok: false, error: 'Current password is required.' }
   }
 
-  const verifier = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  })
-
-  const { error } = await verifier.auth.signInWithPassword({
+  const { error } = await supabase.auth.signInWithPassword({
     email: user.email,
     password: currentPassword,
   })

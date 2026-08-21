@@ -6,6 +6,7 @@ import { google } from "googleapis";
 import path from "path";
 import url from "url";
 import { generatePKCE } from "../utils/PKCE.js";
+import { getSupabaseAccessToken } from "../ipc/authStorage.js";
 
 dotenv.config({ path: path.resolve(process.cwd(), ".env.local"), override: true });
 dotenv.config();
@@ -55,6 +56,17 @@ function normalizeUserId(userId) {
   return normalized || null;
 }
 
+async function getAuthHeaders() {
+  const accessToken = await getSupabaseAccessToken();
+  if (!accessToken) {
+    throw new Error("You must be signed in to ClipX to use YouTube features.");
+  }
+  return {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${accessToken}`,
+  };
+}
+
 async function storeRefreshToken(token, userId) {
   const user_id = normalizeUserId(userId);
   if (!user_id) {
@@ -64,9 +76,7 @@ async function storeRefreshToken(token, userId) {
 
   const response = await fetch(`${baseUrl}/api/google_accounts`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
+    headers: await getAuthHeaders(),
     body: JSON.stringify({ user_id: user_id, token: token })
   });
   const { data, error } = response ? await response.json() : { data: null, error: "Failed to store refresh token via API" };
@@ -93,9 +103,7 @@ export async function getRefreshToken(userId) {
 
   const response = await fetch(`${baseUrl}/api/google_accounts?user_id=${encodeURIComponent(user_id)}`, {
     method: "GET",
-    headers: {
-      "Content-Type": "application/json"
-    }
+    headers: await getAuthHeaders()
   });
   const { data, error } = response ? await response.json() : { data: null, error: "Failed to fetch refresh token via API" };
   if (error) {
@@ -119,9 +127,7 @@ export async function getRefreshToken(userId) {
 export async function deleteRefreshToken(userId) {
   const response = await fetch(`${baseUrl}/api/google_accounts`, {
     method: "DELETE",
-    headers: {
-      "Content-Type": "application/json"
-    },
+    headers: await getAuthHeaders(),
     body: JSON.stringify({ user_id: userId })
   });
   const { data, error } = response ? await response.json() : { data: null, error: "Failed to delete refresh token via API" };
@@ -169,9 +175,7 @@ export async function getAccessToken(userId) {
 
   const response = await fetch(`${baseUrl}/api/google/token`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers: await getAuthHeaders(),
     body: JSON.stringify({
       grant_type: "refresh_token",
       refresh_token: refreshToken,
@@ -343,9 +347,7 @@ export async function unlinkYoutube(userId) {
 
   const response = await fetch(`${baseUrl}/api/google_accounts`, {
     method: "DELETE",
-    headers: {
-      "Content-Type": "application/json"
-    },  
+    headers: await getAuthHeaders(),
     body: JSON.stringify({ user_id: normalizedUserId })
   });
   const { data, error } = response ? await response.json() : { data: null, error: "Failed to delete refresh token via API" };//

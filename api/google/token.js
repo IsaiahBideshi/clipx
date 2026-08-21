@@ -1,5 +1,20 @@
+import { supabase, getAuthenticatedUser } from '../auth.js'
+
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token'
 const REDIRECT_URI = 'http://127.0.0.1:51723'
+
+async function getStoredRefreshToken(userId) {
+  const { data, error } = await supabase
+    .from('google_accounts')
+    .select('refresh_token')
+    .eq('user_id', userId)
+    .maybeSingle()
+
+  if (error) {
+    return null
+  }
+  return data?.refresh_token || null
+}
 
 export default async function handler(req, res) {
   const allowedOrigin = process.env.CORS_ORIGIN || '*'
@@ -39,6 +54,19 @@ export default async function handler(req, res) {
     if (!body.refresh_token) {
       return res.status(400).json({ data: null, error: 'Missing refresh_token', ok: false })
     }
+
+    // Refreshing requires a signed-in caller whose stored token matches the
+    // one being exchanged, so a leaked refresh token is useless on its own.
+    const { user, error: authError } = await getAuthenticatedUser(req)
+    if (authError) {
+      return res.status(401).json({ data: null, error: authError, ok: false })
+    }
+
+    const storedToken = await getStoredRefreshToken(user.id)
+    if (!storedToken || body.refresh_token !== storedToken) {
+      return res.status(403).json({ data: null, error: 'Refresh token does not belong to the authenticated user', ok: false })
+    }
+
     params.refresh_token = body.refresh_token
   } else {
     return res.status(400).json({ data: null, error: 'Unsupported grant_type', ok: false })
