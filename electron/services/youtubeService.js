@@ -189,7 +189,7 @@ export async function getAccessToken(userId) {
       await deleteRefreshToken(userId);
       throw new Error("Stored YouTube login expired or was revoked. Please link your YouTube account again.");
     }
-    throw new Error(`Failed to refresh access token: ${error}`);
+    throw new Error(`Failed to refresh access token: ${payload.error_description || error}`);
   }
   return payload.data.access_token;
 }

@@ -37,6 +37,7 @@ export default async function handler(req, res) {
   }
 
   const body = req.body || {}
+  let authenticatedUserId = null
   const params = {
     client_id: clientId,
     client_secret: clientSecret,
@@ -67,6 +68,7 @@ export default async function handler(req, res) {
       return res.status(403).json({ data: null, error: 'Refresh token does not belong to the authenticated user', ok: false })
     }
 
+    authenticatedUserId = user.id
     params.refresh_token = body.refresh_token
   } else {
     return res.status(400).json({ data: null, error: 'Unsupported grant_type', ok: false })
@@ -83,7 +85,19 @@ export default async function handler(req, res) {
 
     const data = await response.json()
     if (!response.ok || data.error) {
-      return res.status(response.ok ? 400 : response.status).json({ data: null, error: data.error_description || data.error, ok: false })
+      // Keep the machine-readable OAuth error code in `error` (clients branch
+      // on e.g. invalid_grant) and pass Google's prose separately.
+      if (authenticatedUserId && data.error === 'invalid_grant') {
+        // The stored credential is dead; remove it so the next link attempt
+        // starts a clean OAuth flow instead of retrying a revoked token.
+        await supabase.from('google_accounts').delete().eq('user_id', authenticatedUserId)
+      }
+      return res.status(response.ok ? 400 : response.status).json({
+        data: null,
+        error: data.error || 'token_request_failed',
+        error_description: data.error_description || null,
+        ok: false,
+      })
     }
 
     return res.status(200).json({ data, error: null, ok: true })
