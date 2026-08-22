@@ -29,6 +29,22 @@ contextBridge.exposeInMainWorld("clipx", {
   searchGames: (query) => ipcRenderer.invoke("search-games", query),
   getOptions: () => ipcRenderer.invoke("get-options"),
   saveOptions: (options) => ipcRenderer.invoke("save-options", options),
+  onOptionsChanged: (callback) => {
+    if (typeof callback !== "function") {
+      return () => {};
+    }
+
+    const listener = (_event, payload) => {
+      try {
+        callback(payload);
+      } catch (error) {
+        console.error("ClipX: Options changed callback failed:", error);
+      }
+    };
+
+    ipcRenderer.on("options:changed", listener);
+    return () => ipcRenderer.removeListener("options:changed", listener);
+  },
   getLaunchAtStartup: () => ipcRenderer.invoke("get-launch-at-startup"),
   setLaunchAtStartup: (enabled) => ipcRenderer.invoke("set-launch-at-startup", enabled),
   saveClip: (clipInfo) => ipcRenderer.invoke("save-clip", clipInfo),

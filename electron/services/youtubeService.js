@@ -6,6 +6,7 @@ import { google } from "googleapis";
 import path from "path";
 import url from "url";
 import { generatePKCE } from "../utils/PKCE.js";
+import { getSupabaseAccessToken } from "../ipc/authStorage.js";
 
 dotenv.config({ path: path.resolve(process.cwd(), ".env.local"), override: true });
 dotenv.config();
@@ -13,7 +14,6 @@ dotenv.config();
 const SERVICE = "ClipX";
 const ACCOUNT = "youtube_refresh_token";
 let clientId = null;
-let clientSecret = null;
 const redirectPort = 51723;
 const redirectUri = `http://127.0.0.1:${redirectPort}`;
 const OAUTH_TIMEOUT_MS = 90_000;
@@ -37,18 +37,16 @@ async function fetchKeys() {
   }
   if (data) {
     clientId = data.googleClientId;
-    clientSecret = data.googleClientSecret;
   }
 }
 
 (await fetchKeys().then(() => {
-  if (!clientId || !clientSecret) {
-    throw new Error("Missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET in .env.local");
+  if (!clientId) {
+    throw new Error("Missing GOOGLE_CLIENT_ID in .env.local");
   }
 }).catch((err) => {
   console.error("Failed to fetch API keys on startup:", err);
   clientId = null;
-  clientSecret = null;
 }));
 
 
@@ -56,6 +54,17 @@ async function fetchKeys() {
 function normalizeUserId(userId) {
   const normalized = String(userId || "").trim();
   return normalized || null;
+}
+
+async function getAuthHeaders() {
+  const accessToken = await getSupabaseAccessToken();
+  if (!accessToken) {
+    throw new Error("You must be signed in to ClipX to use YouTube features.");
+  }
+  return {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${accessToken}`,
+  };
 }
 
 async function storeRefreshToken(token, userId) {
@@ -67,9 +76,7 @@ async function storeRefreshToken(token, userId) {
 
   const response = await fetch(`${baseUrl}/api/google_accounts`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
+    headers: await getAuthHeaders(),
     body: JSON.stringify({ user_id: user_id, token: token })
   });
   const { data, error } = response ? await response.json() : { data: null, error: "Failed to store refresh token via API" };
@@ -96,9 +103,7 @@ export async function getRefreshToken(userId) {
 
   const response = await fetch(`${baseUrl}/api/google_accounts?user_id=${encodeURIComponent(user_id)}`, {
     method: "GET",
-    headers: {
-      "Content-Type": "application/json"
-    }
+    headers: await getAuthHeaders()
   });
   const { data, error } = response ? await response.json() : { data: null, error: "Failed to fetch refresh token via API" };
   if (error) {
@@ -122,9 +127,7 @@ export async function getRefreshToken(userId) {
 export async function deleteRefreshToken(userId) {
   const response = await fetch(`${baseUrl}/api/google_accounts`, {
     method: "DELETE",
-    headers: {
-      "Content-Type": "application/json"
-    },
+    headers: await getAuthHeaders(),
     body: JSON.stringify({ user_id: userId })
   });
   const { data, error } = response ? await response.json() : { data: null, error: "Failed to delete refresh token via API" };
@@ -141,25 +144,23 @@ export async function deleteRefreshToken(userId) {
 }
 
 async function exchangeCodeForTokens(code, userId) {
-  const response = await fetch("https://oauth2.googleapis.com/token", {
+  const response = await fetch(`${baseUrl}/api/google/token`, {
     method: "POST",
     headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
+      "Content-Type": "application/json",
     },
-    body: new URLSearchParams({
-      client_id: clientId,
-      client_secret: clientSecret,
-      redirect_uri: redirectUri,
+    body: JSON.stringify({
       grant_type: "authorization_code",
       code,
       code_verifier: verifier,
     }),
   });
 
-  const data = await response.json();
-  if (data.error) {
-    throw new Error(`Failed OAuth token exchange: ${data.error_description || data.error}`);
+  const payload = response ? await response.json() : { data: null, error: "Failed to exchange code for tokens" };
+  if (!response.ok || payload.error) {
+    throw new Error(`Failed OAuth token exchange: ${payload.error}`);
   }
+  const data = payload.data;
   if (!data.refresh_token) {
     throw new Error("Failed to get refresh token from Google OAuth response");
   }
@@ -172,28 +173,25 @@ export async function getAccessToken(userId) {
     throw new Error("No refresh token found");
   }
 
-  const response = await fetch("https://oauth2.googleapis.com/token", {
+  const response = await fetch(`${baseUrl}/api/google/token`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: new URLSearchParams({
-      refresh_token: refreshToken,
-      client_id: clientId,
-      client_secret: clientSecret,
+    headers: await getAuthHeaders(),
+    body: JSON.stringify({
       grant_type: "refresh_token",
+      refresh_token: refreshToken,
     }),
   });
 
-  const data = await response.json();
-  if (data.error) {
-    if (data.error === "invalid_grant") {
+  const payload = response ? await response.json() : { data: null, error: "Failed to refresh access token" };
+  if (!response.ok || payload.error) {
+    const error = payload.error;
+    if (error === "invalid_grant") {
       await deleteRefreshToken(userId);
       throw new Error("Stored YouTube login expired or was revoked. Please link your YouTube account again.");
     }
-    throw new Error(`Failed to refresh access token: ${data.error_description || data.error}`);
+    throw new Error(`Failed to refresh access token: ${payload.error_description || error}`);
   }
-  return data.access_token;
+  return payload.data.access_token;
 }
 
 export async function getGoogleUserInfo(accessToken) {
@@ -202,7 +200,21 @@ export async function getGoogleUserInfo(accessToken) {
       Authorization: `Bearer ${accessToken}`,
     },
   });
-  return await response.json();
+  const text = await response.text();
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    throw new Error(
+      `Google userinfo returned a non-JSON response (status ${response.status}): ${text.slice(0, 200)}`
+    );
+  }
+  if (!response.ok) {
+    throw new Error(
+      `Google userinfo request failed with status ${response.status}: ${text.slice(0, 200)}`
+    );
+  }
+  return data;
 }
 
 async function getGoogleProfileImageDataUrl(accessToken, pictureUrl) {
@@ -335,9 +347,7 @@ export async function unlinkYoutube(userId) {
 
   const response = await fetch(`${baseUrl}/api/google_accounts`, {
     method: "DELETE",
-    headers: {
-      "Content-Type": "application/json"
-    },  
+    headers: await getAuthHeaders(),
     body: JSON.stringify({ user_id: normalizedUserId })
   });
   const { data, error } = response ? await response.json() : { data: null, error: "Failed to delete refresh token via API" };//
@@ -372,7 +382,7 @@ export async function uploadClipToYoutube({ videoPath, title, tags, game, userId
   }
 
   const accessToken = await getAccessToken(userId);
-  const oauth2Client = new google.auth.OAuth2(clientId, clientSecret, redirectUri);
+  const oauth2Client = new google.auth.OAuth2(clientId, "", redirectUri);
   oauth2Client.setCredentials({ access_token: accessToken });
 
   const youtube = google.youtube({ version: "v3", auth: oauth2Client });

@@ -83,7 +83,13 @@ export default function ClipEditor({
 
   useEffect(() => {
     function handleClickOutside(event) {
-      if (editorRef.current && !editorRef.current.contains(event.target) && uploadMenuRef.current && !uploadMenuRef.current.contains(event.target)) {
+      if (
+          editorRef.current && 
+          !editorRef.current.contains(event.target) && 
+          uploadMenuRef.current && 
+          !uploadMenuRef.current.contains(event.target) &&
+          !event.target.closest?.(".MuiPopover-root, .MuiPopper-root")
+      ) {
         onClose();
       }
     }
@@ -620,7 +626,7 @@ useEffect(() => {
         <h4>Upload Details</h4>
       </div>
       <form className="upload-menu-form">
-        <TextField fullWidth label={"Title"} className={"tf-sx"} value={clipTitle} onChange={(e) => setClipTitle(e.target.value)} />
+        <TextField fullWidth label={"Title"} value={clipTitle} onChange={(e) => setClipTitle(e.target.value)} />
         <div className="upload-menu-game-row" >
           <AutoComplete
             fullWidth
@@ -650,14 +656,12 @@ useEffect(() => {
             renderInput={(params) => (
               <TextField
                 {...params}
-                className={"tf-sx"}
                 label="Game"
               />
             )}
           />
         </div>
         <AutoComplete
-          className={"tf-sx"}
           disablePortal
           multiple
           id="tags-outlined"
@@ -676,9 +680,8 @@ useEffect(() => {
         />
         <div style={{ display: "flex", justifyContent: "flex-start", width: "50%" }}>
           <FormControl sx={{ alignSelf: "flex-start" }} className="upload-menu-visibility-control">
-            <InputLabel id="demo-simple-select-label" sx={{color: "white"}} >Visibility</InputLabel>
+            <InputLabel id="demo-simple-select-label">Visibility</InputLabel>
             <Select
-              className={"tf-sx"}
               labelId="demo-simple-select-label"
               id="demo-simple-select"
               value={visibility}
@@ -686,9 +689,9 @@ useEffect(() => {
               onChange={handleChange}
               sx={{width: "100%"}}
             >
-              <MenuItem value={"public"}sx={{width: "100%"}}>Public</MenuItem>
-              <MenuItem value={"private"} sx={{width: "100%"}}>Private</MenuItem>
-              <MenuItem value={"friends"}sx={{width: "100%"}}>Friends</MenuItem>
+              <MenuItem value={"public"}>Public</MenuItem>
+              <MenuItem value={"private"}>Private</MenuItem>
+              <MenuItem value={"friends"}>Friends</MenuItem>
             </Select>
           </FormControl>
         </div>

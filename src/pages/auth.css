@@ -8,6 +8,10 @@
   border-radius: 5px;
 }
 
+.login-form .MuiTextField-root {
+  margin-bottom: 10px;
+}
+
 .menu-separator {
   display: flex;
   align-items: center;

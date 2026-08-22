@@ -1,7 +1,3 @@
-import "./clippreview.css";
-
-import Slider from '@mui/material/Slider';
-
 export default function ClipPreview({ clip, onClose }) {
   if (!clip) return null;
 

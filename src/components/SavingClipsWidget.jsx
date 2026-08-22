@@ -1,4 +1,4 @@
-import "./savingclipswidget.css";
+import "./widgets.css";
 
 export default function SavingClipsWidget({ clips, expanded, onToggleExpanded }) {
   if (!clips?.length) return null;

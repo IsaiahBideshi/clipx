@@ -35,6 +35,24 @@ function withStorageQueue(operation) {
   return next;
 }
 
+export async function getSupabaseAccessToken() {
+  const storage = await readAuthStorage();
+  const sessionKey = Object.keys(storage).find(
+    (key) => key.startsWith("sb-") && key.endsWith("-auth-token")
+  );
+  if (!sessionKey) {
+    return null;
+  }
+
+  try {
+    const session = JSON.parse(storage[sessionKey]);
+    return typeof session?.access_token === "string" ? session.access_token : null;
+  } catch (error) {
+    console.error("ClipX: Failed to parse stored auth session:", error);
+    return null;
+  }
+}
+
 export function registerAuthStorageIpcHandlers() {
   ipcMain.handle("auth-storage-get", async (_event, key) => {
     if (typeof key !== "string") {

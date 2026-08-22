@@ -153,17 +153,6 @@ export default function Profile() {
   const loadingFriendships = friendshipsQuery.isLoading && friendships.length === 0;
   const profileHandle = account?.username || session?.user?.user_metadata?.displayName || session?.user?.user_metadata?.name || "User";
 
-  const tfSx = {
-    "& .MuiInputLabel-root": { color: "#e5e7eb" }, // label
-    "& .MuiInputBase-input": { color: "#ffffff" }, // typed text
-    "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.35)" },
-    "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.6)" },
-    "& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: "#90caf9" },
-    "& .MuiInputLabel-root.Mui-focused": { color: "#90caf9" },
-    marginBottom: '10px',
-    textColor: 'white',
-    width: "100%",
-  }
   const navigate = useNavigate();
 
   async function searchFriends(name) {
@@ -516,12 +505,11 @@ export default function Profile() {
         </section>
 
         <section className="profile-card friend-search-card">
-          <h4>Add Friends</h4>
-          <p className="card-copy">Search by username and send requests instantly.</p>
+          <h4 style={{margin: "0 0 16px 0"}}>Add Friends</h4>
           <div className="friend-search-shell" ref={displayResults}>
             <div className={"add-friend"}>
               <TextField
-                sx={tfSx}
+                fullWidth
                 placeholder={"Add a friend"}
                 value={friendName}
                 onChange={(e) => setFriendName(e.target.value)}
@@ -583,7 +571,6 @@ export default function Profile() {
 
         <section className={"profile-card"}>
           <h4>Friends List</h4>
-          <p className="card-copy">People currently connected to your account.</p>
           <div className="stacked-list">
             {loadingFriendships ? (
               <div className="result search-loading result-row">
@@ -613,7 +600,6 @@ export default function Profile() {
 
         <section className={"profile-card"}>
           <h4>Incoming Requests</h4>
-          <p className="card-copy">Approve requests from people who want to connect.</p>
           <div className="stacked-list">
             {loadingFriendships ? (
               <div className="result search-loading result-row">
@@ -652,7 +638,6 @@ export default function Profile() {
 
         <section className={"profile-card"}>
           <h4>Outgoing Requests</h4>
-          <p className="card-copy">Pending invites you have already sent.</p>
           <div className="stacked-list">
             {loadingFriendships ? (
               <div className="result search-loading result-row">
@@ -801,7 +786,7 @@ export default function Profile() {
                   </div>
 
                   <TextField
-                    sx={tfSx}
+                    fullWidth
                     label="Username"
                     value={accountForm.username}
                     onChange={(e) => updateAccountFormField("username", e.target.value)}
@@ -826,7 +811,7 @@ export default function Profile() {
               {!isGoogleConnected && accountTab === "email" && (
                 <form className="account-form" onSubmit={handleSaveEmail}>
                   <TextField
-                    sx={tfSx}
+                    fullWidth
                     label="Email"
                     type="email"
                     value={accountForm.email}
@@ -861,7 +846,7 @@ export default function Profile() {
                   )}
                   {account?.hasPassword && (
                     <TextField
-                      sx={tfSx}
+                      fullWidth
                       label="Current password"
                       type="password"
                       value={accountForm.currentPassword}
@@ -870,7 +855,7 @@ export default function Profile() {
                     />
                   )}
                   <TextField
-                    sx={tfSx}
+                    fullWidth
                     label="New password"
                     type="password"
                     value={accountForm.password}
@@ -879,7 +864,7 @@ export default function Profile() {
                     required
                   />
                   <TextField
-                    sx={tfSx}
+                    fullWidth
                     label="Confirm new password"
                     type="password"
                     value={accountForm.confirmPassword}

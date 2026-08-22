@@ -1,4 +1,4 @@
-import "./uploadingclips.css";
+import "./widgets.css";
 
 export default function UploadingClipsWidget({ clips, expanded, onToggleExpanded }) {
   if (!clips?.length) return null;

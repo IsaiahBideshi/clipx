@@ -56,7 +56,7 @@ function ClipGrid({
 
   const itemCount = loading && clips.length === 0 ? INITIAL_SKELETON_COUNT : clips.length;
   const dataRowCount = Math.ceil(itemCount / columnCount);
-  const loaderRowCount = !loading && (hasMore || loadingMore) ? 1 : 0;
+  const loaderRowCount = !loading && clips.length > 0 && (hasMore || loadingMore) ? 1 : 0;
   const rowCount = dataRowCount + loaderRowCount;
 
   const rowVirtualizer = useVirtualizer({

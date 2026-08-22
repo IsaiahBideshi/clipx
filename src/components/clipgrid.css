@@ -72,9 +72,6 @@
   gap: 20px;
   width: 90%;
 }
-.css-1n3vtnx-MuiFormControl-root{
-  width: 100%;
-}
 
 .clip-options-icon{
   color: rgba(255, 255, 255, 0.72);
@@ -252,17 +249,6 @@
   background: rgba(144, 202, 249, 0.14);
 }
 
-.hidden-btn{
-  position: absolute;
-  right: 60px;
-}
-
-.hidden{
-  display: none;
-  width: 80px;
-  background: none !important;
-}
-
 
 .clip-name{
   font-size: 13px;
@@ -343,25 +329,6 @@
 }
 .mute-button:active{
   border-color: rgba(144, 202, 249, 0.6);
-}
-.MuiChip-label{
-  color: white;
-}
-.search-game-button{
-  align-self: center;
-  margin-left: 0;
-  margin-right: 0 !important;
-}
-.search-game-button:hover{
-  cursor: pointer;
-}
-
-.app{
-  margin-top: 10px;
-  padding-bottom: 100px;
-  overflow-y: scroll;
-  height: calc(100vh - 100px);
-  max-height: 80vh;
 }
 
 .clip-date{
@@ -667,6 +634,11 @@
   gap: 10px;
 }
 
+.upload-menu-form .MuiTextField-root,
+.upload-menu-form .MuiFormControl-root {
+  margin-bottom: 10px;
+}
+
 @media (max-width: 1400px) {
   .clip-editor-container {
     flex-direction: column;
@@ -765,46 +737,4 @@
 
 .clip-grid-loader-row .clip-card-skeleton {
   opacity: 0.82;
-}
-
-.skeleton-thumb,
-.skeleton-line {
-  background: linear-gradient(
-    90deg,
-    #1a1a1a 25%,
-    #2a2a2a 37%,
-    #1a1a1a 63%
-  );
-  background-size: 400% 100%;
-  animation: library-skeleton-shimmer 1.4s ease infinite;
-}
-
-.skeleton-thumb {
-  width: 100%;
-  aspect-ratio: 16 / 9;
-  border-radius: 3px;
-  margin-bottom: 8px;
-}
-
-.skeleton-line {
-  height: 12px;
-  border-radius: 3px;
-}
-
-.skeleton-title {
-  width: 72%;
-  margin-bottom: 8px;
-}
-
-.skeleton-date {
-  width: 48%;
-}
-
-@keyframes library-skeleton-shimmer {
-  0% {
-    background-position: 100% 0;
-  }
-  100% {
-    background-position: 0 0;
-  }
 }
