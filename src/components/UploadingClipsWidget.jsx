@@ -1,6 +1,9 @@
 import "./widgets.css";
+import CloseIcon from "@mui/icons-material/Close";
+import ExpandLessIcon from "@mui/icons-material/ExpandLess";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 
-export default function UploadingClipsWidget({ clips, expanded, onToggleExpanded }) {
+export default function UploadingClipsWidget({ clips, expanded, onToggleExpanded, onDismiss }) {
   if (!clips?.length) return null;
 
   const uploadingCount = clips.filter((clip) => clip.status === "uploading").length;
@@ -28,17 +31,36 @@ export default function UploadingClipsWidget({ clips, expanded, onToggleExpanded
 
   return (
     <div className="uploading-clips-widget">
-      <button type="button" className="uploading-clips-header" onClick={onToggleExpanded}>
-        <div className="uploading-clips-header-left">
-          {uploadingCount > 0 && <span className="uploading-spinner" />}
-          <span className="uploading-clips-title">
-            {uploadingCount > 0
-              ? `Uploading ${uploadingCount} clip${uploadingCount > 1 ? "s" : ""}`
-              : "Recent upload updates"}
+      <div className="uploading-clips-header" onClick={onToggleExpanded}>
+        <button type="button" className="uploading-clips-header-toggle">
+          <span className="uploading-clips-header-left">
+            {uploadingCount > 0 && <span className="uploading-spinner" />}
+            <span className="uploading-clips-title">
+              {uploadingCount > 0
+                ? `Uploading ${uploadingCount} clip${uploadingCount > 1 ? "s" : ""}`
+                : "Recent upload updates"}
+            </span>
           </span>
+        </button>
+        <div className="uploading-clips-actions" onClick={(e) => e.stopPropagation()}>
+          <button
+            type="button"
+            className="uploading-clips-action"
+            aria-label={expanded ? "Minimize" : "Expand"}
+            onClick={onToggleExpanded}
+          >
+            {expanded ? <ExpandMoreIcon /> : <ExpandLessIcon />}
+          </button>
+          <button
+            type="button"
+            className="uploading-clips-action"
+            aria-label="Dismiss"
+            onClick={onDismiss}
+          >
+            <CloseIcon />
+          </button>
         </div>
-        <span className="uploading-clips-toggle">{expanded ? "Hide" : "Show"}</span>
-      </button>
+      </div>
 
       {expanded && (
         <div className="uploading-clips-list">
@@ -59,7 +81,7 @@ export default function UploadingClipsWidget({ clips, expanded, onToggleExpanded
               <span className={`uploading-clip-status ${clip.status === "failed" ? "failed" : ""}`}>
                 {clip.status}
                 {clip.status === "failed" && (
-                  <span>! Ensure google account is linked.</span>
+                  <span>{clip.error ? ` — ${clip.error}` : "! Ensure google account is linked."}</span>
                 )}
               </span>
             </div>

@@ -189,7 +189,7 @@ export async function uploadClip(app, options) {
   const tempPath = path.join(tempDir, `${Date.now()}-${buildClipOutputName(clipTitle)}`);
 
   try {
-    await renderUpscaledClipSegment4K(videoPath, startTime, endTime, tempPath);
+    await renderClipSegment(videoPath, startTime, endTime, tempPath);
     const result = await uploadClipToYoutube({
       videoPath: tempPath,
       title: clipTitle,

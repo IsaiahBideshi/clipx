@@ -594,15 +594,13 @@ useEffect(() => {
         return;
       }
 
-      onUploadQueueEvent?.({ type: "failed", id: uploadId });
+      onUploadQueueEvent?.({ type: "failed", id: uploadId, error: response?.error || "Upload failed." });
     } catch (err) {
-      if (err.message === "No linked YouTube account. Link your account in settings first.") {
-        onUploadQueueEvent?.({ type: "failed", id: uploadId, error: "No linked YouTube account. Link your account in settings first." });
-        console.error("Failed to upload clip:", err);
-        return;
-      }
       console.error("Failed to upload clip:", err);
-      onUploadQueueEvent?.({ type: "failed", id: uploadId });
+      const message = String(err?.message || "")
+        .replace(/^Error invoking remote method '[^']+':\s*(?:Error:\s*)?/, "")
+        .trim();
+      onUploadQueueEvent?.({ type: "failed", id: uploadId, error: message || "Upload failed." });
     } finally {
       setUploading(false);
     }

@@ -62,6 +62,7 @@ export async function linkYoutube() {
     }
     catch (err) {
       console.error("Failed to link Youtube account:", err);
+      throw err;
     }
 }
 
@@ -79,6 +80,7 @@ async function unlinkYoutube() {
     }
     catch (err) {
       console.error("Failed to unlink Youtube account:", err);
+      throw err;
     }
 }
 
@@ -119,6 +121,7 @@ export default function Settings() {
   const [avatarLoadError, setAvatarLoadError] = useState(false);
   const [confirmUnlink, setConfirmUnlink] = useState(false);
   const [linking, setLinking] = useState(false);
+  const [youtubeError, setYoutubeError] = useState(null);
   const [showChangelog, setShowChangelog] = useState(false);
   const { session } = useAuthSession();
   const userId = session?.user?.id || null;
@@ -179,6 +182,7 @@ export default function Settings() {
 
   const handleLinkYoutube = async () => {
     setLinking(true);
+    setYoutubeError(null);
     try {
       const info = await linkYoutube();
       const nextUserId = userId || await getCurrentUserId();
@@ -187,6 +191,8 @@ export default function Settings() {
         queryClient.setQueryData(nextGoogleInfoKey, info);
       }
       await queryClient.invalidateQueries({ queryKey: nextGoogleInfoKey });
+    } catch (err) {
+      setYoutubeError(err?.message || "Failed to link YouTube account.");
     } finally {
       setLinking(false);
     }
@@ -197,9 +203,14 @@ export default function Settings() {
       return;
     }
 
-    await unlinkYoutube();
-    queryClient.setQueryData(googleInfoKey, null);
-    setConfirmUnlink(false);
+    setYoutubeError(null);
+    try {
+      await unlinkYoutube();
+      queryClient.setQueryData(googleInfoKey, null);
+      setConfirmUnlink(false);
+    } catch (err) {
+      setYoutubeError(err?.message || "Failed to unlink YouTube account.");
+    }
   }
 
   useEffect(() => {
@@ -410,6 +421,12 @@ export default function Settings() {
                     )
                   )}
                 </div>
+
+                {youtubeError && (
+                  <p className="card-copy" style={{ color: "#ff9b9b", marginTop: 8 }}>
+                    {youtubeError}
+                  </p>
+                )}
               </div>
             </section>
           </div>

@@ -4,6 +4,8 @@ import path from "path";
 
 let storageQueue = Promise.resolve();
 
+const SESSION_EXPIRY_LEEWAY_MS = 30_000;
+
 function getAuthStoragePath() {
   return path.join(app.getPath("appData"), "clipx", "auth-storage.json");
 }
@@ -46,7 +48,20 @@ export async function getSupabaseAccessToken() {
 
   try {
     const session = JSON.parse(storage[sessionKey]);
-    return typeof session?.access_token === "string" ? session.access_token : null;
+    if (typeof session?.access_token !== "string") {
+      return null;
+    }
+
+    const expiresAtMs = Number(session.expires_at) * 1000;
+    if (
+      Number.isFinite(expiresAtMs) &&
+      Date.now() >= expiresAtMs - SESSION_EXPIRY_LEEWAY_MS
+    ) {
+      console.error("ClipX: Stored Supabase session is expired.");
+      return null;
+    }
+
+    return session.access_token;
   } catch (error) {
     console.error("ClipX: Failed to parse stored auth session:", error);
     return null;

@@ -629,13 +629,11 @@ export default function LocalFiles() {
         youtubeUrl: event.youtubeUrl,
         videoId: event.videoId,
       });
-      setTimeout(() => removeUploadingClip(event.id), 15000);
       return;
     }
 
     if (event.type === "failed") {
-      upsertUploadingClip(event.id, { status: "failed" });
-      setTimeout(() => removeUploadingClip(event.id), 7000);
+      upsertUploadingClip(event.id, { status: "failed", error: event.error });
     }
   }
 
@@ -746,6 +744,7 @@ export default function LocalFiles() {
         clips={uploadingClips}
         expanded={showUploadingList}
         onToggleExpanded={() => setShowUploadingList((prev) => !prev)}
+        onDismiss={() => setUploadingClips([])}
       />
       {deleteClipModalOpen && (
         <div className="delete-modal">
