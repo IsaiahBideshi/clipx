@@ -8,10 +8,12 @@ import { rename } from "fs/promises";
 import { uploadClipToYoutube } from "./youtubeService.js";
 import { resolveFfmpegPath } from "../utils/ffmpeg.js";
 import { getIndexedClipData, setIndexedClipMetadata, markIndexedClipMissing, getWatchedRootForPath, upsertIndexedClip } from "./clipIndexService.js";
+import { getSupabaseAccessToken } from "../ipc/authStorage.js";
 
 ffmpeg.setFfmpegPath(resolveFfmpegPath(ffmpegPath));
 
 const CLIPS_DATA_FILE = "clipsData.json";
+const API_BASE = (process.env.VITE_DATABASE_URL || "https://clipx.bideshi.tech").replace(/\/+$/, "");
 
 function buildClipOutputName(baseName) {
   const safeName = String(baseName || "Untitled Clip")
@@ -190,24 +192,56 @@ export async function uploadClip(app, options) {
 
   try {
     await renderClipSegment(videoPath, startTime, endTime, tempPath);
-    const result = await uploadClipToYoutube({
+    const result = await uploadClipToAzureBlobStorage({
       videoPath: tempPath,
       title: clipTitle,
-      tags,
-      game,
-      userId,
     });
+    return { status: 200, ...result };
 
-    return {
-      status: 200,
-      ...result,
-    };
   } finally {
     try {
       await fs.promises.unlink(tempPath);
     } catch (_error) {
     }
   }
+}
+
+async function uploadClipToAzureBlobStorage({ videoPath, title }) {
+  const token = await getSupabaseAccessToken();
+  if (!token) {
+    throw new Error("Not authenticated. Please log in first.");
+  }
+
+  const blobName = `${Date.now()}-${buildClipOutputName(title)}`;
+
+  const sasRes = await fetch(`${API_BASE}/api/clips`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ name: blobName, contentType: "video/mp4" }),
+  });
+
+  if (!sasRes.ok) {
+    const err = await sasRes.json().catch(() => null);
+    throw new Error(err?.error || `Failed to get upload URL (${sasRes.status})`);
+  }
+
+  const { data } = await sasRes.json();
+  const fileBuffer = await fs.promises.readFile(videoPath);
+
+  const uploadRes = await fetch(data.url, {
+    method: "PUT",
+    headers: { "x-ms-blob-type": "BlockBlob", "Content-Type": "video/mp4" },
+    body: fileBuffer,
+  });
+
+  if (!uploadRes.ok) {
+    throw new Error(`Azure upload failed (${uploadRes.status})`);
+  }
+
+  return { blobName };
 }
 
 export async function getClipData(clipPath) {

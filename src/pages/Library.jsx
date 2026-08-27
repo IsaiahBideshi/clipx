@@ -387,21 +387,47 @@ export function ClipCardSkeleton() {
 
 export function ClipCard({clip, onSelect}) {
   const clipDate = new Date(clip.created_at).toLocaleString( undefined, { dateStyle: 'long', timeStyle: 'short' });
+  const isAzure = Boolean(clip.blob_name);
 
   return (
     <div className="clip-card" onClick={() => onSelect(clip)}>
-      <img src={`https://img.youtube.com/vi/${clip.youtube_video_id}/mqdefault.jpg`} alt="thumb" className="clip-thumb" />
+      {isAzure ? (
+        <div className="clip-thumb clip-thumb-placeholder">Azure Clip</div>
+      ) : (
+        <img src={`https://img.youtube.com/vi/${clip.youtube_video_id}/mqdefault.jpg`} alt="thumb" className="clip-thumb" />
+      )}
       <div className="clip-name">{clip.title}</div>
       <div className="clip-date">{clipDate}</div>
-      {/* <div className="clip-tags">Tags: {clip.tags}</div> */}
     </div>
   );
 }
 
 export function VideoPreview({clip, onClose}){
-  const src = `https://www.youtube.com/embed/${clip.youtube_video_id}?rel=0&modestbranding=1&autoplay=1&vq=hd1080`;
+  const isAzure = Boolean(clip.blob_name);
+  const [streamUrl, setStreamUrl] = useState(null);
   const [gamesSrc, setGamesSrc] = useState(null);
+  const { session } = useAuthSession();
 
+  useEffect(() => {
+    if (!isAzure || !clip.blob_name || !session?.access_token) return;
+
+    async function fetchStreamUrl() {
+      try {
+        const apiBase = (import.meta.env.VITE_DATABASE_URL || "https://clipx.bideshi.tech").replace(/\/+$/, "");
+        const res = await fetch(`${apiBase}/api/clips/stream?name=${encodeURIComponent(clip.blob_name)}`, {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+        const json = await res.json();
+        if (json.data?.url) {
+          setStreamUrl(json.data.url);
+        }
+      } catch (err) {
+        console.error("Failed to get stream URL:", err);
+      }
+    }
+
+    fetchStreamUrl();
+  }, [isAzure, clip.blob_name, session?.access_token]);
 
   useEffect(() => {
     async function getGameImage(){
@@ -422,6 +448,42 @@ export function VideoPreview({clip, onClose}){
       console.warn("Game image is missing:", gamesSrc);
     }
   }, [gamesSrc]);
+
+  if (isAzure) {
+    return (
+      <>
+        <div className="library-video-preview-overlay" />
+        <div className="library-video-preview">
+          <button type="button" onClick={onClose} className="close-preview-btn">
+            <CloseIcon fontSize={"large"} />
+          </button>
+          <div className="video-player-container">
+            {streamUrl ? (
+              <video
+                className="library-iframe"
+                style={{borderRadius: "8px"}}
+                controls
+                autoPlay
+                src={streamUrl}
+              />
+            ) : (
+              <div className="video-player-loading">Loading video...</div>
+            )}
+          </div>
+          <div className="video-metadata">
+            <h2 className="video-title">{clip?.title || "No Video Selected"}</h2>
+            {gamesSrc && (<div className="video-game-row">
+              <img className="video-game-image" src={gamesSrc.image} alt="game"/>
+              <div className="video-game-label">{gamesSrc.label || "Unknown Game"}</div>
+            </div>)}
+            <div className="video-date">{clip?.created_at ? new Date(clip.created_at).toLocaleString() : "No Date Available"}</div>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  const src = `https://www.youtube.com/embed/${clip.youtube_video_id}?rel=0&modestbranding=1&autoplay=1&vq=hd1080`;
 
   return (
     <>

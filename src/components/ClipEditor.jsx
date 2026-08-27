@@ -546,6 +546,7 @@ useEffect(() => {
     .insert({
       owner_id: userId,
       youtube_video_id: clipData.youtubeID || "",
+      blob_name: clipData.blobName || "",
       title: clipData.title,
       description: "",
       visibility: clipData.visibility,
@@ -587,6 +588,7 @@ useEffect(() => {
           clip: clip,
           title: title,
           youtubeID: response.videoId,
+          blobName: response.blobName,
           visibility: visibility,
           userId,
         });

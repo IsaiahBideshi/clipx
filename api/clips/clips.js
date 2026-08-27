@@ -1,4 +1,5 @@
-import { supabase } from '../auth.js'
+import { supabase, getAuthenticatedUser } from '../auth.js'
+import { containerClient, generateSasUrl } from './azure.js'
 
 export default async function handler(req, res) {
   const allowedOrigin = process.env.CORS_ORIGIN || '*'
@@ -55,7 +56,25 @@ export default async function handler(req, res) {
       
       return res.status(400).json({ data: null, error: 'Invalid visibility parameter' })
 
-    case 'POST':
+    case 'POST': {
+      const { user, error: authError } = await getAuthenticatedUser(req)
+      if (authError) {
+        return res.status(401).json({ data: null, error: authError })
+      }
+
+      const { name, contentType } = req.body || {}
+      if (!name || !contentType) {
+        return res.status(400).json({ data: null, error: 'Missing "name" or "contentType" in request body' })
+      }
+
+      try {
+        const url = generateSasUrl(name, 'w')
+        return res.status(200).json({ data: { url, name }, error: null })
+      } catch (err) {
+        console.error('Error generating upload URL:', err)
+        return res.status(500).json({ data: null, error: 'Failed to generate upload URL' })
+      }
+    }
 
     case 'DELETE':
 
