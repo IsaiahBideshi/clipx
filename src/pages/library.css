@@ -102,15 +102,6 @@
   border-radius: 12px;
 }
 
-.clip-thumb-placeholder{
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
-  color: rgba(255, 255, 255, 0.35);
-  font-size: 0.85rem;
-}
-
 .video-metadata{
   margin-top: 12px;
   color: #fff;
@@ -151,7 +142,7 @@
 }
 
 .search-bar {
-  width: min(640px, 100%);
+  width: min(900px, 100%);
   margin: 0;
   display: flex;
   align-items: center;

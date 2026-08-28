@@ -14,12 +14,18 @@ ffmpeg.setFfmpegPath(resolveFfmpegPath(ffmpegPath));
 
 const CLIPS_DATA_FILE = "clipsData.json";
 const API_BASE = (process.env.VITE_DATABASE_URL || "https://clipx.bideshi.tech").replace(/\/+$/, "");
+const AZURE_CLIPS_CONTAINER = "clips";
+const AZURE_THUMBS_CONTAINER = "clip-thumbnails";
 
 function buildClipOutputName(baseName) {
   const safeName = String(baseName || "Untitled Clip")
     .replace(/[<>:"/\\|?*\x00-\x1F]/g, "")
     .trim();
   return `${safeName || "Untitled Clip"}.mp4`;
+}
+
+function buildThumbnailOutputName(baseName) {
+  return buildClipOutputName(baseName).replace(/\.mp4$/, ".jpg");
 }
 
 async function renderClipSegment(videoPath, startTime, endTime, outputPath) {
@@ -32,6 +38,23 @@ async function renderClipSegment(videoPath, startTime, endTime, outputPath) {
       .on("end", resolve)
       .on("error", reject)
       .run();
+  });
+}
+
+async function renderClipThumbnail(videoPath, startTime, endTime, outputPath) {
+  const clipDuration = endTime - startTime;
+  const thumbTimestamp = clipDuration >= 1 ? startTime + 1 : startTime;
+
+  await new Promise((resolve, reject) => {
+    ffmpeg(videoPath)
+      .screenshots({
+        timestamps: [String(thumbTimestamp)],
+        filename: path.basename(outputPath),
+        folder: path.dirname(outputPath),
+        size: "320x180",
+      })
+      .on("end", resolve)
+      .on("error", reject);
   });
 }
 
@@ -188,39 +211,46 @@ export async function uploadClip(app, options) {
 
   const tempDir = path.join(app.getPath("temp"), "clipx", "uploads");
   await fs.promises.mkdir(tempDir, { recursive: true });
-  const tempPath = path.join(tempDir, `${Date.now()}-${buildClipOutputName(clipTitle)}`);
+  const tempStamp = Date.now();
+  const tempPath = path.join(tempDir, `${tempStamp}-${buildClipOutputName(clipTitle)}`);
+  const tempThumbPath = path.join(tempDir, `${tempStamp}-${buildThumbnailOutputName(clipTitle)}`);
 
   try {
     await renderClipSegment(videoPath, startTime, endTime, tempPath);
+
+    let thumbnailPath = null;
+    try {
+      await renderClipThumbnail(videoPath, startTime, endTime, tempThumbPath);
+      thumbnailPath = tempThumbPath;
+    } catch (thumbnailError) {
+      console.error("ClipX: Failed to render thumbnail:", thumbnailError);
+    }
+
     const result = await uploadClipToAzureBlobStorage({
       videoPath: tempPath,
+      thumbnailPath,
       title: clipTitle,
     });
     return { status: 200, ...result };
 
   } finally {
-    try {
-      await fs.promises.unlink(tempPath);
-    } catch (_error) {
+    for (const filePath of [tempPath, tempThumbPath]) {
+      try {
+        await fs.promises.unlink(filePath);
+      } catch (_error) {
+      }
     }
   }
 }
 
-async function uploadClipToAzureBlobStorage({ videoPath, title }) {
-  const token = await getSupabaseAccessToken();
-  if (!token) {
-    throw new Error("Not authenticated. Please log in first.");
-  }
-
-  const blobName = `${Date.now()}-${buildClipOutputName(title)}`;
-
+async function uploadBlobToAzure({ token, name, contentType, filePath, container = AZURE_CLIPS_CONTAINER }) {
   const sasRes = await fetch(`${API_BASE}/api/clips`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ name: blobName, contentType: "video/mp4" }),
+    body: JSON.stringify({ name, contentType, container }),
   });
 
   if (!sasRes.ok) {
@@ -229,19 +259,52 @@ async function uploadClipToAzureBlobStorage({ videoPath, title }) {
   }
 
   const { data } = await sasRes.json();
-  const fileBuffer = await fs.promises.readFile(videoPath);
+  const fileBuffer = await fs.promises.readFile(filePath);
 
   const uploadRes = await fetch(data.url, {
     method: "PUT",
-    headers: { "x-ms-blob-type": "BlockBlob", "Content-Type": "video/mp4" },
+    headers: { "x-ms-blob-type": "BlockBlob", "Content-Type": contentType },
     body: fileBuffer,
   });
 
   if (!uploadRes.ok) {
     throw new Error(`Azure upload failed (${uploadRes.status})`);
   }
+}
 
-  return { blobName };
+async function uploadClipToAzureBlobStorage({ videoPath, thumbnailPath, title }) {
+  const token = await getSupabaseAccessToken();
+  if (!token) {
+    throw new Error("Not authenticated. Please log in first.");
+  }
+
+  const videoBlobName = `${Date.now()}-${buildClipOutputName(title)}`;
+
+  await uploadBlobToAzure({
+    token,
+    name: videoBlobName,
+    contentType: "video/mp4",
+    filePath: videoPath,
+  });
+
+  let thumbnailBlobName = null;
+  if (thumbnailPath) {
+    thumbnailBlobName = `${Date.now()}-${buildThumbnailOutputName(title)}`;
+    try {
+      await uploadBlobToAzure({
+        token,
+        name: thumbnailBlobName,
+        contentType: "image/jpeg",
+        filePath: thumbnailPath,
+        container: AZURE_THUMBS_CONTAINER,
+      });
+    } catch (thumbnailError) {
+      console.error("ClipX: Failed to upload thumbnail:", thumbnailError);
+      thumbnailBlobName = null;
+    }
+  }
+
+  return { blobName: videoBlobName, thumbnailBlobName };
 }
 
 export async function getClipData(clipPath) {

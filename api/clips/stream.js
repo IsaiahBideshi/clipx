@@ -1,4 +1,4 @@
-import { generateSasUrl } from './azure.js'
+import { generateSasUrl, SUPPORTED_CONTAINERS } from './azure.js'
 
 export default async function handler(req, res) {
   const allowedOrigin = process.env.CORS_ORIGIN || '*'
@@ -19,8 +19,13 @@ export default async function handler(req, res) {
     return res.status(400).json({ data: null, error: 'Missing "name" query parameter' })
   }
 
+  const container = req.query.container
+  if (container && !SUPPORTED_CONTAINERS.includes(container)) {
+    return res.status(400).json({ data: null, error: `Unsupported container "${container}"` })
+  }
+
   try {
-    const url = generateSasUrl(blobName, 'r')
+    const url = generateSasUrl(blobName, 'r', container)
     return res.status(200).json({ data: { url }, error: null })
   } catch (err) {
     console.error('Error generating stream URL:', err)

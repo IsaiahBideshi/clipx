@@ -547,6 +547,7 @@ useEffect(() => {
       owner_id: userId,
       youtube_video_id: clipData.youtubeID || "",
       blob_name: clipData.blobName || "",
+      thumbnail_blob_name: clipData.thumbnailBlobName || "",
       title: clipData.title,
       description: "",
       visibility: clipData.visibility,
@@ -589,6 +590,7 @@ useEffect(() => {
           title: title,
           youtubeID: response.videoId,
           blobName: response.blobName,
+          thumbnailBlobName: response.thumbnailBlobName,
           visibility: visibility,
           userId,
         });

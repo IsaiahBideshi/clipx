@@ -1,5 +1,5 @@
 import { supabase, getAuthenticatedUser } from '../auth.js'
-import { containerClient, generateSasUrl } from './azure.js'
+import { generateSasUrl, SUPPORTED_CONTAINERS, CONTAINER_NAME } from './azure.js'
 
 export default async function handler(req, res) {
   const allowedOrigin = process.env.CORS_ORIGIN || '*'
@@ -62,13 +62,16 @@ export default async function handler(req, res) {
         return res.status(401).json({ data: null, error: authError })
       }
 
-      const { name, contentType } = req.body || {}
+      const { name, contentType, container = CONTAINER_NAME } = req.body || {}
       if (!name || !contentType) {
         return res.status(400).json({ data: null, error: 'Missing "name" or "contentType" in request body' })
       }
+      if (!SUPPORTED_CONTAINERS.includes(container)) {
+        return res.status(400).json({ data: null, error: `Unsupported container "${container}"` })
+      }
 
       try {
-        const url = generateSasUrl(name, 'w')
+        const url = generateSasUrl(name, 'w', container)
         return res.status(200).json({ data: { url, name }, error: null })
       } catch (err) {
         console.error('Error generating upload URL:', err)

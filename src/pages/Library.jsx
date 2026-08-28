@@ -1,5 +1,5 @@
 import {useEffect, useMemo, useRef, useState} from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Fuse from "fuse.js";
 import STOREDGAMES from "../data/games.json";
 import { supabase } from '../lib/supabase.js';
@@ -12,9 +12,11 @@ import TextField from '@mui/material/TextField';
 import AutoComplete from '@mui/material/Autocomplete';
 import { CircularProgress } from "@mui/material";
 import { OverlayScrollbarsComponent } from "overlayscrollbars-react";
+import RefreshIcon from "@mui/icons-material/Refresh";
 import "overlayscrollbars/overlayscrollbars.css";
 
 import "./library.css";
+import fallBackThumb from "../assets/thumbnail.png";
 
 const GRID_GAP = 20;
 const MIN_CARD_WIDTH = 270;
@@ -147,6 +149,7 @@ export default function Library() {
   const allClipTags = clipTagsQuery.data || [];
   const loadingClips = clipsQuery.isLoading;
 
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     function moveSelectedClip(direction) {
@@ -299,6 +302,13 @@ export default function Library() {
             value={titleQuery}
             onChange={(e) => setTitleQuery(e.target.value)}
           />
+          <div>
+            <RefreshIcon
+              fontSize="large"
+              sx={{ cursor: "pointer" }}
+              onClick={() => clipsQuery.refetch()}
+            />
+          </div>
         </div>
         <div className="search-bar filter-search-bar">
           <AutoComplete
@@ -384,6 +394,38 @@ export function ClipCardSkeleton() {
   );
 }
 
+function AzureClipThumb({clip}) {
+  const { session } = useAuthSession();
+  const userId = session?.user?.id;
+  const canFetch = Boolean(clip.thumbnail_blob_name && userId && session?.access_token);
+  const thumbUrlQuery = useQuery({
+    queryKey: ["library", "clipThumb", userId, clip.thumbnail_blob_name],
+    queryFn: async () => {
+      const apiBase = (import.meta.env.VITE_DATABASE_URL || "https://clipx.bideshi.tech").replace(/\/+$/, "");
+      const res = await fetch(`${apiBase}/api/clips/stream?name=${encodeURIComponent(clip.thumbnail_blob_name)}&container=clip-thumbnails`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      const json = await res.json().catch(() => null);
+      const url = json?.data?.url;
+      if (!res.ok || !url) {
+        throw new Error(`Failed to load thumbnail (${res.status})`);
+      }
+      return url;
+    },
+    enabled: canFetch,
+    staleTime: 30 * 60 * 1000,
+    gcTime: 60 * 60 * 1000,
+  });
+
+  if (thumbUrlQuery.data) {
+    return <img src={thumbUrlQuery.data} alt="thumb" className="clip-thumb" />;
+  }
+  if (canFetch && thumbUrlQuery.isPending) {
+    return <div className="clip-thumb skeleton-thumb" />;
+  }
+  return <img src={fallBackThumb} alt="thumb" className="clip-thumb" />;
+}
+
 
 export function ClipCard({clip, onSelect}) {
   const clipDate = new Date(clip.created_at).toLocaleString( undefined, { dateStyle: 'long', timeStyle: 'short' });
@@ -392,7 +434,7 @@ export function ClipCard({clip, onSelect}) {
   return (
     <div className="clip-card" onClick={() => onSelect(clip)}>
       {isAzure ? (
-        <div className="clip-thumb clip-thumb-placeholder">Azure Clip</div>
+        <AzureClipThumb clip={clip} />
       ) : (
         <img src={`https://img.youtube.com/vi/${clip.youtube_video_id}/mqdefault.jpg`} alt="thumb" className="clip-thumb" />
       )}
