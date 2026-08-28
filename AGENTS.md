@@ -19,8 +19,8 @@ PowerShell here has execution-policy disabled, so **`npm` fails; always use `npm
 
 ## Env & secrets
 
-- Secrets live in gitignored `.env` and `.env.local` (both contain real Supabase service-role and Google client keys). Never commit them or echo their values.
-- `electron/main.js` loads `.env` via `dotenv/config`. `electron/services/googleAuthService.js` loads `.env.local` **first with `override: true`** — so `.env.local` values win for Google OAuth.
+- Secrets live in the gitignored `.env` (Supabase service-role key, Google/Twitch IGDB keys, etc.). Never commit them or echo their values. `.env.local` is not used by the app — if `vercel env pull` creates one locally, it's only for the Vercel CLI (`vercel dev`).
+- `electron/main.js` loads `.env` via `dotenv/config`; the renderer gets `VITE_*` from the same `.env` at build time. No service loads `.env.local`, so nothing can clobber `process.env`.
 - Renderer-side API base: `import.meta.env.VITE_DATABASE_URL`, defaulting to `https://clipx.bideshi.tech` (see `src/lib/accountApi.js`).
 - Google OAuth client ID/secret are fetched at runtime by the main process from `{API_BASE}/api/keys`, not read from env directly.
 - Auth in the renderer uses Supabase with a custom storage adapter that persists sessions via IPC (`window.clipx.authStorage*`), falling back to `localStorage` outside Electron.

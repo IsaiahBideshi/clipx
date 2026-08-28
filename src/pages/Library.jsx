@@ -16,7 +16,7 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 import "overlayscrollbars/overlayscrollbars.css";
 
 import "./library.css";
-import fallBackThumb from "../assets/thumbnail.png";
+import fallBackThumb from "../assets/thumbnail.svg";
 
 const GRID_GAP = 20;
 const MIN_CARD_WIDTH = 270;
@@ -420,10 +420,10 @@ function AzureClipThumb({clip}) {
   if (thumbUrlQuery.data) {
     return <img src={thumbUrlQuery.data} alt="thumb" className="clip-thumb" />;
   }
-  if (canFetch && thumbUrlQuery.isPending) {
-    return <div className="clip-thumb skeleton-thumb" />;
+  if (thumbUrlQuery.isError || !clip.thumbnail_blob_name) {
+    return <img src={fallBackThumb} alt="thumb" className="clip-thumb" />;
   }
-  return <img src={fallBackThumb} alt="thumb" className="clip-thumb" />;
+  return <div className="clip-thumb skeleton-thumb" />;
 }
 
 

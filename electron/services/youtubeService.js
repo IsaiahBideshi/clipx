@@ -1,15 +1,10 @@
 import fs from "fs";
 import http from "http";
 import keytar from "keytar";
-import dotenv from "dotenv";
 import { google } from "googleapis";
-import path from "path";
 import url from "url";
 import { generatePKCE } from "../utils/PKCE.js";
 import { getSupabaseAccessToken } from "../ipc/authStorage.js";
-
-dotenv.config({ path: path.resolve(process.cwd(), ".env.local"), override: true });
-dotenv.config();
 
 const SERVICE = "ClipX";
 const ACCOUNT = "youtube_refresh_token";
@@ -42,7 +37,7 @@ async function fetchKeys() {
 
 (await fetchKeys().then(() => {
   if (!clientId) {
-    throw new Error("Missing GOOGLE_CLIENT_ID in .env.local");
+    throw new Error("Missing GOOGLE_CLIENT_ID in Vercel env");
   }
 }).catch((err) => {
   console.error("Failed to fetch API keys on startup:", err);

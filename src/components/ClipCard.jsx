@@ -1,4 +1,4 @@
-import fallBackThumb from "../assets/thumbnail.png";
+import fallBackThumb from "../assets/thumbnail.svg";
 import { useState, useEffect } from "react";
 
 import MoreVertIcon from '@mui/icons-material/MoreVert';

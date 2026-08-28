@@ -1,14 +1,9 @@
 import http from "http";
-import dotenv from "dotenv";
-import path from "path";
 import url from "url";
 
 import { google } from "googleapis";
 import { createClient } from "@supabase/supabase-js";
 import { generatePKCE } from "../utils/PKCE.js";
-
-dotenv.config({ path: path.resolve(process.cwd(), ".env.local"), override: true });
-dotenv.config();
 
 const supabase = createClient(
   "https://vymaqpjhajwpbzmnoadk.supabase.co",
