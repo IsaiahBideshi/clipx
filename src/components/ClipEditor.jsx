@@ -13,6 +13,20 @@ import { isTextEntryActive } from "../lib/hotkeys.js";
 import { InputLabel, MenuItem, Select, FormControl, Typography } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 
+const VOLUME_STORAGE_KEY = "clipx:volume";
+const MUTED_STORAGE_KEY = "clipx:muted";
+
+function readSavedVolume() {
+  const stored = globalThis.localStorage?.getItem(VOLUME_STORAGE_KEY);
+  const value = Number(stored);
+  return Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : 1;
+}
+
+function readSavedMuted() {
+  const stored = globalThis.localStorage?.getItem(MUTED_STORAGE_KEY);
+  return stored === "true";
+}
+
 
 function getEditableClipName(fileName) {
   const name = String(fileName || "");
@@ -65,8 +79,16 @@ export default function ClipEditor({
 
   const [isPlaying, setIsPlaying] = useState(false);
 
-  const [volume, setVolume] = useState(1);
-  const [isMuted, setIsMuted] = useState(false);
+  const [volume, setVolume] = useState(() => readSavedVolume());
+  const [isMuted, setIsMuted] = useState(() => readSavedMuted());
+
+  useEffect(() => {
+    globalThis.localStorage?.setItem(VOLUME_STORAGE_KEY, String(volume));
+  }, [volume]);
+
+  useEffect(() => {
+    globalThis.localStorage?.setItem(MUTED_STORAGE_KEY, String(isMuted));
+  }, [isMuted]);
 
   const [clipData, setClipData] = useState(null);
 
@@ -306,6 +328,8 @@ export default function ClipEditor({
 
 
     setIsPlaying(!el.paused && !el.ended);
+    el.volume = volume;
+    el.muted = isMuted;
     onVolumeChange();
 
     return () => {

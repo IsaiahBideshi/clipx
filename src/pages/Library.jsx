@@ -448,7 +448,24 @@ export function VideoPreview({clip, onClose}){
   const isAzure = Boolean(clip.blob_name);
   const [streamUrl, setStreamUrl] = useState(null);
   const [gamesSrc, setGamesSrc] = useState(null);
+  const videoRef = useRef(null);
   const { session } = useAuthSession();
+
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!el) return;
+
+    const stored = Number(globalThis.localStorage?.getItem("clipx:volume"));
+    const savedVolume = Number.isFinite(stored) ? Math.max(0, Math.min(1, stored)) : 1;
+    el.volume = savedVolume;
+
+    const onVolumeChange = () => {
+      globalThis.localStorage?.setItem("clipx:volume", String(el.volume));
+    };
+
+    el.addEventListener("volumechange", onVolumeChange);
+    return () => el.removeEventListener("volumechange", onVolumeChange);
+  }, [streamUrl]);
 
   useEffect(() => {
     if (!isAzure || !clip.blob_name || !session?.access_token) return;
@@ -502,6 +519,7 @@ export function VideoPreview({clip, onClose}){
           <div className="video-player-container">
             {streamUrl ? (
               <video
+                ref={videoRef}
                 className="library-iframe"
                 style={{borderRadius: "8px"}}
                 controls
