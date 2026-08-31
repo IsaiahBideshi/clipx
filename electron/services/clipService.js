@@ -166,6 +166,14 @@ export async function saveClip(options) {
   await fs.promises.mkdir(outputDir, { recursive: true });
   const outputPath = path.join(outputDir, buildClipOutputName(clipTitle));
 
+  const fileExists = await fs.promises.access(outputPath, fs.constants.F_OK)
+    .then(() => true)
+    .catch(() => false);
+
+  if (fileExists) {
+    throw new Error(`A clip named "${clipTitle}" already exists`);
+  }
+
   await renderClipSegment(videoPath, startTime, endTime, outputPath);
 
   const stat = await fs.promises.stat(outputPath);
