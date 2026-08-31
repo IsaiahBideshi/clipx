@@ -65,7 +65,11 @@ export default function ClipEditor({
   isSavedClipsView = false, 
   onClose, 
   baseFolder,
-  triggerClipIndexRefresh
+  triggerClipIndexRefresh,
+  uploading,
+  setUploading,
+  saving,
+  setSaving
 }) {
   const videoRef = useRef(null);
   const shellRef = useRef(null);
@@ -424,6 +428,10 @@ export default function ClipEditor({
             onUploadQueueEvent={onUploadQueueEvent}
             onDelete={onDelete}
             onRefreshIndex={triggerClipIndexRefresh}
+            uploading={uploading}
+            setUploading={setUploading}
+            saving={saving}
+            setSaving={setSaving}
           />
         </div>
       )}
@@ -465,7 +473,7 @@ async function searchGames(gameName) {
 }
 
 
-function UploadMenu({clip, start, end, onRefreshIndex, onSaveQueueEvent, onUploadQueueEvent, onDelete}) {
+function UploadMenu({clip, start, end, onRefreshIndex, onSaveQueueEvent, onUploadQueueEvent, onDelete, uploading, setUploading, saving, setSaving}) {
   const [tags, setTags] = useState([]);
   const [friendsInClip, setFriendsInClip] = useState([]);
   const [peopleInput, setPeopleInput] = useState('');
@@ -475,7 +483,6 @@ function UploadMenu({clip, start, end, onRefreshIndex, onSaveQueueEvent, onUploa
   const [gameInput, setGameInput] = useState("");
   const [gameOptions, setGameOptions] = useState([{ id: "testgame", label: "Test Game"},]);
   const [storedGamesLabels, setStoredGamesLabels] = useState([]);
-  const [uploading, setUploading] = useState(false);
   const [visibility, setVisibility] = useState("private");
   const [friendsOptions, setFriendsOptions] = useState([]);
   const userId = session?.user?.id;
@@ -539,6 +546,7 @@ useEffect(() => {
       return;
     }
 
+    setSaving(true);
     const saveId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
     const displayName = title?.trim() || clip?.name || "Untitled Clip";
     onSaveQueueEvent?.({ type: "started", id: saveId, name: displayName });
@@ -548,15 +556,20 @@ useEffect(() => {
       if (response === 200){
         onSaveQueueEvent?.({ type: "success", id: saveId });
         const renameResponse = await window.clipx.renameClip(clip?.path, "[UNCUT] " + displayName);
-        if (renameResponse !== 200) {
+        if (!renameResponse?.path) {
           console.error("Failed to rename clip after saving:", renameResponse);
         }
         return;
       }
-      onSaveQueueEvent?.({ type: "failed", id: saveId });
+      onSaveQueueEvent?.({ type: "failed", id: saveId, error: response?.error || "Something went wrong saving this clip. Please try again." });
     } catch (err) {
       console.error("Failed to save clip:", err);
-      onSaveQueueEvent?.({ type: "failed", id: saveId });
+      const message = String(err?.message || "")
+        .replace(/^Error invoking remote method '[^']+':\s*(?:Error:\s*)?/, "")
+        .trim();
+      onSaveQueueEvent?.({ type: "failed", id: saveId, error: message || "Something went wrong saving this clip. Please try again." });
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -727,12 +740,12 @@ useEffect(() => {
             <Button
               variant={"contained"}
               onClick={() => {uploadClip(clip, start, end, clipTitle, game, tags)}}
-              disabled={uploading}
+              disabled={uploading || saving}
             >
             Upload
           </Button>)}
-        <Button variant={session ? "outlined" : "contained"} onClick={() => {saveClip(clip, start, end, clipTitle, game, tags)}} >Save</Button>
-        <Button variant={"contained"} color={"error"} onClick={() => {onDelete(clip)}} >Delete</Button>
+        <Button variant={session ? "outlined" : "contained"} onClick={() => {saveClip(clip, start, end, clipTitle, game, tags)}} disabled={uploading || saving} >Save</Button>
+        <Button variant={"contained"} color={"error"} onClick={() => {onDelete(clip)}} disabled={uploading || saving} >Delete</Button>
       </div>
     </div>
   );
