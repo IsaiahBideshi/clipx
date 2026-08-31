@@ -3,7 +3,7 @@ import FolderIcon from '@mui/icons-material/Folder';
 import FileOpenIcon from '@mui/icons-material/FileOpen';
 import EditIcon from '@mui/icons-material/Edit';
 
-export default function ClipContextMenu({ clip, position, ref, onOpen, onDelete, onRename, onOpenInExplorer }) {
+export default function ClipContextMenu({ clip, position, ref, onOpen, onDelete, onRename, onOpenInExplorer, disabled = false }) {
   return (
     <div className="clip-context-menu"
       style={{
@@ -18,7 +18,7 @@ export default function ClipContextMenu({ clip, position, ref, onOpen, onDelete,
         <FileOpenIcon />
         <span style={{ }}>Open</span>
       </div>
-      <div className="clip-context-menu-item" onClick={onRename}>
+      <div className={`clip-context-menu-item${disabled ? " disabled" : ""}`} onClick={disabled ? undefined : onRename}>
         <EditIcon />
         Rename
       </div>
@@ -26,7 +26,7 @@ export default function ClipContextMenu({ clip, position, ref, onOpen, onDelete,
         <FolderIcon />
         Open in Explorer
       </div>
-      <div className="clip-context-menu-item" style={{ color: "red",  }}  onClick={onDelete}>
+      <div className={`clip-context-menu-item${disabled ? " disabled" : ""}`} style={{ color: "red",  }} onClick={disabled ? undefined : onDelete}>
         <DeleteIcon />
         Delete
       </div>

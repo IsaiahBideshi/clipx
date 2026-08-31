@@ -111,6 +111,10 @@
   color: rgba(144, 202, 249, 0.72);
   cursor: pointer;
 }
+.clip-context-menu-item.disabled{
+  opacity: 0.45;
+  pointer-events: none;
+}
 
 .cancel-button{
   background: rgba(255, 255, 255, 0.06);
