@@ -1,4 +1,4 @@
-import { supabase } from "../auth.js"
+import { supabase } from "./auth.js"
 
 export default async function handler(req, res) {
   const allowedOrigin = process.env.CORS_ORIGIN || '*'

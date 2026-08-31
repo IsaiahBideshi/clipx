@@ -1,10 +1,3 @@
-import { ok } from "assert";
-import dotenv from "dotenv";
-import path from "path";
-
-
-
-
 export default async function handler(req, res) {
   const allowedOrigin = process.env.CORS_ORIGIN || '*'
   res.setHeader('Access-Control-Allow-Origin', allowedOrigin)
