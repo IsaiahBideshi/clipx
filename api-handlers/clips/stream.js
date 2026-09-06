@@ -1,5 +1,6 @@
 import { generateSasUrl, getPublicBlobUrl, BlobNotFoundError, SUPPORTED_CONTAINERS, CONTAINER_NAME, THUMBS_CONTAINER_NAME } from './azure.js'
 import { getAuthenticatedUser, supabase } from '../auth.js'
+import { areFriends } from '../friendships.js'
 
 export default async function handler(req, res) {
   const allowedOrigin = process.env.CORS_ORIGIN || '*'
@@ -101,17 +102,7 @@ async function canViewClip(clip, user) {
   }
 
   if (clip.visibility === 'friends') {
-    const { data, error } = await supabase
-      .from('friendships')
-      .select('id')
-      .eq('status', 'accepted')
-      .or(`and(user_id.eq.${user.id},friend_id.eq.${clip.owner_id}),and(user_id.eq.${clip.owner_id},friend_id.eq.${user.id})`)
-      .limit(1)
-
-    if (error) {
-      throw new Error(`Failed to check friendship: ${error.message}`)
-    }
-    return Boolean(data?.length)
+    return areFriends(user.id, clip.owner_id)
   }
 
   return false

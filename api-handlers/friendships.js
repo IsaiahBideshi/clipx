@@ -1,5 +1,19 @@
 import { supabase } from "./auth.js"
 
+export async function areFriends(userId1, userId2) {
+  const { data, error } = await supabase
+    .from('friendships')
+    .select('id')
+    .eq('status', 'accepted')
+    .or(`and(user_id.eq.${userId1},friend_id.eq.${userId2}),and(user_id.eq.${userId2},friend_id.eq.${userId1})`)
+    .limit(1)
+
+  if (error) {
+    throw new Error(`Failed to check friendship: ${error.message}`)
+  }
+  return Boolean(data?.length)
+}
+
 export default async function handler(req, res) {
   const allowedOrigin = process.env.CORS_ORIGIN || '*'
   res.setHeader('Access-Control-Allow-Origin', allowedOrigin)
