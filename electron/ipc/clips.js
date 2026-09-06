@@ -1,6 +1,6 @@
 import { app, ipcMain } from "electron";
 
-import { getClipData, renameClip, saveClip, uploadClip, deleteClip } from "../services/clipService.js";
+import { getClipData, renameClip, saveClip, uploadClip, deleteClip, deleteClipBlob } from "../services/clipService.js";
 
 export function registerClipIpcHandlers() {
   ipcMain.handle("save-clip", async (_event, options) => {
@@ -21,5 +21,9 @@ export function registerClipIpcHandlers() {
 
   ipcMain.handle("delete-clip", async (_event, clipPath) => {
     return await deleteClip(clipPath);
+  });
+
+  ipcMain.handle("delete-clip-blob", async (_event, options) => {
+    return await deleteClipBlob(options);
   });
 }

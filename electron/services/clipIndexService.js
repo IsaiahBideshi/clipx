@@ -103,6 +103,14 @@ function rowToClip(row) {
     return null;
   }
 
+  let thumbnailPath = row.thumbnail_path || null;
+  if (thumbnailPath && !fs.existsSync(thumbnailPath)) {
+    getDb()
+      .prepare("UPDATE clips SET thumbnail_path = NULL WHERE path = ?")
+      .run(normalizeStoredPath(row.path));
+    thumbnailPath = null;
+  }
+
   return {
     id: row.id,
     name: row.name,
@@ -113,7 +121,7 @@ function rowToClip(row) {
     createdAtMs: row.created_at_ms,
     modifiedAtMs: row.modified_at_ms,
     collection: row.collection,
-    thumbnailPath: row.thumbnail_path || null,
+    thumbnailPath,
     savedMetadata: parseJson(row.saved_metadata_json),
   };
 }

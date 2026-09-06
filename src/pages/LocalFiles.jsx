@@ -98,7 +98,8 @@ export default function LocalFiles() {
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const [renameModalOpen, setRenameModalOpen] = useState(false);
   const [renameValue, setRenameValue] = useState("");
-
+  const [uploading, setUploading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const renameModalRef = useRef(null);
   const contextMenuRef = useRef(null);
   const deleteModalRef = useRef(null);
@@ -607,8 +608,7 @@ export default function LocalFiles() {
     }
 
     if (event.type === "failed") {
-      upsertSavingClip(event.id, { status: "failed" });
-      setTimeout(() => removeSavingClip(event.id), 5000);
+      upsertSavingClip(event.id, { status: "failed", error: event.error });
     }
   }
 
@@ -699,6 +699,10 @@ export default function LocalFiles() {
           onNextClip={() => moveSelectedClip(1)}
           onPrevClip={() => moveSelectedClip(-1)}
           triggerClipIndexRefresh={() => refreshFiles()}
+          uploading={uploading}
+          setUploading={setUploading}
+          saving={saving}
+          setSaving={setSaving}
         />
       )}
 
@@ -739,6 +743,7 @@ export default function LocalFiles() {
         clips={savingClips}
         expanded={showSavingList}
         onToggleExpanded={() => setShowSavingList((prev) => !prev)}
+        onDismiss={() => setSavingClips([])}
       />
       <UploadingClipsWidget
         clips={uploadingClips}
@@ -817,6 +822,7 @@ export default function LocalFiles() {
           ref={contextMenuRef}
           clip={contextMenu}
           position={mousePosition}
+          disabled={uploading || saving}
           onOpen={() => {
             setClip(contextMenu);
             setContextMenu(null);

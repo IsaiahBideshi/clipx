@@ -90,6 +90,18 @@
   height: 100%;
 }
 
+.video-player-loading{
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.95rem;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 12px;
+}
+
 .video-metadata{
   margin-top: 12px;
   color: #fff;
@@ -130,7 +142,7 @@
 }
 
 .search-bar {
-  width: min(640px, 100%);
+  width: min(900px, 100%);
   margin: 0;
   display: flex;
   align-items: center;

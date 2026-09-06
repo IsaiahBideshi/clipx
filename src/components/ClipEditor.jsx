@@ -13,6 +13,20 @@ import { isTextEntryActive } from "../lib/hotkeys.js";
 import { InputLabel, MenuItem, Select, FormControl, Typography } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 
+const VOLUME_STORAGE_KEY = "clipx:volume";
+const MUTED_STORAGE_KEY = "clipx:muted";
+
+function readSavedVolume() {
+  const stored = globalThis.localStorage?.getItem(VOLUME_STORAGE_KEY);
+  const value = Number(stored);
+  return Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : 1;
+}
+
+function readSavedMuted() {
+  const stored = globalThis.localStorage?.getItem(MUTED_STORAGE_KEY);
+  return stored === "true";
+}
+
 
 function getEditableClipName(fileName) {
   const name = String(fileName || "");
@@ -51,7 +65,11 @@ export default function ClipEditor({
   isSavedClipsView = false, 
   onClose, 
   baseFolder,
-  triggerClipIndexRefresh
+  triggerClipIndexRefresh,
+  uploading,
+  setUploading,
+  saving,
+  setSaving
 }) {
   const videoRef = useRef(null);
   const shellRef = useRef(null);
@@ -65,8 +83,16 @@ export default function ClipEditor({
 
   const [isPlaying, setIsPlaying] = useState(false);
 
-  const [volume, setVolume] = useState(1);
-  const [isMuted, setIsMuted] = useState(false);
+  const [volume, setVolume] = useState(() => readSavedVolume());
+  const [isMuted, setIsMuted] = useState(() => readSavedMuted());
+
+  useEffect(() => {
+    globalThis.localStorage?.setItem(VOLUME_STORAGE_KEY, String(volume));
+  }, [volume]);
+
+  useEffect(() => {
+    globalThis.localStorage?.setItem(MUTED_STORAGE_KEY, String(isMuted));
+  }, [isMuted]);
 
   const [clipData, setClipData] = useState(null);
 
@@ -306,6 +332,8 @@ export default function ClipEditor({
 
 
     setIsPlaying(!el.paused && !el.ended);
+    el.volume = volume;
+    el.muted = isMuted;
     onVolumeChange();
 
     return () => {
@@ -400,6 +428,10 @@ export default function ClipEditor({
             onUploadQueueEvent={onUploadQueueEvent}
             onDelete={onDelete}
             onRefreshIndex={triggerClipIndexRefresh}
+            uploading={uploading}
+            setUploading={setUploading}
+            saving={saving}
+            setSaving={setSaving}
           />
         </div>
       )}
@@ -441,7 +473,7 @@ async function searchGames(gameName) {
 }
 
 
-function UploadMenu({clip, start, end, onRefreshIndex, onSaveQueueEvent, onUploadQueueEvent, onDelete}) {
+function UploadMenu({clip, start, end, onRefreshIndex, onSaveQueueEvent, onUploadQueueEvent, onDelete, uploading, setUploading, saving, setSaving}) {
   const [tags, setTags] = useState([]);
   const [friendsInClip, setFriendsInClip] = useState([]);
   const [peopleInput, setPeopleInput] = useState('');
@@ -451,7 +483,6 @@ function UploadMenu({clip, start, end, onRefreshIndex, onSaveQueueEvent, onUploa
   const [gameInput, setGameInput] = useState("");
   const [gameOptions, setGameOptions] = useState([{ id: "testgame", label: "Test Game"},]);
   const [storedGamesLabels, setStoredGamesLabels] = useState([]);
-  const [uploading, setUploading] = useState(false);
   const [visibility, setVisibility] = useState("private");
   const [friendsOptions, setFriendsOptions] = useState([]);
   const userId = session?.user?.id;
@@ -515,8 +546,9 @@ useEffect(() => {
       return;
     }
 
+    setSaving(true);
     const saveId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-    const displayName = title?.trim() || clip?.name || "Untitled Clip";
+    const displayName = title?.trim() || getEditableClipName(clip?.name) || "Untitled Clip";
     onSaveQueueEvent?.({ type: "started", id: saveId, name: displayName });
 
     try {
@@ -524,15 +556,20 @@ useEffect(() => {
       if (response === 200){
         onSaveQueueEvent?.({ type: "success", id: saveId });
         const renameResponse = await window.clipx.renameClip(clip?.path, "[UNCUT] " + displayName);
-        if (renameResponse !== 200) {
+        if (!renameResponse?.path) {
           console.error("Failed to rename clip after saving:", renameResponse);
         }
         return;
       }
-      onSaveQueueEvent?.({ type: "failed", id: saveId });
+      onSaveQueueEvent?.({ type: "failed", id: saveId, error: response?.error || "Something went wrong saving this clip. Please try again." });
     } catch (err) {
       console.error("Failed to save clip:", err);
-      onSaveQueueEvent?.({ type: "failed", id: saveId });
+      const message = String(err?.message || "")
+        .replace(/^Error invoking remote method '[^']+':\s*(?:Error:\s*)?/, "")
+        .trim();
+      onSaveQueueEvent?.({ type: "failed", id: saveId, error: message || "Something went wrong saving this clip. Please try again." });
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -546,6 +583,8 @@ useEffect(() => {
     .insert({
       owner_id: userId,
       youtube_video_id: clipData.youtubeID || "",
+      blob_name: clipData.blobName || "",
+      thumbnail_blob_name: clipData.thumbnailBlobName || "",
       title: clipData.title,
       description: "",
       visibility: clipData.visibility,
@@ -566,31 +605,46 @@ useEffect(() => {
     setUploading(true);
 
     const uploadId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-    const displayName = title?.trim() || clip?.name || "Untitled Clip";
+    const displayName = title?.trim() || getEditableClipName(clip?.name) || "Untitled Clip";
     onUploadQueueEvent?.({ type: "started", id: uploadId, name: displayName });
 
     try {
-      const response = await window.clipx.uploadClip({ clip, start, end, title, game, tags, userId });
+      const response = await window.clipx.uploadClip({ clip, start, end, displayName, game, tags, userId });
       if (response?.status === 200) {
-        onUploadQueueEvent?.({
-          type: "success",
-          id: uploadId,
-          youtubeUrl: response.youtubeUrl,
-          videoId: response.videoId,
-        });
-
         const error  = await saveClipRecord({
           id: uploadId,
           name: displayName,
           game: game,
           tags: tags,
           clip: clip,
-          title: title,
+          title: displayName,
           youtubeID: response.videoId,
+          blobName: response.blobName,
+          thumbnailBlobName: response.thumbnailBlobName,
           visibility: visibility,
           userId,
         });
-        if (error) console.error("Failed to save clip record to database:", error);
+        
+        if (error) {
+          console.error("Failed to save clip record to database:", error);
+          try {
+            await window.clipx.deleteClipBlob({
+              blobName: response.blobName,
+              thumbnailBlobName: response.thumbnailBlobName,
+            });
+          } catch (cleanupError) {
+            console.error("Failed to clean up uploaded blobs after persistence failure:", cleanupError);
+          }
+          onUploadQueueEvent?.({ type: "failed", id: uploadId, error: "Upload succeeded but could not be saved to your library. Please try again." });
+          return;
+        }
+
+        onUploadQueueEvent?.({
+          type: "success",
+          id: uploadId,
+          youtubeUrl: response.youtubeUrl,
+          videoId: response.videoId,
+        });
         return;
       }
 
@@ -699,12 +753,12 @@ useEffect(() => {
             <Button
               variant={"contained"}
               onClick={() => {uploadClip(clip, start, end, clipTitle, game, tags)}}
-              disabled={uploading}
+              disabled={uploading || saving}
             >
             Upload
           </Button>)}
-        <Button variant={session ? "outlined" : "contained"} onClick={() => {saveClip(clip, start, end, clipTitle, game, tags)}} >Save</Button>
-        <Button variant={"contained"} color={"error"} onClick={() => {onDelete(clip)}} >Delete</Button>
+        <Button variant={session ? "outlined" : "contained"} onClick={() => {saveClip(clip, start, end, clipTitle, game, tags)}} disabled={uploading || saving} >Save</Button>
+        <Button variant={"contained"} color={"error"} onClick={() => {onDelete(clip)}} disabled={uploading || saving} >Delete</Button>
       </div>
     </div>
   );

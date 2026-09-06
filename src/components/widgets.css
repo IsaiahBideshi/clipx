@@ -59,13 +59,7 @@
   text-overflow: ellipsis;
 }
 
-.saving-clips-toggle,
-.uploading-clips-toggle {
-  font-size: 11px;
-  color: #b0bec5;
-  flex: 0 0 auto;
-}
-
+.saving-clips-header-toggle,
 .uploading-clips-header-toggle {
   flex: 1 1 auto;
   min-width: 0;
@@ -78,6 +72,7 @@
   cursor: pointer;
 }
 
+.saving-clips-actions,
 .uploading-clips-actions {
   display: flex;
   align-items: center;
@@ -85,6 +80,7 @@
   flex: 0 0 auto;
 }
 
+.saving-clips-action,
 .uploading-clips-action {
   display: inline-flex;
   align-items: center;
@@ -99,11 +95,13 @@
   cursor: pointer;
 }
 
+.saving-clips-action:hover,
 .uploading-clips-action:hover {
   background: rgba(255, 255, 255, 0.08);
   color: #fff;
 }
 
+.saving-clips-action .MuiSvgIcon-root,
 .uploading-clips-action .MuiSvgIcon-root {
   font-size: 16px;
 }
@@ -162,9 +160,6 @@
   font-size: 11px;
   color: #90caf9;
   text-transform: lowercase;
-}
-
-.uploading-clip-status {
   flex: 0 1 auto;
   min-width: 0;
   overflow-wrap: anywhere;

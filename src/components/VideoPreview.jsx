@@ -9,7 +9,7 @@ import VolumeDownIcon from "@mui/icons-material/VolumeDown";
 import FullscreenIcon from "@mui/icons-material/Fullscreen";
 import FullscreenExitIcon from "@mui/icons-material/FullscreenExit";
 import { isTextEntryActive } from "../lib/hotkeys.js";
-import fallBackThumb from "../assets/thumbnail.png";
+import fallBackThumb from "../assets/thumbnail.svg";
 
 
 function formatTime(timeInSeconds) {
