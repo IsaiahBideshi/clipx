@@ -22,6 +22,12 @@ const appTheme = createTheme({
           textTransform: "none",
           fontWeight: 600,
           borderRadius: 999,
+          "&.Mui-disabled": {
+            color: "rgba(255, 255, 255, 0.4)",
+            borderColor: "rgba(255, 255, 255, 0.14)",
+            background: "rgba(255, 255, 255, 0.06)",
+            boxShadow: "none",
+          },
         },
         sizeSmall: { padding: "6px 14px", fontSize: "0.8rem" },
         sizeMedium: { padding: "8px 18px", fontSize: "0.9rem" },
@@ -58,12 +64,6 @@ const appTheme = createTheme({
         text: {
           color: "rgba(255, 255, 255, 0.85)",
           "&:hover": { background: "rgba(255, 255, 255, 0.08)" },
-        },
-        disabled: {
-          color: "rgba(255, 255, 255, 0.4)",
-          borderColor: "rgba(255, 255, 255, 0.14)",
-          background: "rgba(255, 255, 255, 0.06)",
-          boxShadow: "none",
         },
       },
     },
