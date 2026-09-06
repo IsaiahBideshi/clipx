@@ -5,7 +5,6 @@ import {
   StorageSharedKeyCredential,
 } from '@azure/storage-blob'
 
-const CONNECTION_STRING = process.env.AZURE_STORAGE_CONNECTION_STRING
 const CONTAINER_NAME = 'clips'
 const THUMBS_CONTAINER_NAME = 'clip-thumbnails'
 const SUPPORTED_CONTAINERS = [CONTAINER_NAME, THUMBS_CONTAINER_NAME]
@@ -19,11 +18,33 @@ function parseConnectionString(str) {
   return parts
 }
 
-const blobServiceClient = BlobServiceClient.fromConnectionString(CONNECTION_STRING)
-const containerClient = blobServiceClient.getContainerClient(CONTAINER_NAME)
+let _blobServiceClient, _credential
 
-const conn = parseConnectionString(CONNECTION_STRING)
-const credential = new StorageSharedKeyCredential(conn.AccountName, conn.AccountKey)
+function getBlobServiceClient() {
+  if (!_blobServiceClient) {
+    const connectionString = process.env.AZURE_STORAGE_CONNECTION_STRING
+    if (!connectionString) throw new Error('AZURE_STORAGE_CONNECTION_STRING is not set')
+    _blobServiceClient = BlobServiceClient.fromConnectionString(connectionString)
+  }
+  return _blobServiceClient
+}
+
+function getCredential() {
+  if (!_credential) {
+    const connectionString = process.env.AZURE_STORAGE_CONNECTION_STRING
+    if (!connectionString) throw new Error('AZURE_STORAGE_CONNECTION_STRING is not set')
+    const conn = parseConnectionString(connectionString)
+    _credential = new StorageSharedKeyCredential(conn.AccountName, conn.AccountKey)
+  }
+  return _credential
+}
+
+function getContainerClient(containerName = CONTAINER_NAME) {
+  return getBlobServiceClient().getContainerClient(containerName)
+}
+
+const blobServiceClient = new Proxy({}, { get: (_, prop) => getBlobServiceClient()[prop] })
+const containerClient = new Proxy({}, { get: (_, prop) => getContainerClient()[prop] })
 
 export function encodeBlobPath(blobName) {
   return String(blobName)
@@ -33,11 +54,11 @@ export function encodeBlobPath(blobName) {
 }
 
 export function getPublicBlobUrl(blobName, containerName = CONTAINER_NAME) {
-  return `${blobServiceClient.url}${containerName}/${encodeBlobPath(blobName)}`;
+  return `${getBlobServiceClient().url}${containerName}/${encodeBlobPath(blobName)}`;
 }
 
 export async function deleteBlob(blobName, containerName = CONTAINER_NAME) {
-  const container = blobServiceClient.getContainerClient(containerName)
+  const container = getBlobServiceClient().getContainerClient(containerName)
   await container.getBlobClient(blobName).deleteIfExists()
 }
 
@@ -45,7 +66,7 @@ export async function generateSasUrl(blobName, permissions = 'r', containerName 
   const perms = BlobSASPermissions.parse(permissions)
 
   if (perms.read) {
-    const container = blobServiceClient.getContainerClient(containerName)
+    const container = getBlobServiceClient().getContainerClient(containerName)
     const exists = await container.getBlobClient(blobName).exists()
     if (!exists) {
       throw new BlobNotFoundError(blobName, containerName)
@@ -59,10 +80,10 @@ export async function generateSasUrl(blobName, permissions = 'r', containerName 
       permissions: perms,
       expiresOn: new Date(Date.now() + 3600 * 1000),
     },
-    credential
+    getCredential()
   ).toString()
 
-  return `${blobServiceClient.url}${containerName}/${encodeBlobPath(blobName)}?${sasToken}`
+  return `${getBlobServiceClient().url}${containerName}/${encodeBlobPath(blobName)}?${sasToken}`
 }
 
 export class BlobNotFoundError extends Error {
