@@ -13,6 +13,10 @@
     {
       "source": "/terms",
       "destination": "/landing/terms.html"
+    },
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/index"
     }
   ]
 }

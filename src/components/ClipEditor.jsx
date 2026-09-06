@@ -548,7 +548,7 @@ useEffect(() => {
 
     setSaving(true);
     const saveId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-    const displayName = title?.trim() || clip?.name || "Untitled Clip";
+    const displayName = title?.trim() || getEditableClipName(clip?.name) || "Untitled Clip";
     onSaveQueueEvent?.({ type: "started", id: saveId, name: displayName });
 
     try {
@@ -605,11 +605,11 @@ useEffect(() => {
     setUploading(true);
 
     const uploadId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-    const displayName = title?.trim() || clip?.name || "Untitled Clip";
+    const displayName = title?.trim() || getEditableClipName(clip?.name) || "Untitled Clip";
     onUploadQueueEvent?.({ type: "started", id: uploadId, name: displayName });
 
     try {
-      const response = await window.clipx.uploadClip({ clip, start, end, title, game, tags, userId });
+      const response = await window.clipx.uploadClip({ clip, start, end, displayName, game, tags, userId });
       if (response?.status === 200) {
         onUploadQueueEvent?.({
           type: "success",
@@ -624,7 +624,7 @@ useEffect(() => {
           game: game,
           tags: tags,
           clip: clip,
-          title: title,
+          title: displayName,
           youtubeID: response.videoId,
           blobName: response.blobName,
           thumbnailBlobName: response.thumbnailBlobName,

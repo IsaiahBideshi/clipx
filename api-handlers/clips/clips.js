@@ -1,5 +1,5 @@
 import { supabase, getAuthenticatedUser } from '../auth.js'
-import { generateSasUrl, SUPPORTED_CONTAINERS, CONTAINER_NAME } from './azure.js'
+import { generateSasUrl, BlobNotFoundError, SUPPORTED_CONTAINERS, CONTAINER_NAME } from './azure.js'
 
 export default async function handler(req, res) {
   const allowedOrigin = process.env.CORS_ORIGIN || '*'
@@ -71,7 +71,12 @@ export default async function handler(req, res) {
       }
 
       try {
-        const url = generateSasUrl(name, 'w', container)
+        const canWrite = await canWriteBlob(name, user)
+        if (!canWrite) {
+          return res.status(403).json({ data: null, error: 'You do not have permission to write to this blob' })
+        }
+        
+        const url = await generateSasUrl(name, 'w', container)
         return res.status(200).json({ data: { url, name }, error: null })
       } catch (err) {
         console.error('Error generating upload URL:', err)
@@ -86,4 +91,38 @@ export default async function handler(req, res) {
     default:
       return res.status(405).json({ data: null, error: 'Method not allowed' })
   }
+}
+
+async function findClipByBlob(blobName) {
+  const { data, error } = await supabase
+    .from('clips')
+    .select('owner_id')
+    .eq('blob_name', blobName)
+    .limit(1)
+
+  if (error) {
+    throw new Error(`Failed to find clip by blob name: ${error.message}`)
+  }
+  if (data?.length) {
+    return data[0]
+  }
+
+  const { data: thumbData, error: thumbError } = await supabase
+    .from('clips')
+    .select('owner_id')
+    .eq('thumbnail_blob_name', blobName)
+    .limit(1)
+
+  if (thumbError) {
+    throw new Error(`Failed to find clip by thumbnail blob name: ${thumbError.message}`)
+  }
+  return thumbData?.length ? thumbData[0] : null
+}
+
+async function canWriteBlob(blobName, user) {
+  const clip = await findClipByBlob(blobName)
+  if (clip) {
+    return clip.owner_id === user.id
+  }
+  return blobName.startsWith(`${user.id}/`)
 }

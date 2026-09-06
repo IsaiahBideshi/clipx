@@ -25,18 +25,47 @@ const containerClient = blobServiceClient.getContainerClient(CONTAINER_NAME)
 const conn = parseConnectionString(CONNECTION_STRING)
 const credential = new StorageSharedKeyCredential(conn.AccountName, conn.AccountKey)
 
-export function generateSasUrl(blobName, permissions = 'r', containerName = CONTAINER_NAME) {
+export function encodeBlobPath(blobName) {
+  return String(blobName)
+    .split("/")
+    .map((segment) => encodeURIComponent(segment))
+    .join("/");
+}
+
+export function getPublicBlobUrl(blobName, containerName = CONTAINER_NAME) {
+  return `${blobServiceClient.url}${containerName}/${encodeBlobPath(blobName)}`;
+}
+
+export async function generateSasUrl(blobName, permissions = 'r', containerName = CONTAINER_NAME) {
+  const perms = BlobSASPermissions.parse(permissions)
+
+  if (perms.read) {
+    const container = blobServiceClient.getContainerClient(containerName)
+    const exists = await container.getBlobClient(blobName).exists()
+    if (!exists) {
+      throw new BlobNotFoundError(blobName, containerName)
+    }
+  }
+
   const sasToken = generateBlobSASQueryParameters(
     {
       containerName,
       blobName,
-      permissions: BlobSASPermissions.parse(permissions),
+      permissions: perms,
       expiresOn: new Date(Date.now() + 3600 * 1000),
     },
     credential
   ).toString()
 
-  return `${blobServiceClient.url}${containerName}/${encodeURIComponent(blobName)}?${sasToken}`
+  return `${blobServiceClient.url}${containerName}/${encodeBlobPath(blobName)}?${sasToken}`
+}
+
+export class BlobNotFoundError extends Error {
+  constructor(blobName, containerName) {
+    super(`Blob "${blobName}" not found in container "${containerName}"`)
+    this.name = 'BlobNotFoundError'
+    this.statusCode = 404
+  }
 }
 
 export { blobServiceClient, containerClient, CONTAINER_NAME, THUMBS_CONTAINER_NAME, SUPPORTED_CONTAINERS }

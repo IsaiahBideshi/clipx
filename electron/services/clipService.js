@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { randomUUID } from "node:crypto";
 import ffmpeg from "fluent-ffmpeg";
 import ffmpegPath from "ffmpeg-static";
 import { app } from "electron";
@@ -16,6 +17,10 @@ const CLIPS_DATA_FILE = "clipsData.json";
 const API_BASE = (process.env.VITE_DATABASE_URL || "https://clipx.bideshi.tech").replace(/\/+$/, "");
 const AZURE_CLIPS_CONTAINER = "clips";
 const AZURE_THUMBS_CONTAINER = "clip-thumbnails";
+
+function stripVideoExtension(fileName) {
+  return String(fileName || "").replace(/\.(mp4|webm|mov)$/i, "");
+}
 
 function buildClipOutputName(baseName) {
   const safeName = String(baseName || "Untitled Clip")
@@ -205,7 +210,7 @@ export async function uploadClip(app, options) {
   const videoPath = clip?.path;
   const startTime = options?.start;
   const endTime = options?.end;
-  const clipTitle = options?.title || `Untitled Clip ${Date.now()}`;
+  const clipTitle = options?.title || stripVideoExtension(clip?.name) || `Untitled Clip ${Date.now()}`;
   const tags = options?.tags || [];
   const game = options?.game || null;
   const userId = options?.userId || null;
@@ -238,6 +243,7 @@ export async function uploadClip(app, options) {
       videoPath: tempPath,
       thumbnailPath,
       title: clipTitle,
+      userId,
     });
     return { status: 200, ...result };
 
@@ -280,13 +286,14 @@ async function uploadBlobToAzure({ token, name, contentType, filePath, container
   }
 }
 
-async function uploadClipToAzureBlobStorage({ videoPath, thumbnailPath, title }) {
+async function uploadClipToAzureBlobStorage({ videoPath, thumbnailPath, title, userId }) {
   const token = await getSupabaseAccessToken();
-  if (!token) {
+  if (!token || !userId) {
     throw new Error("Not authenticated. Please log in first.");
   }
 
-  const videoBlobName = `${Date.now()}-${buildClipOutputName(title)}`;
+  const blobPrefix = `${userId}/`;
+  const videoBlobName = `${blobPrefix}${randomUUID()}-${buildClipOutputName(title)}`;
 
   await uploadBlobToAzure({
     token,
@@ -297,7 +304,7 @@ async function uploadClipToAzureBlobStorage({ videoPath, thumbnailPath, title })
 
   let thumbnailBlobName = null;
   if (thumbnailPath) {
-    thumbnailBlobName = `${Date.now()}-${buildThumbnailOutputName(title)}`;
+    thumbnailBlobName = `${blobPrefix}${randomUUID()}-${buildThumbnailOutputName(title)}`;
     try {
       await uploadBlobToAzure({
         token,
