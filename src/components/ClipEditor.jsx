@@ -611,13 +611,6 @@ useEffect(() => {
     try {
       const response = await window.clipx.uploadClip({ clip, start, end, displayName, game, tags, userId });
       if (response?.status === 200) {
-        onUploadQueueEvent?.({
-          type: "success",
-          id: uploadId,
-          youtubeUrl: response.youtubeUrl,
-          videoId: response.videoId,
-        });
-
         const error  = await saveClipRecord({
           id: uploadId,
           name: displayName,
@@ -631,7 +624,27 @@ useEffect(() => {
           visibility: visibility,
           userId,
         });
-        if (error) console.error("Failed to save clip record to database:", error);
+        
+        if (error) {
+          console.error("Failed to save clip record to database:", error);
+          try {
+            await window.clipx.deleteClipBlob({
+              blobName: response.blobName,
+              thumbnailBlobName: response.thumbnailBlobName,
+            });
+          } catch (cleanupError) {
+            console.error("Failed to clean up uploaded blobs after persistence failure:", cleanupError);
+          }
+          onUploadQueueEvent?.({ type: "failed", id: uploadId, error: "Upload succeeded but could not be saved to your library. Please try again." });
+          return;
+        }
+
+        onUploadQueueEvent?.({
+          type: "success",
+          id: uploadId,
+          youtubeUrl: response.youtubeUrl,
+          videoId: response.videoId,
+        });
         return;
       }
 

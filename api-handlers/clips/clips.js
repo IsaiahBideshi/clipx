@@ -1,5 +1,6 @@
 import { supabase, getAuthenticatedUser } from '../auth.js'
-import { generateSasUrl, BlobNotFoundError, SUPPORTED_CONTAINERS, CONTAINER_NAME, THUMBS_CONTAINER_NAME } from './azure.js'
+import { generateSasUrl, deleteBlob, BlobNotFoundError, SUPPORTED_CONTAINERS, CONTAINER_NAME, THUMBS_CONTAINER_NAME } from './azure.js'
+import { areFriends } from '../friendships.js'
 
 export default async function handler(req, res) {
   const allowedOrigin = process.env.CORS_ORIGIN || '*'
@@ -12,12 +13,12 @@ export default async function handler(req, res) {
   }
 
   switch (req.method) {
-    case 'GET':
+    case 'GET': {
       if (req.query.visibility === 'public') {
         const { data, error } = await supabase
           .from('clips')
           .select('*')
-          .neq('visibility', 'private')
+          .eq('visibility', 'public')
           .order('created_at', { ascending: false })
         if (error) {
           console.error('Error fetching public clips:', error)
@@ -26,11 +27,48 @@ export default async function handler(req, res) {
 
         return res.status(200).json({ data, error: null })
       }
-      else if (req.query.visibility === 'private') {
+
+      const { user, error: authError } = await getAuthenticatedUser(req)
+      if (authError) {
+        return res.status(401).json({ data: null, error: authError })
+      }
+
+      if (req.query.visibility === 'friends') {
+        const friendId = req.query.friendId
+        if (!friendId) {
+          return res.status(400).json({ data: null, error: 'Missing "friendId" query parameter' })
+        }
+
+        try {
+          const friends = await areFriends(user.id, friendId)
+          if (!friends) {
+            return res.status(403).json({ data: null, error: 'You are not friends with this user' })
+          }
+        } catch (err) {
+          console.error('Error checking friendship:', err)
+          return res.status(500).json({ data: null, error: 'Failed to verify friendship' })
+        }
+
+        const { data, error } = await supabase
+          .from('clips')
+          .select('*')
+          .eq('owner_id', friendId)
+          .in('visibility', ['public', 'friends'])
+          .order('created_at', { ascending: false })
+        if (error) {
+          console.error('Error fetching friend clips:', error)
+          return res.status(500).json({ data: null, error: error.message })
+        }
+
+        return res.status(200).json({ data, error: null })
+      }
+
+      if (req.query.visibility === 'private') {
         const { data, error } = await supabase
           .from('clips')
           .select('*')
           .eq('visibility', 'private')
+          .eq('owner_id', user.id)
           .order('created_at', { ascending: false })
         if (error) {
           console.error('Error fetching private clips:', error)
@@ -51,10 +89,30 @@ export default async function handler(req, res) {
           return res.status(500).json({ data: null, error: error.message })
         }
 
-        return res.status(200).json({ data, error: null })
+        let friends = false
+        try {
+          friends = await areFriends(user.id, req.query.userId)
+        } catch (err) {
+          console.error('Error checking friendship:', err)
+          return res.status(500).json({ data: null, error: 'Failed to verify friendship' })
+        }
+
+        const visibleClips = []
+        for (const clip of data) {
+          if (clip.owner_id === user.id) {
+            visibleClips.push(clip)
+          } else if (clip.visibility === 'public') {
+            visibleClips.push(clip)
+          } else if (clip.visibility === 'friends' && friends) {
+            visibleClips.push(clip)
+          }
+        }
+
+        return res.status(200).json({ data: visibleClips, error: null })
       }
       
       return res.status(400).json({ data: null, error: 'Invalid visibility parameter' })
+    }
 
     case 'POST': {
       const { user, error: authError } = await getAuthenticatedUser(req)
@@ -84,7 +142,33 @@ export default async function handler(req, res) {
       }
     }
 
-    case 'DELETE':
+    case 'DELETE': {
+      const { user, error: authError } = await getAuthenticatedUser(req)
+      if (authError) {
+        return res.status(401).json({ data: null, error: authError })
+      }
+
+      const { name, container = CONTAINER_NAME } = req.body || {}
+      if (!name) {
+        return res.status(400).json({ data: null, error: 'Missing "name" in request body' })
+      }
+      if (!SUPPORTED_CONTAINERS.includes(container)) {
+        return res.status(400).json({ data: null, error: `Unsupported container "${container}"` })
+      }
+
+      try {
+        const canDelete = await canWriteBlob(name, user, container)
+        if (!canDelete) {
+          return res.status(403).json({ data: null, error: 'You do not have permission to delete this blob' })
+        }
+
+        await deleteBlob(name, container)
+        return res.status(200).json({ data: { deleted: true }, error: null })
+      } catch (err) {
+        console.error('Error deleting blob:', err)
+        return res.status(500).json({ data: null, error: 'Failed to delete blob' })
+      }
+    }
 
     case 'PUT':
 
@@ -127,5 +211,5 @@ async function canWriteBlob(blobName, user, container) {
   if (clip) {
     return clip.owner_id === user.id && clip.container === container
   }
-  return blobName.startsWith(`${user.id}/`) && container === CONTAINER_NAME
+  return blobName.startsWith(`${user.id}/`) && SUPPORTED_CONTAINERS.includes(container)
 }

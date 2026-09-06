@@ -304,8 +304,8 @@ async function uploadClipToAzureBlobStorage({ videoPath, thumbnailPath, title, u
 
   let thumbnailBlobName = null;
   if (thumbnailPath) {
-    thumbnailBlobName = `${blobPrefix}${randomUUID()}-${buildThumbnailOutputName(title)}`;
     try {
+      thumbnailBlobName = `${blobPrefix}${randomUUID()}-${buildThumbnailOutputName(title)}`;
       await uploadBlobToAzure({
         token,
         name: thumbnailBlobName,
@@ -315,11 +315,55 @@ async function uploadClipToAzureBlobStorage({ videoPath, thumbnailPath, title, u
       });
     } catch (thumbnailError) {
       console.error("ClipX: Failed to upload thumbnail:", thumbnailError);
+      try {
+        await uploadClipToBlobStorageDelete({ token, name: thumbnailBlobName, container: AZURE_THUMBS_CONTAINER });
+      } catch (cleanupError) {
+        console.error("ClipX: Failed to clean up thumbnail blob after upload failure:", cleanupError);
+      }
       thumbnailBlobName = null;
     }
   }
 
   return { blobName: videoBlobName, thumbnailBlobName };
+}
+
+async function uploadClipToBlobStorageDelete({ token, name, container }) {
+  const res = await fetch(`${API_BASE}/api/clips`, {
+    method: "DELETE",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ name, container }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => null);
+    throw new Error(err?.error || `Failed to delete blob (${res.status})`);
+  }
+}
+
+export async function deleteClipBlob({ blobName, thumbnailBlobName }) {
+  const token = await getSupabaseAccessToken();
+  if (!token) {
+    throw new Error("Not authenticated. Please log in first.");
+  }
+
+  const names = [];
+  if (blobName) {
+    names.push({ name: blobName, container: AZURE_CLIPS_CONTAINER });
+  }
+  if (thumbnailBlobName) {
+    names.push({ name: thumbnailBlobName, container: AZURE_THUMBS_CONTAINER });
+  }
+
+  if (names.length === 0) {
+    return;
+  }
+
+  for (const { name, container } of names) {
+    await uploadClipToBlobStorageDelete({ token, name, container });
+  }
 }
 
 export async function getClipData(clipPath) {

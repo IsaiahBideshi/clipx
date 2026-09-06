@@ -36,6 +36,11 @@ export function getPublicBlobUrl(blobName, containerName = CONTAINER_NAME) {
   return `${blobServiceClient.url}${containerName}/${encodeBlobPath(blobName)}`;
 }
 
+export async function deleteBlob(blobName, containerName = CONTAINER_NAME) {
+  const container = blobServiceClient.getContainerClient(containerName)
+  await container.getBlobClient(blobName).deleteIfExists()
+}
+
 export async function generateSasUrl(blobName, permissions = 'r', containerName = CONTAINER_NAME) {
   const perms = BlobSASPermissions.parse(permissions)
 

@@ -21,8 +21,9 @@ export default async function handler(req, res) {
   }
 
   try {
+    const prefix = `${user.id}/`
     const blobs = []
-    for await (const blob of containerClient.listBlobsFlat()) {
+    for await (const blob of containerClient.listBlobsFlat({ prefix })) {
       blobs.push({
         name: blob.name,
         lastModified: blob.properties.lastModified,
