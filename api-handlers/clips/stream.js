@@ -1,4 +1,4 @@
-import { generateSasUrl, getPublicBlobUrl, BlobNotFoundError, SUPPORTED_CONTAINERS } from './azure.js'
+import { generateSasUrl, getPublicBlobUrl, BlobNotFoundError, SUPPORTED_CONTAINERS, CONTAINER_NAME, THUMBS_CONTAINER_NAME } from './azure.js'
 import { getAuthenticatedUser, supabase } from '../auth.js'
 
 export default async function handler(req, res) {
@@ -36,6 +36,11 @@ export default async function handler(req, res) {
       return res.status(404).json({ data: null, error: 'Clip not found' })
     }
 
+    const requestedContainer = container || CONTAINER_NAME
+    if (requestedContainer !== clip.container) {
+      return res.status(403).json({ data: null, error: 'You do not have permission to view this clip' })
+    }
+
     const allowed = await canViewClip(clip, user)
     if (!allowed) {
       return res.status(403).json({ data: null, error: 'You do not have permission to view this clip' })
@@ -43,8 +48,8 @@ export default async function handler(req, res) {
 
     const url =
       clip.visibility === 'public'
-        ? getPublicBlobUrl(blobName, container)
-        : await generateSasUrl(blobName, 'r', container)
+        ? getPublicBlobUrl(blobName, requestedContainer)
+        : await generateSasUrl(blobName, 'r', requestedContainer)
     return res.status(200).json({ data: { url }, error: null })
   } catch (err) {
     console.error('Error generating stream URL:', err)
@@ -66,7 +71,7 @@ async function findClipByBlob(blobName) {
     throw new Error(`Failed to find clip by blob name: ${error.message}`)
   }
   if (data?.length) {
-    return data[0]
+    return { ...data[0], container: CONTAINER_NAME }
   }
 
   const { data: thumbData, error: thumbError } = await supabase
@@ -78,7 +83,10 @@ async function findClipByBlob(blobName) {
   if (thumbError) {
     throw new Error(`Failed to find clip by thumbnail blob name: ${thumbError.message}`)
   }
-  return thumbData?.length ? thumbData[0] : null
+  if (thumbData?.length) {
+    return { ...thumbData[0], container: THUMBS_CONTAINER_NAME }
+  }
+  return null
 }
 
 async function canViewClip(clip, user) {
