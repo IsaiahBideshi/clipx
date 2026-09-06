@@ -13,6 +13,14 @@ import { getSupabaseAccessToken } from "../ipc/authStorage.js";
 
 ffmpeg.setFfmpegPath(resolveFfmpegPath(ffmpegPath));
 
+export class ClipServiceError extends Error {
+  constructor(message, statusCode = 500) {
+    super(message);
+    this.name = "ClipServiceError";
+    this.statusCode = statusCode;
+  }
+}
+
 const CLIPS_DATA_FILE = "clipsData.json";
 const API_BASE = (process.env.VITE_DATABASE_URL || "https://clipx.bideshi.tech").replace(/\/+$/, "");
 const AZURE_CLIPS_CONTAINER = "clips";
@@ -414,6 +422,9 @@ export async function renameClip(clipPath, newName) {
   const clipDir = path.dirname(clipPath);
   const newClipPath = path.join(clipDir, baseName + ext);
 
+  if (newClipPath !== clipPath && fs.existsSync(newClipPath)) {
+    throw new ClipServiceError(`A clip named "${baseName + ext}" already exists`, 409);
+  }
 
   try {
     await rename(clipPath, newClipPath);
@@ -425,7 +436,7 @@ export async function renameClip(clipPath, newName) {
     return { path: newClipPath, name: path.basename(newClipPath) };
   } catch (error) {
     console.error(`Failed to rename clip from ${clipPath} to ${newClipPath}:`, error);
-    throw new Error(`Failed to rename clip: ${error.message}`);
+    throw new ClipServiceError(`Failed to rename clip: ${error.message}`, 500);
   }
 }
 

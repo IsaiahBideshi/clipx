@@ -98,6 +98,7 @@ export default function LocalFiles() {
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const [renameModalOpen, setRenameModalOpen] = useState(false);
   const [renameValue, setRenameValue] = useState("");
+  const [renameError, setRenameError] = useState("");
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const renameModalRef = useRef(null);
@@ -566,11 +567,21 @@ export default function LocalFiles() {
     }
 
     const promise = window.clipx.renameClip(clipToRename?.path, newName)
-      .then(() => {
+      .then((result) => {
+        if (result?.ok === false) {
+          console.error("Failed to rename clip:", result);
+          setRenameError(result.message || "Failed to rename clip.");
+          return;
+        }
         setRenameModalOpen(false);
+        setRenameError("");
       })
       .catch((error) => {
         console.error("Failed to rename clip:", error);
+        setRenameError(
+          error?.message?.replace(/^(rename-clip|Failed to rename clip):\s*/g, "") ||
+          "Unknown error."
+        );
       });
   }
 
@@ -796,7 +807,10 @@ export default function LocalFiles() {
             </div>
             <TextField
               value={renameValue}
-              onChange={(e) => setRenameValue(e.target.value)}
+              onChange={(e) => {
+                setRenameValue(e.target.value);
+                setRenameError("");
+              }}
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   handleRenameClip();
@@ -809,6 +823,9 @@ export default function LocalFiles() {
               fullWidth
               margin="normal"
             />
+            {renameError && (
+              <p className="auth-error" style={{ margin: "8px 0 0", textAlign: "center" }}>{renameError}</p>
+            )}
             <div style={{ display: "flex", marginLeft: "auto", marginRight: "auto", marginTop: "20px", width: "fit-content", gap: "12px" }}>
               <button className="cancel-button" onClick={() => setRenameModalOpen(false)}>Cancel</button>
               <button className="rename-button" onClick={handleRenameClip}>Rename</button>
@@ -836,6 +853,7 @@ export default function LocalFiles() {
             setClipToRename(contextMenu);
             setRenameModalOpen(true);
             setRenameValue(getEditableClipName(contextMenu.name || ""));
+            setRenameError("");
             setContextMenu(null);
           }}
           onOpenInExplorer={async () => {

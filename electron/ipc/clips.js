@@ -1,6 +1,6 @@
 import { app, ipcMain } from "electron";
 
-import { getClipData, renameClip, saveClip, uploadClip, deleteClip, deleteClipBlob } from "../services/clipService.js";
+import { getClipData, renameClip, saveClip, uploadClip, deleteClip, deleteClipBlob, ClipServiceError } from "../services/clipService.js";
 
 export function registerClipIpcHandlers() {
   ipcMain.handle("save-clip", async (_event, options) => {
@@ -8,7 +8,14 @@ export function registerClipIpcHandlers() {
   });
 
   ipcMain.handle("rename-clip", async (_event, clipPath, newName) => {
-    return await renameClip(clipPath, newName);
+    try {
+      return { ok: true, ...(await renameClip(clipPath, newName)) };
+    } catch (error) {
+      if (error instanceof ClipServiceError) {
+        return { ok: false, statusCode: error.statusCode, message: error.message };
+      }
+      throw error;
+    }
   });
 
   ipcMain.handle("upload-clip", async (_event, options) => {
