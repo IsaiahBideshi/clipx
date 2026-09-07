@@ -1,13 +1,9 @@
 import {useState, useEffect, useRef} from 'react'
 
 export default function EditorTimeline({duration, currentTime, inPoint, outPoint, onSeek, onSetIn, onSetOut}) {
-  if (!duration) return null;
-
-  const MINIMUM_CLIP_LENGTH = 3; // seconds
-
-
   const timelineRef = useRef(null);
   const [dragging, setDragging] = useState(null); // 'in' | 'out' | null
+  const MINIMUM_CLIP_LENGTH = 3; // seconds
 
   const inPct = (inPoint / duration) * 100;
   const outPct = (outPoint / duration) * 100;
@@ -81,6 +77,7 @@ export default function EditorTimeline({duration, currentTime, inPoint, outPoint
     }
   }, [currentTime]);
 
+  if (!duration) return null;
 
 
   return (
