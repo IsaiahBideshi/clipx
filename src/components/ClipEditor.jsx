@@ -344,14 +344,6 @@ export default function ClipEditor({
     };
   }, []);
 
-  useEffect(() => {
-    function onFullscreenChange() {
-      setIsFullscreen(document.fullscreenElement === shellRef.current);
-    }
-
-    document.addEventListener("fullscreenchange", onFullscreenChange);
-    return () => document.removeEventListener("fullscreenchange", onFullscreenChange);
-  }, []);
 
   return (
     <div className="clip-editor-container">
