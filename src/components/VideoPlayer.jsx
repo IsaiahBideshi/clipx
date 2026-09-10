@@ -355,7 +355,7 @@ export default function VideoPlayer({
           const el = videoRef.current;
           if (autoPlay && el && el.paused && !autoplayedRef.current) {
             autoplayedRef.current = true;
-            el.play().catch(() => {});
+            play();
           }
         }}
         onError={(e) => {
