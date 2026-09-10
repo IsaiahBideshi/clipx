@@ -81,6 +81,16 @@ export default function VideoPlayer({
     autoplayedRef.current = false;
   }, [src]);
 
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!el || el.readyState < 2) return;
+    if (el.currentTime < start || el.currentTime >= end) {
+      el.currentTime = start;
+      setCurrentTime(start);
+      callbacksRef.current.onTimeUpdate?.(start);
+    }
+  }, [start]);
+
   function seek(time) {
     const el = videoRef.current;
     if (!el) return;
@@ -333,6 +343,14 @@ export default function VideoPlayer({
         }}
         onTimeUpdate={(e) => {
           const t = e.target.currentTime;
+          const el = e.target;
+          if (end > start && t >= end && !el.paused) {
+            el.pause();
+            el.currentTime = start;
+            setCurrentTime(start);
+            callbacksRef.current.onTimeUpdate?.(start);
+            return;
+          }
           setCurrentTime(t);
           callbacksRef.current.onTimeUpdate?.(t);
         }}
@@ -353,7 +371,7 @@ export default function VideoPlayer({
         onCanPlay={() => {
           setLoading(false);
           const el = videoRef.current;
-          if (autoPlay && el && el.paused && !autoplayedRef.current) {
+          if (autoPlay && el && !autoplayedRef.current) {
             autoplayedRef.current = true;
             play();
           }
