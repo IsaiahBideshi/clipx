@@ -17,10 +17,22 @@ import "overlayscrollbars/overlayscrollbars.css";
 
 import "./library.css";
 import fallBackThumb from "../assets/thumbnail.svg";
+import VideoPlayer from "../components/VideoPlayer";
 
 const GRID_GAP = 20;
 const MIN_CARD_WIDTH = 270;
 const INITIAL_SKELETON_COUNT = 20;
+
+function readSavedVolume() {
+  const stored = globalThis.localStorage?.getItem("clipx:volume");
+  const value = stored === null ? 1 : Number(stored);
+  return Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : 1;
+}
+
+function readSavedMuted() {
+  const stored = globalThis.localStorage?.getItem("clipx:muted");
+  return stored === "true";
+}
 
 async function fetchLibraryClips() {
   const { data, error } = await supabase
@@ -151,31 +163,34 @@ export default function Library() {
 
   const queryClient = useQueryClient();
 
+  function moveSelectedClip(direction) {
+    if (!filteredClips.length) return;
+
+    setSelectedClip((currentClip) => {
+      if (!currentClip) {
+        return direction > 0 ? filteredClips[0] : filteredClips[filteredClips.length - 1];
+      }
+
+      const currentIndex = filteredClips.findIndex((item) => item.id === currentClip.id);
+      if (currentIndex < 0) {
+        return direction > 0 ? filteredClips[0] : filteredClips[filteredClips.length - 1];
+      }
+
+      const nextIndex = Math.max(0, Math.min(filteredClips.length - 1, currentIndex + direction));
+      return filteredClips[nextIndex];
+    });
+  }
+
   useEffect(() => {
-    function moveSelectedClip(direction) {
-      if (!clips.length) return;
-
-      setSelectedClip((currentClip) => {
-        if (!currentClip) {
-          return direction > 0 ? clips[0] : clips[clips.length - 1];
-        }
-
-        const currentIndex = clips.findIndex((item) => item.id === currentClip.id);
-        if (currentIndex < 0) {
-          return direction > 0 ? clips[0] : clips[clips.length - 1];
-        }
-
-        const nextIndex = Math.max(0, Math.min(clips.length - 1, currentIndex + direction));
-        return clips[nextIndex];
-      });
-    }
-
     function onKeyDown(e) {
       if (isTextEntryActive(e)) return;
 
       if (e.code === "Escape") {
         setSelectedClip(null);
+        return;
       }
+
+      if (selectedClip?.blob_name) return;
 
       if (e.code === "ArrowUp") {
         e.preventDefault();
@@ -190,7 +205,7 @@ export default function Library() {
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [clips]);
+  }, [filteredClips, selectedClip]);
 
   useEffect(() => {
     if (!loadingSession && !session) {
@@ -379,7 +394,15 @@ export default function Library() {
           ))}
       </div>
 
-      {selectedClip && <VideoPreview clip={selectedClip} onClose={() => setSelectedClip(null)} />}
+      {selectedClip && (
+        <VideoPreview
+          key={selectedClip.blob_name || selectedClip.youtube_video_id || selectedClip.id}
+          clip={selectedClip}
+          onClose={() => setSelectedClip(null)}
+          onPrevClip={() => moveSelectedClip(-1)}
+          onNextClip={() => moveSelectedClip(1)}
+        />
+      )}
     </OverlayScrollbarsComponent>
   );
 }
@@ -444,48 +467,50 @@ export function ClipCard({clip, onSelect}) {
   );
 }
 
-export function VideoPreview({clip, onClose}){
+// Legacy Component.
+
+export function VideoPreview({clip, onClose, onPrevClip, onNextClip}){
   const isAzure = Boolean(clip.blob_name);
   const [streamUrl, setStreamUrl] = useState(null);
   const [gamesSrc, setGamesSrc] = useState(null);
-  const videoRef = useRef(null);
   const { session } = useAuthSession();
 
+  const [volume, setVolume] = useState(() => readSavedVolume());
+  const [muted, setMuted] = useState(() => readSavedMuted());
+
   useEffect(() => {
-    const el = videoRef.current;
-    if (!el) return;
+    globalThis.localStorage?.setItem("clipx:volume", String(volume));
+  }, [volume]);
 
-    const stored = Number(globalThis.localStorage?.getItem("clipx:volume"));
-    const savedVolume = Number.isFinite(stored) ? Math.max(0, Math.min(1, stored)) : 1;
-    el.volume = savedVolume;
-
-    const onVolumeChange = () => {
-      globalThis.localStorage?.setItem("clipx:volume", String(el.volume));
-    };
-
-    el.addEventListener("volumechange", onVolumeChange);
-    return () => el.removeEventListener("volumechange", onVolumeChange);
-  }, [streamUrl]);
+  useEffect(() => {
+    globalThis.localStorage?.setItem("clipx:muted", String(muted));
+  }, [muted]);
 
   useEffect(() => {
     if (!isAzure || !clip.blob_name || !session?.access_token) return;
+
+    const controller = new AbortController();
 
     async function fetchStreamUrl() {
       try {
         const apiBase = (import.meta.env.VITE_DATABASE_URL || "https://clipx.bideshi.tech").replace(/\/+$/, "");
         const res = await fetch(`${apiBase}/api/clips/stream?name=${encodeURIComponent(clip.blob_name)}`, {
           headers: { Authorization: `Bearer ${session.access_token}` },
+          signal: controller.signal,
         });
         const json = await res.json();
         if (json.data?.url) {
           setStreamUrl(json.data.url);
         }
       } catch (err) {
+        if (err?.name === "AbortError") return;
         console.error("Failed to get stream URL:", err);
       }
     }
 
     fetchStreamUrl();
+
+    return () => controller.abort();
   }, [isAzure, clip.blob_name, session?.access_token]);
 
   useEffect(() => {
@@ -517,18 +542,19 @@ export function VideoPreview({clip, onClose}){
             <CloseIcon fontSize={"large"} />
           </button>
           <div className="video-player-container">
-            {streamUrl ? (
-              <video
-                ref={videoRef}
-                className="library-iframe"
-                style={{borderRadius: "8px"}}
-                controls
-                autoPlay
-                src={streamUrl}
-              />
-            ) : (
-              <div className="video-player-loading">Loading video...</div>
-            )}
+            <VideoPlayer
+              className="video-player-shell-fill"
+              src={streamUrl || undefined}
+              volume={volume}
+              muted={muted}
+              showSkipButtons
+              onPrevClip={onPrevClip}
+              onNextClip={onNextClip}
+              onVolumeChange={({ volume: v, muted: m }) => {
+                setVolume(v);
+                setMuted(m);
+              }}
+            />
           </div>
           <div className="video-metadata">
             <h2 className="video-title">{clip?.title || "No Video Selected"}</h2>

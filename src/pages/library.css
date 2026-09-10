@@ -90,18 +90,6 @@
   height: 100%;
 }
 
-.video-player-loading{
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: rgba(255, 255, 255, 0.5);
-  font-size: 0.95rem;
-  background: rgba(0, 0, 0, 0.3);
-  border-radius: 12px;
-}
-
 .video-metadata{
   margin-top: 12px;
   color: #fff;
@@ -220,29 +208,6 @@
 
 .library .clip-date {
   color: rgba(255, 255, 255, 0.62);
-}
-
-.library-video-preview .close-preview-btn {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  z-index: 5;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 999px;
-  color: #fff;
-  width: 42px;
-  height: 42px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: background 180ms ease, border-color 180ms ease, transform 180ms ease;
-}
-
-.library-video-preview .close-preview-btn:hover {
-  background: rgba(255, 76, 76, 0.22);
-  border-color: rgba(255, 125, 125, 0.65);
-  transform: translateY(-1px);
 }
 
 .clip-card-skeleton {

@@ -3,15 +3,15 @@ import Fuse from "fuse.js";
 import STOREDGAMES from "../data/games.json"
 
 import EditorTimeline from "./EditorTimeline.jsx";
-import VideoPreview from "./VideoPreview";
+import VideoPlayer from "./VideoPlayer";
 import TextField from '@mui/material/TextField';
 import Button from '@mui/material/Button';
 import AutoComplete from '@mui/material/Autocomplete';
 import { supabase } from "../lib/supabase.js";
 import { useAuthSession } from "../lib/authSession.js";
-import { isTextEntryActive } from "../lib/hotkeys.js";
 import { InputLabel, MenuItem, Select, FormControl, Typography } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
+import fallBackThumb from "../assets/thumbnail.svg";
 
 const VOLUME_STORAGE_KEY = "clipx:volume";
 const MUTED_STORAGE_KEY = "clipx:muted";
@@ -71,8 +71,7 @@ export default function ClipEditor({
   saving,
   setSaving
 }) {
-  const videoRef = useRef(null);
-  const shellRef = useRef(null);
+  const playerRef = useRef(null);
   const editorRef = useRef(null);
   const uploadMenuRef = useRef(null);
 
@@ -81,7 +80,7 @@ export default function ClipEditor({
   const [inPoint, setInPoint] = useState(0);
   const [outPoint, setOutPoint] = useState(0);
 
-  const [isPlaying, setIsPlaying] = useState(false);
+  const [thumbSrc, setThumbSrc] = useState(fallBackThumb);
 
   const [volume, setVolume] = useState(() => readSavedVolume());
   const [isMuted, setIsMuted] = useState(() => readSavedMuted());
@@ -127,74 +126,80 @@ export default function ClipEditor({
   }, []);
 
   // When video loads
-  function handleLoadedMetadata(e) {
-    const d = e.target.duration;
+  function handleLoadedMetadata(d) {
     setDuration(d);
     setOutPoint(d);
   }
 
   // When video plays
-  function handleTimeUpdate(e) {
-    const time = e.target.currentTime;
-
+  function handleTimeUpdate(time) {
     setCurrentTime(time);
   }
 
 
   // Seek video
   function seek(time) {
-    if (!videoRef.current) return;
-    videoRef.current.currentTime = time;
-    setCurrentTime(time);
+    playerRef.current?.seek(time);
   }
 
-  function togglePlay() {
-    const el = videoRef.current;
-    if (!el) return;
+  // In/out point shortcuts only — all playback keys are handled inside VideoPlayer
+  function handleKeyShortcut(e) {
+    if (e.key === "i") {
+      const newIn = Math.min(currentTime, outPoint - 0.1);
+      setInPoint(newIn);
 
-    if (el.paused || el.ended) {
-      el.play();
-    } else {
-      el.pause();
+      if (playerRef.current?.currentTime < newIn) {
+        seek(newIn);
+      }
     }
-  }
+    if (e.key === "o") {
+      const newOut = Math.max(currentTime, inPoint + 0.1);
+      setOutPoint(newOut);
 
-  function play() {
-    const video = videoRef.current;
-    if (!video) return;
-
-    // If outside cut, snap to IN
-    if (video.currentTime < inPoint || video.currentTime >= outPoint) {
-      video.currentTime = inPoint;
-      setCurrentTime(inPoint);
-    }
-
-    video.play();
-  }
-
-  function setVideoVolume(next) {
-    const el = videoRef.current;
-    const v = Math.max(0, Math.min(1, next));
-    setVolume(v);
-
-    if (el) {
-      el.volume = v;
-      if (v === 0) {
-        el.muted = true;
-        setIsMuted(true);
-      } else if (el.muted) {
-        el.muted = false;
-        setIsMuted(false);
+      if (playerRef.current?.currentTime > newOut) {
+        seek(newOut);
       }
     }
   }
 
-  function toggleMute() {
-    const el = videoRef.current;
-    const nextMuted = !isMuted;
-    setIsMuted(nextMuted);
-    if (el) el.muted = nextMuted;
-  }
+  useEffect(() => {
+    let mounted = true;
+
+    function getThumbUrl(thumbPath) {
+      return thumbPath ? `clipx://image?path=${encodeURIComponent(thumbPath)}` : null;
+    }
+
+    const cachedThumbUrl = getThumbUrl(clip.thumbnailPath);
+    if (cachedThumbUrl) {
+      setThumbSrc(cachedThumbUrl);
+      return () => {
+        mounted = false;
+      };
+    }
+
+    setThumbSrc(fallBackThumb);
+
+    const getThumbnail = window.clipx?.getThumbnail;
+    if (typeof getThumbnail !== "function") {
+      return () => {
+        mounted = false;
+      };
+    }
+
+    getThumbnail(clip.path, baseFolder)
+      .then((thumbPath) => {
+        if (mounted) {
+          setThumbSrc(getThumbUrl(thumbPath));
+        }
+      })
+      .catch((error) => {
+        console.error("Failed to load thumbnail:", error);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [clip, baseFolder]);
 
   useEffect( () => {
     async function loadClipData() {
@@ -215,144 +220,6 @@ export default function ClipEditor({
   }, [clip]);
 
 
-  // Keyboard controls
-  useEffect(() => {
-    function onKeyDown(e) {
-      if (isTextEntryActive(e)) return;
-      if (e.ctrlKey) return;
-
-      if (e.key >= "0" && e.key <= "9") {
-        e.preventDefault();
-        const percentage = (e.key === "0") ? 0 : (e.key / 10);
-        const newTime = percentage * duration;
-        seek(newTime);
-      }
-
-      if (e.key === "ArrowUp") {
-        e.preventDefault();
-        const newVolume = Math.min(volume + 0.1, 1);
-        setVideoVolume(newVolume);
-      }
-      if (e.key === "ArrowDown") {
-        e.preventDefault();
-        const newVolume = Math.max(volume - 0.1, 0);
-        setVideoVolume(newVolume);
-      }
-
-      if (e.key === "ArrowLeft") {
-        const newTime = Math.max(currentTime - 5, 0);
-        if (newTime < inPoint) {
-          seek(inPoint);
-          return;
-        }
-        seek(newTime);
-      };
-
-      if (e.key === "ArrowRight") {
-        const newTime = Math.min(currentTime + 5, duration);
-        if (newTime > outPoint) {
-          seek(outPoint);
-          return;
-        }
-        seek(newTime);
-      }
-
-      if (e.shiftKey && e.key === "ArrowLeft") {
-        const newTime = Math.max(currentTime - 1, 0);
-        if (newTime < inPoint) {
-          seek(inPoint);
-          return;
-        }
-        seek(newTime);
-      }
-
-      if (e.shiftKey && e.key === "ArrowRight") {
-        const newTime = Math.min(currentTime + 1, duration);
-        if (newTime > outPoint) {
-          seek(outPoint);
-          return;
-        }
-        seek(newTime);
-      }
-
-      if (e.code === "Space") {
-        e.preventDefault();
-
-        const video = videoRef.current;
-        if (!video) return;
-
-        if (video.paused) {
-          play();
-        } else {
-          video.pause();
-        }
-      }
-
-
-      if (e.key === "i") {
-        const newIn = Math.min(currentTime, outPoint - 0.1);
-        setInPoint(newIn);
-
-        if (videoRef.current.currentTime < newIn) {
-          seek(newIn);
-        }
-      }
-      if (e.key === "o") {
-        const newOut = Math.max(currentTime, inPoint + 0.1);
-        setOutPoint(newOut);
-
-        if (videoRef.current.currentTime > newOut) {
-          seek(newOut);
-        }
-      }
-    }
-
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [currentTime, duration, inPoint, outPoint, volume, isMuted]);
-
-  useEffect(() => {
-    const el = videoRef.current;
-    if (!el) return;
-
-    const onPlay = () => setIsPlaying(true);
-    const onPause = () => setIsPlaying(false);
-    const onEnded = () => setIsPlaying(false);
-
-    const onVolumeChange = () => {
-      setVolume(el.volume ?? 1);
-      setIsMuted(!!el.muted);
-    };
-
-    el.addEventListener("play", onPlay);
-    el.addEventListener("pause", onPause);
-    el.addEventListener("ended", onEnded);
-    el.addEventListener("volumechange", onVolumeChange);
-
-
-
-    setIsPlaying(!el.paused && !el.ended);
-    el.volume = volume;
-    el.muted = isMuted;
-    onVolumeChange();
-
-    return () => {
-      el.removeEventListener("play", onPlay);
-      el.removeEventListener("pause", onPause);
-      el.removeEventListener("ended", onEnded);
-      el.removeEventListener("volumechange", onVolumeChange);
-    };
-  }, []);
-
-  useEffect(() => {
-    function onFullscreenChange() {
-      setIsFullscreen(document.fullscreenElement === shellRef.current);
-    }
-
-    document.addEventListener("fullscreenchange", onFullscreenChange);
-    return () => document.removeEventListener("fullscreenchange", onFullscreenChange);
-  }, []);
-
   return (
     <div className="clip-editor-container">
       
@@ -360,25 +227,24 @@ export default function ClipEditor({
         <button className={"close-preview-btn"} onClick={onClose}>
           <CloseIcon fontSize={"large"} />
         </button>
-        <VideoPreview
-          clip={clip}
-          videoRef={videoRef}
-          onLoadedMetadata={handleLoadedMetadata}
-          onTimeUpdate={handleTimeUpdate}
-          onTogglePlay={togglePlay}
-          onSeek={seek}
-          isPlaying={isPlaying}
-          currentTime={currentTime}
-          duration={duration}
+        <VideoPlayer
+          ref={playerRef}
+          src={`clipx://video?path=${encodeURIComponent(clip.path)}`}
+          poster={thumbSrc}
+          volume={volume}
+          muted={isMuted}
           startTime={inPoint}
           endTime={outPoint}
-          volume={volume}
-          isMuted={isMuted}
-          onToggleMute={toggleMute}
-          onSetVolume={setVideoVolume}
-          baseFolder={baseFolder}
+          showSkipButtons
           onNextClip={onNextClip}
           onPrevClip={onPrevClip}
+          onLoadedMetadata={handleLoadedMetadata}
+          onTimeUpdate={handleTimeUpdate}
+          onVolumeChange={({ volume: v, muted: m }) => {
+            setVolume(v);
+            setIsMuted(m);
+          }}
+          onKeyDown={handleKeyShortcut}
         />
 
         <Typography 
