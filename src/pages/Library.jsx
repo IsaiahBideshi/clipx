@@ -164,20 +164,20 @@ export default function Library() {
   const queryClient = useQueryClient();
 
   function moveSelectedClip(direction) {
-    if (!clips.length) return;
+    if (!filteredClips.length) return;
 
     setSelectedClip((currentClip) => {
       if (!currentClip) {
-        return direction > 0 ? clips[0] : clips[clips.length - 1];
+        return direction > 0 ? filteredClips[0] : filteredClips[filteredClips.length - 1];
       }
 
-      const currentIndex = clips.findIndex((item) => item.id === currentClip.id);
+      const currentIndex = filteredClips.findIndex((item) => item.id === currentClip.id);
       if (currentIndex < 0) {
-        return direction > 0 ? clips[0] : clips[clips.length - 1];
+        return direction > 0 ? filteredClips[0] : filteredClips[filteredClips.length - 1];
       }
 
-      const nextIndex = Math.max(0, Math.min(clips.length - 1, currentIndex + direction));
-      return clips[nextIndex];
+      const nextIndex = Math.max(0, Math.min(filteredClips.length - 1, currentIndex + direction));
+      return filteredClips[nextIndex];
     });
   }
 
@@ -205,7 +205,7 @@ export default function Library() {
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [clips, selectedClip]);
+  }, [filteredClips, selectedClip]);
 
   useEffect(() => {
     if (!loadingSession && !session) {
