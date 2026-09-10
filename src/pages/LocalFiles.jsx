@@ -507,22 +507,13 @@ export default function LocalFiles() {
       if (e.code === "Escape") {
         setClip(null);
         setDeleteClipModalOpen(false);
-      }
-
-      if (e.ctrlKey && e.code === "ArrowLeft") {
-        e.preventDefault();
-        moveSelectedClip(-1);
-      }
-
-      if (e.ctrlKey && e.code === "ArrowRight") {
-        e.preventDefault();
-        moveSelectedClip(1);
+        return;
       }
     }
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [moveSelectedClip]);
+  }, []);
 
   useEffect(() => {
     function handleClickOutside(event) {
