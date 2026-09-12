@@ -4,7 +4,7 @@
   box-sizing: border-box;
   padding: 24px;
   width: 100%;
-  height: calc(100vh - 8vh);
+  height: calc(100vh - 8vh - 30px);
   overflow-x: hidden;
   border: 1px solid var(--border);
   background: var(--page-surface);
