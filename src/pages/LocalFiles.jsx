@@ -4,10 +4,10 @@ import ClipEditor from "../components/ClipEditor.jsx";
 import SavingClipsWidget from "../components/SavingClipsWidget.jsx";
 import UploadingClipsWidget from "../components/UploadingClipsWidget.jsx";
 import ClipContextMenu from "../components/ClipContextMenu.jsx";
+import RefreshButton from "../components/RefreshButton.jsx";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import RefreshIcon from "@mui/icons-material/Refresh";
 import FolderOffIcon from "@mui/icons-material/FolderOff";
 import { Switch, TextField } from "@mui/material";
 import { isTextEntryActive } from "../lib/hotkeys.js";
@@ -649,11 +649,10 @@ export default function LocalFiles() {
     >
       {(rootPath || loadingInitial) && (
         <div className="local-files-header">
-          <RefreshIcon
+          <RefreshButton
             className="local-files-refresh"
             fontSize="large"
-            sx={{ cursor: "pointer" }}
-            onClick={refreshFiles}
+            onRefresh={refreshFiles}
           />
           <span className="local-files-toggle-label">Saved Clips</span>
           <Switch
