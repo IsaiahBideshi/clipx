@@ -181,6 +181,32 @@ export default function Library() {
     });
   }
 
+  const filteredClips = useMemo(() => {
+    const normalizedTitle = titleQuery.trim().toLowerCase();
+    const friendIds = new Set(selectedFriends.map((friend) => friend.id));
+
+    return clips.filter((clip) => {
+      if (normalizedTitle && !String(clip.title || "").toLowerCase().includes(normalizedTitle)) {
+        return false;
+      }
+
+      if (game?.id && clip.game_id !== game.id) {
+        return false;
+      }
+
+      if (friendIds.size > 0) {
+        const clipFriendIds = new Set(
+          allClipTags
+            .filter((tag) => tag.user_id && tag.clip_id === clip.id)
+            .map((tag) => tag.user_id)
+        );
+        return Array.from(friendIds).some((friendId) => clipFriendIds.has(friendId));
+      }
+
+      return true;
+    });
+  }, [allClipTags, clips, game, selectedFriends, titleQuery]);
+
   useEffect(() => {
     function onKeyDown(e) {
       if (isTextEntryActive(e)) return;
@@ -230,32 +256,6 @@ export default function Library() {
 
     handleSearchGame();
   }, [gameInput]);
-
-  const filteredClips = useMemo(() => {
-    const normalizedTitle = titleQuery.trim().toLowerCase();
-    const friendIds = new Set(selectedFriends.map((friend) => friend.id));
-
-    return clips.filter((clip) => {
-      if (normalizedTitle && !String(clip.title || "").toLowerCase().includes(normalizedTitle)) {
-        return false;
-      }
-
-      if (game?.id && clip.game_id !== game.id) {
-        return false;
-      }
-
-      if (friendIds.size > 0) {
-        const clipFriendIds = new Set(
-          allClipTags
-            .filter((tag) => tag.user_id && tag.clip_id === clip.id)
-            .map((tag) => tag.user_id)
-        );
-        return Array.from(friendIds).some((friendId) => clipFriendIds.has(friendId));
-      }
-
-      return true;
-    });
-  }, [allClipTags, clips, game, selectedFriends, titleQuery]);
 
 
   const containerRef = useRef(null);
