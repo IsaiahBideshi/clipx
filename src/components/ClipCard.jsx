@@ -60,7 +60,7 @@ function ClipCard({ clip, baseFolder, onClick, onContextMenuAction }) {
         )}
       <div style={{ flex: 1, display: "flex", flexDirection: "row", justifyContent: "space-between", width: "100%", alignItems: "center", gap: "8px" }}>
         <div>
-          <div className="clip-name">{clip.name}</div>
+          <div className="clip-name" title={clip.name}>{clip.name}</div>
           <div className={"clip-date"}>{formatDate(clip.createdAt)}</div>
         </div>
         <div style={{ position: "relative", flexShrink: 0 }}>
