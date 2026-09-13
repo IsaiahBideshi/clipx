@@ -71,6 +71,24 @@ async function exchangeCodeForTokens(code) {
   return payload.data;
 }
 
+async function syncGoogleAvatar(session, pictureUrl) {
+  const response = await fetch(`${baseUrl}/api/account`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${session.access_token}`,
+    },
+    body: JSON.stringify({
+      action: "provider-avatar",
+      avatarUrl: pictureUrl,
+    }),
+  });
+  const payload = response ? await response.json() : { data: null, error: "Failed to sync avatar" };
+  if (!response.ok || payload.error) {
+    throw new Error(payload.error || `Avatar sync failed with status ${response.status}`);
+  }
+}
+
 export async function signInWithGoogle(shell) {
   if (!clientId) {
     throw new Error(
@@ -95,9 +113,21 @@ export async function signInWithGoogle(shell) {
             access_token: tokens.access_token,
           });
 
+          if (error) {
+            throw error;
+          }
+
+          const session = data.session;
+          const picture = session?.user?.user_metadata?.picture;
+
+          if (session && picture) {
+            syncGoogleAvatar(session, picture).catch((syncError) => {
+              console.warn("Failed to sync Google avatar:", syncError?.message);
+            });
+          }
 
           clearTimeout(timeoutId);
-          resolve({ ok: true, session: data.session });
+          resolve({ ok: true, session });
         } else if (queryObject.error) {
           res.end("Authorization failed.");
           server.removeAllListeners("request");
