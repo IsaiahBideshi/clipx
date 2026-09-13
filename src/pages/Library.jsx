@@ -1,9 +1,10 @@
 import {useEffect, useMemo, useRef, useState} from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import Fuse from "fuse.js";
 import STOREDGAMES from "../data/games.json";
 import { supabase } from '../lib/supabase.js';
 import { useAuthSession } from "../lib/authSession.js";
+import { listClips } from "../lib/clipsApi.js";
 import { isTextEntryActive } from '../lib/hotkeys.js';
 import { useNavigate } from "react-router-dom";
 
@@ -24,6 +25,8 @@ import RefreshButton from "../components/RefreshButton.jsx";
 const GRID_GAP = 20;
 const MIN_CARD_WIDTH = 270;
 const INITIAL_SKELETON_COUNT = 20;
+const LIBRARY_PAGE_SIZE = 50;
+const GAME_BY_ID = new Map(STOREDGAMES.map((game) => [game.id, game]));
 
 function readSavedVolume() {
   const stored = globalThis.localStorage?.getItem("clipx:volume");
@@ -36,18 +39,47 @@ function readSavedMuted() {
   return stored === "true";
 }
 
-async function fetchLibraryClips() {
-  const { data, error } = await supabase
-    .from('clips')
-    .select('*')
-    .neq('visibility', 'private')
-    .order('created_at', { ascending: false });
+async function fetchLibraryClips(session, filters, offset = 0) {
+  if (!session?.user?.id) {
+    return { clips: [], count: 0 };
+  }
 
+  const query = {
+    scope: "library",
+    limit: LIBRARY_PAGE_SIZE,
+    offset,
+  };
+  if (filters.title?.trim()) {
+    query.title = filters.title.trim();
+  }
+  if (filters.game?.id) {
+    query.gameId = filters.game.id;
+  }
+  if (filters.owner?.id) {
+    query.ownerId = filters.owner.id;
+  }
+  if (filters.tags?.length) {
+    query.tagIds = filters.tags.map((tag) => tag.id).join(",");
+  }
+
+  const { data, error, count } = await listClips(session, query);
   if (error) {
     throw error;
   }
 
-  return data || [];
+  return { clips: data || [], count: count ?? (data || []).length };
+}
+
+function libraryClipsKey(filters) {
+  return [
+    "library",
+    "clips",
+    "feed",
+    filters.title?.trim() || "",
+    filters.game?.id ?? null,
+    filters.owner?.id ?? null,
+    (filters.tags || []).map((tag) => tag.id).join(","),
+  ];
 }
 
 async function fetchFriendsOptions(userId) {
@@ -86,18 +118,6 @@ async function fetchFriendsOptions(userId) {
       return { id: friendId, label: friendInfo.username };
     })
     .filter(Boolean);
-}
-
-async function fetchClipTags() {
-  const { data, error } = await supabase
-    .from("clip_tags")
-    .select("*");
-
-  if (error) {
-    throw error;
-  }
-
-  return data || [];
 }
 
 async function searchOwners(query) {
@@ -163,10 +183,15 @@ export default function Library() {
 
   const navigate = useNavigate();
   const userId = session?.user?.id;
-  const clipsQuery = useQuery({
-    queryKey: ["library", "clips"],
-    queryFn: fetchLibraryClips,
+  const clipsQuery = useInfiniteQuery({
+    queryKey: libraryClipsKey(filters),
+    queryFn: ({ pageParam = 0 }) => fetchLibraryClips(session, filters, pageParam),
     enabled: Boolean(session),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, allPages) => {
+      const loaded = allPages.reduce((n, p) => n + (p?.clips?.length || 0), 0);
+      return (lastPage?.count ?? 0) > loaded ? loaded : undefined;
+    },
   });
   const friendsOptionsQuery = useQuery({
     queryKey: ["library", "friendsOptions", userId],
@@ -174,16 +199,10 @@ export default function Library() {
     enabled: Boolean(userId),
     placeholderData: [],
   });
-  const clipTagsQuery = useQuery({
-    queryKey: ["library", "clipTags"],
-    queryFn: fetchClipTags,
-    enabled: Boolean(session),
-    placeholderData: [],
-  });
-  const clips = clipsQuery.data || [];
+  const clips = useMemo(() => (clipsQuery.data?.pages || []).flatMap((p) => p?.clips || []), [clipsQuery.data]);
+  const clipTotal = clipsQuery.data?.pages?.[0]?.count ?? clips.length;
   const friendsOptions = friendsOptionsQuery.data || [];
-  const allClipTags = clipTagsQuery.data || [];
-  const loadingClips = clipsQuery.isLoading;
+  const loadingClips = clipsQuery.isInitialLoading;
 
   const ownerIds = useMemo(
     () => Array.from(new Set(clips.map((clip) => clip.owner_id).filter(Boolean))),
@@ -230,35 +249,7 @@ export default function Library() {
     });
   }
 
-  const filteredClips = useMemo(() => {
-    const normalizedTitle = filters.title.trim().toLowerCase();
-    const friendIds = new Set(filters.tags.map((tag) => tag.id));
-
-    return clips.filter((clip) => {
-      if (normalizedTitle && !String(clip.title || "").toLowerCase().includes(normalizedTitle)) {
-        return false;
-      }
-
-      if (filters.game?.id && clip.game_id !== filters.game.id) {
-        return false;
-      }
-
-      if (filters.owner?.id && clip.owner_id !== filters.owner.id) {
-        return false;
-      }
-
-      if (friendIds.size > 0) {
-        const clipFriendIds = new Set(
-          allClipTags
-            .filter((tag) => tag.user_id && tag.clip_id === clip.id)
-            .map((tag) => tag.user_id)
-        );
-        return Array.from(friendIds).some((friendId) => clipFriendIds.has(friendId));
-      }
-
-      return true;
-    });
-  }, [allClipTags, clips, filters]);
+  const filteredClips = clips;
 
   useEffect(() => {
     function onKeyDown(e) {
@@ -390,7 +381,7 @@ export default function Library() {
           <h2>Library</h2>
         </div>
         <div className="library-hero-actions">
-          <div className="clip-count">{filteredClips.length} clip{filteredClips.length === 1 ? "" : "s"}</div>
+          <div className="clip-count">{clipTotal} clip{clipTotal === 1 ? "" : "s"}</div>
           <RefreshButton onRefresh={() => clipsQuery.refetch()} />
         </div>
       </div>
@@ -398,7 +389,7 @@ export default function Library() {
       <section className="search" aria-label="Search clips">
         <div className="search-head">
           <h2 className="search-title">Find a clip</h2>
-          <p className="search-count"><b>{filteredClips.length}</b>&nbsp;{filteredClips.length === 1 ? "match" : "matches"}</p>
+          <p className="search-count"><b>{filteredClips.length}</b> of {clipTotal} match{clipTotal === 1 ? "" : "es"}</p>
         </div>
         <div className="search-grid">
           <div className="field">
@@ -523,6 +514,18 @@ export default function Library() {
           ))}
       </div>
 
+      {clipsQuery.hasNextPage && (
+        <div className="library-load-more">
+          <Button
+            variant="outlined"
+            onClick={() => clipsQuery.fetchNextPage()}
+            disabled={clipsQuery.isFetchingNextPage}
+          >
+            {clipsQuery.isFetchingNextPage ? "Loading…" : "Load more"}
+          </Button>
+        </div>
+      )}
+
       {selectedClip && (
         <VideoPreview
           key={selectedClip.blob_name || selectedClip.youtube_video_id || selectedClip.id}
@@ -582,6 +585,10 @@ function AzureClipThumb({clip}) {
 export function ClipCard({clip, owner, onSelect}) {
   const clipDate = new Date(clip.created_at).toLocaleString( undefined, { dateStyle: 'long', timeStyle: 'short' });
   const isAzure = Boolean(clip.blob_name);
+  const game = clip.game_id != null ? GAME_BY_ID.get(clip.game_id) : null;
+  const gameCover = game?.cover?.url
+    ? ("https:" + game.cover.url).replace("/t_thumb/", "/t_cover_big/")
+    : null;
 
   return (
     <div className="clip-card" onClick={() => onSelect(clip)}>
@@ -590,20 +597,27 @@ export function ClipCard({clip, owner, onSelect}) {
       ) : (
         <img src={`https://img.youtube.com/vi/${clip.youtube_video_id}/mqdefault.jpg`} alt="thumb" className="clip-thumb" />
       )}
-      <div className="clip-name" title={clip.title}>{clip.title}</div>
-      {owner && (
-        <div className="clip-owner">
-          {owner.avatar_url ? (
-            <img src={owner.avatar_url} alt={owner.username} className="clip-owner-avatar" />
-          ) : (
-            <div className="clip-owner-avatar" aria-hidden="true">
-              {getOwnerInitials(owner.username)}
+      <div className="clip-info">
+        <div className="clip-text">
+          <div className="clip-name" title={clip.title}>{clip.title}</div>
+          {owner && (
+            <div className="clip-owner">
+              {owner.avatar_url ? (
+                <img src={owner.avatar_url} alt={owner.username} className="clip-owner-avatar" />
+              ) : (
+                <div className="clip-owner-avatar" aria-hidden="true">
+                  {getOwnerInitials(owner.username)}
+                </div>
+              )}
+              <span className="clip-owner-name">{owner.username}</span>
             </div>
           )}
-          <span className="clip-owner-name">{owner.username}</span>
+          <div className="clip-date">{clipDate}</div>
         </div>
-      )}
-      <div className="clip-date">{clipDate}</div>
+        {gameCover && (
+          <img className="clip-game-thumb" src={gameCover} alt={game.name} title={game.name} />
+        )}
+      </div>
     </div>
   );
 }

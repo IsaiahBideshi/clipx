@@ -33,6 +33,61 @@ export default async function handler(req, res) {
         return res.status(401).json({ data: null, error: authError })
       }
 
+      if (req.query.scope === 'library') {
+        const limit = Math.max(1, Math.min(parseInt(req.query.limit) || 50, 100))
+        const offset = Math.max(0, parseInt(req.query.offset) || 0)
+
+        let query = supabase
+          .from('clips')
+          .select('*', { count: 'exact' })
+          .or(`visibility.neq.private,and(visibility.eq.private,owner_id.eq.${user.id})`)
+
+        const rawTitle = String(req.query.title || '').trim()
+        if (rawTitle) {
+          const escaped = rawTitle.replace(/[\\%_]/g, (match) => `\\${match}`)
+          query = query.ilike('title', `%${escaped}%`)
+        }
+
+        if (req.query.gameId) {
+          query = query.eq('game_id', req.query.gameId)
+        }
+
+        if (req.query.ownerId) {
+          query = query.eq('owner_id', req.query.ownerId)
+        }
+
+        const tagIds = String(req.query.tagIds || '')
+          .split(',')
+          .map((id) => id.trim())
+          .filter(Boolean)
+        if (tagIds.length > 0) {
+          const { data: taggedClips, error: tagError } = await supabase
+            .from('clip_tags')
+            .select('clip_id')
+            .in('user_id', tagIds)
+          if (tagError) {
+            console.error('Error fetching tagged clip ids:', tagError)
+            return res.status(500).json({ data: null, error: tagError.message })
+          }
+          const clipIds = Array.from(new Set((taggedClips || []).map((t) => t.clip_id).filter(Boolean)))
+          if (clipIds.length === 0) {
+            return res.status(200).json({ data: [], error: null, count: 0 })
+          }
+          query = query.in('id', clipIds)
+        }
+
+        const { data, error, count } = await query
+          .order('created_at', { ascending: false })
+          .range(offset, offset + limit - 1)
+
+        if (error) {
+          console.error('Error fetching library feed:', error)
+          return res.status(500).json({ data: null, error: error.message })
+        }
+
+        return res.status(200).json({ data, error: null, count: count ?? 0 })
+      }
+
       if (req.query.visibility === 'friends') {
         const friendId = req.query.friendId
         if (!friendId) {

@@ -257,6 +257,12 @@
   gap: 20px;
 }
 
+.library .library-load-more {
+  display: flex;
+  justify-content: center;
+  margin: 24px 0;
+}
+
 .library .clip-card {
   width: min(270px, 100%);
   border: 1px solid rgba(255, 255, 255, 0.12);
@@ -292,6 +298,35 @@
 
 .library .clip-name {
   color: #f7f8ff;
+}
+
+.library .clip-info {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 10px 0 0;
+  width: auto;
+  font-size: 13px;
+  position: relative;
+}
+
+.library .clip-text {
+  flex: 1;
+  min-width: 0;
+  max-width: 80%;
+}
+
+.library .clip-game-thumb {
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 100%;
+  width: auto;
+  aspect-ratio: 2/3;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 .library .library-clip-grid .clip-name {
