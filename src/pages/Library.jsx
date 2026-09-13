@@ -203,6 +203,7 @@ export default function Library() {
     },
     enabled: ownerIds.length > 0,
     placeholderData: [],
+    refetchOnMount: "always",
   });
   const ownerMap = useMemo(
     () => Object.fromEntries((ownersQuery.data || []).map((user) => [user.id, user])),
