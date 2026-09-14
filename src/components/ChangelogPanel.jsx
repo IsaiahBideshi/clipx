@@ -1,21 +1,15 @@
+import semver from "semver";
+
 export function normalizeVersion(version) {
   return String(version || "").trim().replace(/^v/i, "").toLowerCase();
 }
 
 export function compareVersions(a, b) {
-  const parse = (value) => normalizeVersion(value).split(/\D+/).filter(Boolean).map(Number);
-  const left = parse(a);
-  const right = parse(b);
-  const length = Math.max(left.length, right.length);
-
-  for (let i = 0; i < length; i += 1) {
-    const diff = (left[i] || 0) - (right[i] || 0);
-    if (diff !== 0) {
-      return diff;
-    }
+  try {
+    return semver.compare(normalizeVersion(a), normalizeVersion(b));
+  } catch {
+    return 0;
   }
-
-  return 0;
 }
 
 function decodeHtmlEntities(value) {
@@ -162,12 +156,13 @@ export function parseChangelogSections(changelog, highlightedVersion, { fromVers
   const isHtml = hasHtmlMarkup(text);
   const parsedSections = isHtml ? parseHtmlChangelogSections(text) : [];
   let sections = parsedSections.length ? parsedSections : (isHtml ? [] : parseMarkdownChangelogSections(text));
+  const hasParsedSections = sections.length > 0;
 
   if (fromVersion && sections.length) {
     sections = sections.filter((section) => compareVersions(section.version, fromVersion) > 0);
   }
 
-  if (!sections.length) {
+  if (!hasParsedSections) {
     const version = highlightedVersion ? `v${normalizeVersion(highlightedVersion)}` : "Latest update";
     const content = isHtml ? htmlToPlainText(text) : text;
     return [{
