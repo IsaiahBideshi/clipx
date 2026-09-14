@@ -349,7 +349,7 @@ function UploadMenu({clip, start, end, onRefreshIndex, onSaveQueueEvent, onUploa
   const [gameInput, setGameInput] = useState("");
   const [gameOptions, setGameOptions] = useState([{ id: "testgame", label: "Test Game"},]);
   const [storedGamesLabels, setStoredGamesLabels] = useState([]);
-  const [visibility, setVisibility] = useState("private");
+  const [visibility, setVisibility] = useState("public");
   const [friendsOptions, setFriendsOptions] = useState([]);
   const userId = session?.user?.id;
 
