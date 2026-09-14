@@ -1,0 +1,22 @@
+.refresh-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.refresh-button-spinner {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.refresh-button.spinning .refresh-button-spinner {
+  animation: refresh-button-spin 600ms ease-out;
+}
+
+@keyframes refresh-button-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
