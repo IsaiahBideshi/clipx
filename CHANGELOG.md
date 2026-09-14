@@ -1,5 +1,20 @@
 # Changelog
 
+## v1.2.0
+
+- New: Clips now stored in Cloud instead of YouTube.
+- New: Reusable video player with playback, volume, fullscreen and keyboard shortcuts.
+- New: Library page redesign.
+- New: Volume and mute state remembered between sessions.
+- Fix: Renaming a clip to an existing name no longer breaks.
+- Fix: Saving a clip with a name that already exists is blocked.
+- Fix: Deleting a clip's thumbnail generates a new one.
+- Fix: No clips / no folder / loading skeleton gating bugs fixed.
+- Fix: Changing the clip folder updates the local files page without a restart.
+- Fix: Clips load faster from Cloud.
+- Fix: Clip names are one line long, full name shown on hover.
+- Fix: Pages no longer cut off by the menu bar.
+
 ## v1.1.7
 
 - Feat: Automatically download and install updates on first launch.
