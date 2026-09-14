@@ -70,11 +70,12 @@ async function fetchLibraryClips(session, filters, offset = 0) {
   return { clips: data || [], count: count ?? (data || []).length };
 }
 
-function libraryClipsKey(filters) {
+function libraryClipsKey(userId, filters) {
   return [
     "library",
     "clips",
     "feed",
+    userId,
     filters.title?.trim() || "",
     filters.game?.id ?? null,
     filters.owner?.id ?? null,
@@ -184,7 +185,7 @@ export default function Library() {
   const navigate = useNavigate();
   const userId = session?.user?.id;
   const clipsQuery = useInfiniteQuery({
-    queryKey: libraryClipsKey(filters),
+    queryKey: libraryClipsKey(userId, filters),
     queryFn: ({ pageParam = 0 }) => fetchLibraryClips(session, filters, pageParam),
     enabled: Boolean(session),
     initialPageParam: 0,

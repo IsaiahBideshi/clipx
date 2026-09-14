@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { getAuthMessage } from "../pages/signup";
+import { queryClient, QUERY_CACHE_STORAGE_KEY } from "./queryClient.js";
 
 const authStorage = {
     async getItem(key) {
@@ -154,6 +155,8 @@ async function loginWithEmail(email, password) {
 async function logout() {
     const { error } = await supabase.auth.signOut();
     throwIfAuthError(error);
+    queryClient.clear();
+    globalThis.localStorage?.removeItem(QUERY_CACHE_STORAGE_KEY);
 }
 
 async function getSession() {
