@@ -13,6 +13,10 @@ import Signup from "./pages/signup.jsx";
 import Login from "./pages/login.jsx";
 import NavBar from "./components/NavBar.jsx";
 import MenuBar from "./components/MenuBar.jsx";
+import ChangelogModal from "./components/ChangelogModal.jsx";
+import changelog from "../CHANGELOG.md?raw";
+
+const LAST_SEEN_CHANGELOG_KEY = "clipx:lastSeenChangelogVersion";
 
 const NAV_UPDATE_STATUSES = new Set([
   "available",
@@ -33,7 +37,30 @@ function hasNavUpdate(updateState) {
 
 export default function App() {
   const [updateState, setUpdateState] = useState(null);
+  const [updateChangelog, setUpdateChangelog] = useState(null);
   const showUpdateButton = hasNavUpdate(updateState);
+
+  function maybeShowPostUpdateChangelog(version) {
+    if (!version) {
+      return;
+    }
+
+    const lastSeen = globalThis.localStorage?.getItem(LAST_SEEN_CHANGELOG_KEY);
+
+    if (lastSeen && lastSeen !== version) {
+      setUpdateChangelog({ version, fromVersion: lastSeen });
+      return;
+    }
+
+    globalThis.localStorage?.setItem(LAST_SEEN_CHANGELOG_KEY, version);
+  }
+
+  function handleCloseUpdateChangelog() {
+    if (updateChangelog?.version) {
+      globalThis.localStorage?.setItem(LAST_SEEN_CHANGELOG_KEY, updateChangelog.version);
+    }
+    setUpdateChangelog(null);
+  }
 
   function handleUpdateClick() {
     if (updateState?.status === "downloaded") {
@@ -55,6 +82,7 @@ export default function App() {
     window.clipx.getUpdateState?.().then((state) => {
       if (mounted) {
         setUpdateState(state);
+        maybeShowPostUpdateChangelog(state?.currentVersion);
       }
     }).catch((err) => {
       console.error("Failed to load update state:", err);
@@ -111,6 +139,14 @@ export default function App() {
           </ErrorBoundary>
         } />
       </Routes>
+      {updateChangelog && (
+        <ChangelogModal
+          changelog={changelog}
+          currentVersion={updateChangelog.version}
+          fromVersion={updateChangelog.fromVersion}
+          onClose={handleCloseUpdateChangelog}
+        />
+      )}
     </>
   );
 }

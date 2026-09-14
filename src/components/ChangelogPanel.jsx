@@ -2,6 +2,22 @@ export function normalizeVersion(version) {
   return String(version || "").trim().replace(/^v/i, "").toLowerCase();
 }
 
+export function compareVersions(a, b) {
+  const parse = (value) => normalizeVersion(value).split(/\D+/).filter(Boolean).map(Number);
+  const left = parse(a);
+  const right = parse(b);
+  const length = Math.max(left.length, right.length);
+
+  for (let i = 0; i < length; i += 1) {
+    const diff = (left[i] || 0) - (right[i] || 0);
+    if (diff !== 0) {
+      return diff;
+    }
+  }
+
+  return 0;
+}
+
 function decodeHtmlEntities(value) {
   const text = String(value || "");
 
@@ -135,7 +151,7 @@ function parseMarkdownChangelogSections(text) {
   }));
 }
 
-export function parseChangelogSections(changelog, highlightedVersion) {
+export function parseChangelogSections(changelog, highlightedVersion, { fromVersion } = {}) {
   const rawText = String(changelog || "").trim();
   const decodedText = decodeHtmlEntities(rawText).trim();
   const text = hasHtmlMarkup(rawText) || hasHtmlMarkup(decodedText) ? decodedText : rawText;
@@ -145,7 +161,11 @@ export function parseChangelogSections(changelog, highlightedVersion) {
 
   const isHtml = hasHtmlMarkup(text);
   const parsedSections = isHtml ? parseHtmlChangelogSections(text) : [];
-  const sections = parsedSections.length ? parsedSections : (isHtml ? [] : parseMarkdownChangelogSections(text));
+  let sections = parsedSections.length ? parsedSections : (isHtml ? [] : parseMarkdownChangelogSections(text));
+
+  if (fromVersion && sections.length) {
+    sections = sections.filter((section) => compareVersions(section.version, fromVersion) > 0);
+  }
 
   if (!sections.length) {
     const version = highlightedVersion ? `v${normalizeVersion(highlightedVersion)}` : "Latest update";
@@ -165,8 +185,8 @@ export function parseChangelogSections(changelog, highlightedVersion) {
   }));
 }
 
-export default function ChangelogPanel({ changelog, highlightedVersion, highlightedLabel = "Current version" }) {
-  const sections = parseChangelogSections(changelog, highlightedVersion);
+export default function ChangelogPanel({ changelog, highlightedVersion, highlightedLabel = "Current version", fromVersion }) {
+  const sections = parseChangelogSections(changelog, highlightedVersion, { fromVersion });
 
   if (!sections.length) {
     return null;
