@@ -1,32 +1,27 @@
 import {useEffect, useMemo, useRef, useState} from "react";
-import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Fuse from "fuse.js";
 import STOREDGAMES from "../data/games.json";
 import { supabase } from '../lib/supabase.js';
 import { useAuthSession } from "../lib/authSession.js";
-import { listClips } from "../lib/clipsApi.js";
 import { isTextEntryActive } from '../lib/hotkeys.js';
 import { useNavigate } from "react-router-dom";
 
 import CloseIcon from '@mui/icons-material/Close';
 import TextField from '@mui/material/TextField';
 import AutoComplete from '@mui/material/Autocomplete';
-import InputAdornment from '@mui/material/InputAdornment';
-import SearchIcon from '@mui/icons-material/Search';
-import { Button, CircularProgress } from "@mui/material";
+import { CircularProgress } from "@mui/material";
 import { OverlayScrollbarsComponent } from "overlayscrollbars-react";
+import RefreshIcon from "@mui/icons-material/Refresh";
 import "overlayscrollbars/overlayscrollbars.css";
 
 import "./library.css";
 import fallBackThumb from "../assets/thumbnail.svg";
 import VideoPlayer from "../components/VideoPlayer";
-import RefreshButton from "../components/RefreshButton.jsx";
 
 const GRID_GAP = 20;
 const MIN_CARD_WIDTH = 270;
 const INITIAL_SKELETON_COUNT = 20;
-const LIBRARY_PAGE_SIZE = 50;
-const GAME_BY_ID = new Map(STOREDGAMES.map((game) => [game.id, game]));
 
 function readSavedVolume() {
   const stored = globalThis.localStorage?.getItem("clipx:volume");
@@ -39,48 +34,18 @@ function readSavedMuted() {
   return stored === "true";
 }
 
-async function fetchLibraryClips(session, filters, offset = 0) {
-  if (!session?.user?.id) {
-    return { clips: [], count: 0 };
-  }
+async function fetchLibraryClips() {
+  const { data, error } = await supabase
+    .from('clips')
+    .select('*')
+    .neq('visibility', 'private')
+    .order('created_at', { ascending: false });
 
-  const query = {
-    scope: "library",
-    limit: LIBRARY_PAGE_SIZE,
-    offset,
-  };
-  if (filters.title?.trim()) {
-    query.title = filters.title.trim();
-  }
-  if (filters.game?.id) {
-    query.gameId = filters.game.id;
-  }
-  if (filters.owner?.id) {
-    query.ownerId = filters.owner.id;
-  }
-  if (filters.tags?.length) {
-    query.tagIds = filters.tags.map((tag) => tag.id).join(",");
-  }
-
-  const { data, error, count } = await listClips(session, query);
   if (error) {
     throw error;
   }
 
-  return { clips: data || [], count: count ?? (data || []).length };
-}
-
-function libraryClipsKey(userId, filters) {
-  return [
-    "library",
-    "clips",
-    "feed",
-    userId,
-    filters.title?.trim() || "",
-    filters.game?.id ?? null,
-    filters.owner?.id ?? null,
-    (filters.tags || []).map((tag) => tag.id).join(","),
-  ];
+  return data || [];
 }
 
 async function fetchFriendsOptions(userId) {
@@ -121,22 +86,16 @@ async function fetchFriendsOptions(userId) {
     .filter(Boolean);
 }
 
-async function searchOwners(query) {
-  const name = String(query || "").trim();
-  if (name.length < 3) return [];
-
+async function fetchClipTags() {
   const { data, error } = await supabase
-    .from("users")
-    .select("id, username")
-    .ilike("username", `%${name}%`)
-    .limit(8);
+    .from("clip_tags")
+    .select("*");
 
   if (error) {
-    console.error("Failed to search users:", error);
-    return [];
+    throw error;
   }
 
-  return (data || []).map((user) => ({ id: user.id, label: user.username }));
+  return data || [];
 }
 
 async function checkStoredGames(query) {
@@ -171,28 +130,19 @@ async function searchGames(gameName) {
 
 export default function Library() {
   const [selectedClip, setSelectedClip] = useState(null);
-  const [draftTitle, setDraftTitle] = useState("");
-  const [draftGame, setDraftGame] = useState(null);
-  const [draftGameInput, setDraftGameInput] = useState("");
-  const [draftTags, setDraftTags] = useState([]);
+  const [titleQuery, setTitleQuery] = useState("");
+  const [game, setGame] = useState(null);
   const [gameOptions, setGameOptions] = useState([]);
-  const [ownerOptions, setOwnerOptions] = useState([]);
-  const [draftOwner, setDraftOwner] = useState(null);
-  const [ownerInput, setOwnerInput] = useState("");
-  const [filters, setFilters] = useState({ title: "", game: null, tags: [], owner: null });
+  const [gameInput, setGameInput] = useState("");
+  const [selectedFriends, setSelectedFriends] = useState([]);
   const { session, loading: loadingSession } = useAuthSession();
 
   const navigate = useNavigate();
   const userId = session?.user?.id;
-  const clipsQuery = useInfiniteQuery({
-    queryKey: libraryClipsKey(userId, filters),
-    queryFn: ({ pageParam = 0 }) => fetchLibraryClips(session, filters, pageParam),
+  const clipsQuery = useQuery({
+    queryKey: ["library", "clips"],
+    queryFn: fetchLibraryClips,
     enabled: Boolean(session),
-    initialPageParam: 0,
-    getNextPageParam: (lastPage, allPages) => {
-      const loaded = allPages.reduce((n, p) => n + (p?.clips?.length || 0), 0);
-      return (lastPage?.count ?? 0) > loaded ? loaded : undefined;
-    },
   });
   const friendsOptionsQuery = useQuery({
     queryKey: ["library", "friendsOptions", userId],
@@ -200,35 +150,16 @@ export default function Library() {
     enabled: Boolean(userId),
     placeholderData: [],
   });
-  const clips = useMemo(() => (clipsQuery.data?.pages || []).flatMap((p) => p?.clips || []), [clipsQuery.data]);
-  const clipTotal = clipsQuery.data?.pages?.[0]?.count ?? clips.length;
-  const friendsOptions = friendsOptionsQuery.data || [];
-  const loadingClips = clipsQuery.isInitialLoading;
-
-  const ownerIds = useMemo(
-    () => Array.from(new Set(clips.map((clip) => clip.owner_id).filter(Boolean))),
-    [clips]
-  );
-  const ownersQuery = useQuery({
-    queryKey: ["library", "owners", ownerIds.join(",")],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("users")
-        .select("id, username, avatar_url")
-        .in("id", ownerIds);
-      if (error) {
-        throw error;
-      }
-      return data || [];
-    },
-    enabled: ownerIds.length > 0,
+  const clipTagsQuery = useQuery({
+    queryKey: ["library", "clipTags"],
+    queryFn: fetchClipTags,
+    enabled: Boolean(session),
     placeholderData: [],
-    refetchOnMount: "always",
   });
-  const ownerMap = useMemo(
-    () => Object.fromEntries((ownersQuery.data || []).map((user) => [user.id, user])),
-    [ownersQuery.data]
-  );
+  const clips = clipsQuery.data || [];
+  const friendsOptions = friendsOptionsQuery.data || [];
+  const allClipTags = clipTagsQuery.data || [];
+  const loadingClips = clipsQuery.isLoading;
 
   const queryClient = useQueryClient();
 
@@ -250,7 +181,31 @@ export default function Library() {
     });
   }
 
-  const filteredClips = clips;
+  const filteredClips = useMemo(() => {
+    const normalizedTitle = titleQuery.trim().toLowerCase();
+    const friendIds = new Set(selectedFriends.map((friend) => friend.id));
+
+    return clips.filter((clip) => {
+      if (normalizedTitle && !String(clip.title || "").toLowerCase().includes(normalizedTitle)) {
+        return false;
+      }
+
+      if (game?.id && clip.game_id !== game.id) {
+        return false;
+      }
+
+      if (friendIds.size > 0) {
+        const clipFriendIds = new Set(
+          allClipTags
+            .filter((tag) => tag.user_id && tag.clip_id === clip.id)
+            .map((tag) => tag.user_id)
+        );
+        return Array.from(friendIds).some((friendId) => clipFriendIds.has(friendId));
+      }
+
+      return true;
+    });
+  }, [allClipTags, clips, game, selectedFriends, titleQuery]);
 
   useEffect(() => {
     function onKeyDown(e) {
@@ -286,7 +241,7 @@ export default function Library() {
 
   useEffect(() => {
     async function handleSearchGame() {
-      const games = await searchGames(draftGameInput);
+      const games = await searchGames(gameInput);
       const options = games.map((entry) => ({
         id: entry.id,
         label:
@@ -300,39 +255,7 @@ export default function Library() {
     }
 
     handleSearchGame();
-  }, [draftGameInput]);
-
-  useEffect(() => {
-    async function handleSearchOwner() {
-      if (!ownerInput.trim()) {
-        setOwnerOptions(userId ? [{ id: userId, label: "Me" }] : []);
-        return;
-      }
-      const options = await searchOwners(ownerInput);
-      setOwnerOptions(options);
-    }
-
-    handleSearchOwner();
-  }, [ownerInput, userId]);
-
-  function applyFilters() {
-    setFilters({
-      title: draftTitle.trim(),
-      game: draftGame,
-      tags: draftTags,
-      owner: draftOwner,
-    });
-  }
-
-  function clearFilters() {
-    setDraftTitle("");
-    setDraftGame(null);
-    setDraftGameInput("");
-    setDraftTags([]);
-    setDraftOwner(null);
-    setOwnerInput("");
-    setFilters({ title: "", game: null, tags: [], owner: null });
-  }
+  }, [gameInput]);
 
 
   const containerRef = useRef(null);
@@ -379,123 +302,80 @@ export default function Library() {
     >
       <div className="library-hero">
         <div>
+          <p className="eyebrow">Discover</p>
           <h2>Library</h2>
-        </div>
-        <div className="library-hero-actions">
-          <div className="clip-count">{clipTotal} clip{clipTotal === 1 ? "" : "s"}</div>
-          <RefreshButton onRefresh={() => clipsQuery.refetch()} />
+          <p className="hero-copy">Browse uploaded clips and preview details before opening full playback.</p>
         </div>
       </div>
       
-      <section className="search" aria-label="Search clips">
-        <div className="search-head">
-          <h2 className="search-title">Find a clip</h2>
-          <p className="search-count"><b>{filteredClips.length}</b> of {clipTotal} match{clipTotal === 1 ? "" : "es"}</p>
-        </div>
-        <div className="search-grid">
-          <div className="field">
-            <label className="field-label" htmlFor="search-title">Clip title</label>
-            <TextField
-              fullWidth
-              id="search-title"
-              placeholder="Search by title"
-              value={draftTitle}
-              onChange={(e) => setDraftTitle(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  applyFilters();
-                }
-              }}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchIcon className="field-icon" />
-                  </InputAdornment>
-                ),
-              }}
-            />
-          </div>
-          <div className="field">
-            <label className="field-label" htmlFor="search-game">Game</label>
-            <AutoComplete
-              id="search-game"
-              options={gameOptions}
-              filterOptions={(options) => options}
-              freeSolo
-              value={draftGame}
-              inputValue={draftGameInput}
-              onInputChange={(_e, newInputValue) => setDraftGameInput(newInputValue)}
-              onChange={(_e, newValue) => {
-                setDraftGame(newValue);
-                setDraftGameInput(newValue?.label ?? "");
-              }}
-              renderOption={(props, opt) => (
-                <li {...props} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  {opt.image && (
-                    <img
-                      src={opt.image}
-                      alt={opt.label}
-                      style={{ width: 32, height: 45, objectFit: "cover", borderRadius: 2 }}
-                    />
-                  )}
-                  <span>{opt.label}</span>
-                </li>
-              )}
-              renderInput={(params) => (
-                <TextField
-                  {...params}
-                  fullWidth
-                  placeholder="Search game"
-                />
-              )}
-            />
-          </div>
-          <div className="field">
-            <label className="field-label" htmlFor="search-owner">Owner</label>
-            <AutoComplete
-              id="search-owner"
-              options={ownerOptions}
-              filterOptions={(options) => options}
-              value={draftOwner}
-              inputValue={ownerInput}
-              onInputChange={(_e, newInputValue) => setOwnerInput(newInputValue)}
-              onChange={(_e, newValue) => {
-                setDraftOwner(newValue);
-                setOwnerInput(newValue?.label ?? "");
-              }}
-              renderInput={(params) => (
-                <TextField
-                  {...params}
-                  fullWidth
-                  placeholder="Search owner"
-                />
-              )}
-            />
-          </div>
-          <div className="field">
-            <label className="field-label" htmlFor="search-tags">Tags</label>
-            <AutoComplete
-              multiple
-              options={friendsOptions}
-              value={draftTags}
-              onChange={(_e, newValue) => setDraftTags(newValue)}
-              filterSelectedOptions
-              renderInput={(params) => (
-                <TextField
-                  {...params}
-                  fullWidth
-                  placeholder="People in the clip"
-                />
-              )}
+      <div className="filtering-container">
+        <div className="search-bar">
+          <TextField
+            fullWidth
+            label="Clip title"
+            placeholder="Search by clip title"
+            value={titleQuery}
+            onChange={(e) => setTitleQuery(e.target.value)}
+          />
+          <div>
+            <RefreshIcon
+              fontSize="large"
+              sx={{ cursor: "pointer" }}
+              onClick={() => clipsQuery.refetch()}
             />
           </div>
         </div>
-        <div className="search-actions">
-          <Button variant={"contained"} onClick={applyFilters}>Filter</Button>
-          <Button variant={"outlined"} onClick={clearFilters}>Clear</Button>
+        <div className="search-bar filter-search-bar">
+          <AutoComplete
+            options={gameOptions}
+            filterOptions={(options) => options}
+            freeSolo
+            value={game}
+            inputValue={gameInput}
+            onInputChange={(_e, newInputValue) => setGameInput(newInputValue)}
+            onChange={(_e, newValue) => {
+              setGame(newValue);
+              setGameInput(newValue?.label ?? "");
+            }}
+            renderOption={(props, opt) => (
+              <li {...props} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                {opt.image && (
+                  <img
+                    src={opt.image}
+                    alt={opt.label}
+                    style={{ width: 32, height: 45, objectFit: "cover", borderRadius: 2 }}
+                  />
+                )}
+                <span>{opt.label}</span>
+              </li>
+            )}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                fullWidth
+                label="Game"
+                placeholder="Search game"
+              />
+            )}
+          />
+
+          <AutoComplete
+            multiple
+            options={friendsOptions}
+            value={selectedFriends}
+            onChange={(_e, newValue) => setSelectedFriends(newValue)}
+            filterSelectedOptions
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                fullWidth
+                label="Friends"
+                placeholder="Search friends"
+              />
+            )}
+          />
         </div>
-      </section>
+      </div>
 
       <div className="clip-grid library-clip-grid" ref={containerRef}>
         {loadingClips
@@ -506,7 +386,6 @@ export default function Library() {
               <ClipCard
                 key={clip.id}
                 clip={clip}
-                owner={ownerMap[clip.owner_id]}
                 onSelect={setSelectedClip}
               />
             ))}
@@ -514,18 +393,6 @@ export default function Library() {
             <div key={`filler-${i}`} className="clip-card filler" />
           ))}
       </div>
-
-      {clipsQuery.hasNextPage && (
-        <div className="library-load-more">
-          <Button
-            variant="outlined"
-            onClick={() => clipsQuery.fetchNextPage()}
-            disabled={clipsQuery.isFetchingNextPage}
-          >
-            {clipsQuery.isFetchingNextPage ? "Loading…" : "Load more"}
-          </Button>
-        </div>
-      )}
 
       {selectedClip && (
         <VideoPreview
@@ -583,13 +450,9 @@ function AzureClipThumb({clip}) {
 }
 
 
-export function ClipCard({clip, owner, onSelect}) {
+export function ClipCard({clip, onSelect}) {
   const clipDate = new Date(clip.created_at).toLocaleString( undefined, { dateStyle: 'long', timeStyle: 'short' });
   const isAzure = Boolean(clip.blob_name);
-  const game = clip.game_id != null ? GAME_BY_ID.get(clip.game_id) : null;
-  const gameCover = game?.cover?.url
-    ? ("https:" + game.cover.url).replace("/t_thumb/", "/t_cover_big/")
-    : null;
 
   return (
     <div className="clip-card" onClick={() => onSelect(clip)}>
@@ -598,39 +461,10 @@ export function ClipCard({clip, owner, onSelect}) {
       ) : (
         <img src={`https://img.youtube.com/vi/${clip.youtube_video_id}/mqdefault.jpg`} alt="thumb" className="clip-thumb" />
       )}
-      <div className="clip-info">
-        <div className="clip-text">
-          <div className="clip-name" title={clip.title}>{clip.title}</div>
-          {owner && (
-            <div className="clip-owner">
-              {owner.avatar_url ? (
-                <img src={owner.avatar_url} alt={owner.username} className="clip-owner-avatar" />
-              ) : (
-                <div className="clip-owner-avatar" aria-hidden="true">
-                  {getOwnerInitials(owner.username)}
-                </div>
-              )}
-              <span className="clip-owner-name">{owner.username}</span>
-            </div>
-          )}
-          <div className="clip-date">{clipDate}</div>
-        </div>
-        {gameCover && (
-          <img className="clip-game-thumb" src={gameCover} alt={game.name} title={game.name} />
-        )}
-      </div>
+      <div className="clip-name">{clip.title}</div>
+      <div className="clip-date">{clipDate}</div>
     </div>
   );
-}
-
-function getOwnerInitials(name) {
-  return String(name || "?")
-    .split(/[\s@._-]+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join("")
-    .toUpperCase() || "?";
 }
 
 // Legacy Component.

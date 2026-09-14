@@ -2,7 +2,6 @@ import { QueryClient } from "@tanstack/react-query";
 import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
 
 export const QUERY_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
-export const QUERY_CACHE_STORAGE_KEY = "clipx-query-cache";
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -21,6 +20,6 @@ const queryStorage = typeof globalThis.localStorage === "undefined" ? undefined 
 
 export const queryPersister = createSyncStoragePersister({
   storage: queryStorage,
-  key: QUERY_CACHE_STORAGE_KEY,
+  key: "clipx-query-cache",
   throttleTime: 1000,
 });

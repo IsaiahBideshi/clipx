@@ -22,7 +22,7 @@ createRoot(document.getElementById('root')).render(
             if (scope === "localFiles" && resource === "clips" && cursor !== null) {
               return false;
             }
-            if (scope === "library" && (resource === "clipThumb" || resource === "owners")) {
+            if (scope === "library" && resource === "clipThumb") {
               return false;
             }
 

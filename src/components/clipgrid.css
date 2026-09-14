@@ -488,11 +488,11 @@
 
 .clip-grid-virtual .clip-name {
   display: -webkit-box;
-  min-height: 17px;
+  min-height: 34px;
   overflow: hidden;
   overflow-wrap: anywhere;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 1;
+  -webkit-line-clamp: 2;
 }
 
 .clip-grid-loader-row .clip-card-skeleton {
