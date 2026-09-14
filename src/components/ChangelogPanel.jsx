@@ -1,5 +1,15 @@
+import semver from "semver";
+
 export function normalizeVersion(version) {
   return String(version || "").trim().replace(/^v/i, "").toLowerCase();
+}
+
+export function compareVersions(a, b) {
+  try {
+    return semver.compare(normalizeVersion(a), normalizeVersion(b));
+  } catch {
+    return 0;
+  }
 }
 
 function decodeHtmlEntities(value) {
@@ -135,7 +145,7 @@ function parseMarkdownChangelogSections(text) {
   }));
 }
 
-export function parseChangelogSections(changelog, highlightedVersion) {
+export function parseChangelogSections(changelog, highlightedVersion, { fromVersion } = {}) {
   const rawText = String(changelog || "").trim();
   const decodedText = decodeHtmlEntities(rawText).trim();
   const text = hasHtmlMarkup(rawText) || hasHtmlMarkup(decodedText) ? decodedText : rawText;
@@ -145,9 +155,14 @@ export function parseChangelogSections(changelog, highlightedVersion) {
 
   const isHtml = hasHtmlMarkup(text);
   const parsedSections = isHtml ? parseHtmlChangelogSections(text) : [];
-  const sections = parsedSections.length ? parsedSections : (isHtml ? [] : parseMarkdownChangelogSections(text));
+  let sections = parsedSections.length ? parsedSections : (isHtml ? [] : parseMarkdownChangelogSections(text));
+  const hasParsedSections = sections.length > 0;
 
-  if (!sections.length) {
+  if (fromVersion && sections.length) {
+    sections = sections.filter((section) => compareVersions(section.version, fromVersion) > 0);
+  }
+
+  if (!hasParsedSections) {
     const version = highlightedVersion ? `v${normalizeVersion(highlightedVersion)}` : "Latest update";
     const content = isHtml ? htmlToPlainText(text) : text;
     return [{
@@ -165,8 +180,8 @@ export function parseChangelogSections(changelog, highlightedVersion) {
   }));
 }
 
-export default function ChangelogPanel({ changelog, highlightedVersion, highlightedLabel = "Current version" }) {
-  const sections = parseChangelogSections(changelog, highlightedVersion);
+export default function ChangelogPanel({ changelog, highlightedVersion, highlightedLabel = "Current version", fromVersion }) {
+  const sections = parseChangelogSections(changelog, highlightedVersion, { fromVersion });
 
   if (!sections.length) {
     return null;
