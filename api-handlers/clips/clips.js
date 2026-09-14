@@ -37,10 +37,32 @@ export default async function handler(req, res) {
         const limit = Math.max(1, Math.min(parseInt(req.query.limit) || 50, 100))
         const offset = Math.max(0, parseInt(req.query.offset) || 0)
 
+        const { data: friendRows, error: friendsError } = await supabase
+          .from('friendships')
+          .select('user_id, friend_id')
+          .eq('status', 'accepted')
+          .or(`user_id.eq.${user.id},friend_id.eq.${user.id}`)
+        if (friendsError) {
+          console.error('Error fetching friend ids:', friendsError)
+          return res.status(500).json({ data: null, error: friendsError.message })
+        }
+
+        const friendIds = Array.from(
+          new Set(
+            (friendRows || []).map((row) =>
+              row.user_id === user.id ? row.friend_id : row.user_id
+            )
+          )
+        )
+
+        const visibilityFilter = friendIds.length > 0
+          ? `or(visibility.eq.public,owner_id.eq.${user.id},and(visibility.eq.friends,owner_id.in.(${friendIds.join(',')})))`
+          : `or(visibility.eq.public,owner_id.eq.${user.id})`
+
         let query = supabase
           .from('clips')
           .select('*', { count: 'exact' })
-          .or(`visibility.neq.private,and(visibility.eq.private,owner_id.eq.${user.id})`)
+          .or(visibilityFilter)
 
         const rawTitle = String(req.query.title || '').trim()
         if (rawTitle) {
