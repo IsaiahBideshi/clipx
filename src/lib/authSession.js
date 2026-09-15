@@ -30,26 +30,62 @@ export function useAuthSession() {
 
   useEffect(() => {
     let cancelled = false;
+    let initialSessionHandled = false;
+    let resolved = false;
+    let resolvedSession = null;
+    let fallbackTimer;
 
-    resolveAuthSession().then((nextSession) => {
-      if (cancelled) return;
-      setSession(nextSession);
-      setLoading(false);
-    });
+    resolveAuthSession().then(
+      (nextSession) => {
+        resolved = true;
+        resolvedSession = nextSession;
+        if (cancelled || initialSessionHandled) {
+          return;
+        }
+        // A null result here can precede the real session when async storage
+        // hasn't finished loading yet. INITIAL_SESSION below is authoritative
+        // for the signed-out case, so only a non-null session clears loading.
+        if (nextSession) {
+          setSession(nextSession);
+          setLoading(false);
+        }
+      },
+      () => {
+        resolved = true;
+        resolvedSession = null;
+      }
+    );
 
     const {
       data: { subscription },
     } = auth.onAuthStateChange((event, nextSession) => {
-      if (cancelled || event === "INITIAL_SESSION") {
+      if (cancelled) {
         return;
+      }
+      if (event === "INITIAL_SESSION") {
+        initialSessionHandled = true;
+        clearTimeout(fallbackTimer);
       }
 
       setSession(nextSession);
       setLoading(false);
     });
 
+    // Safety net: if INITIAL_SESSION is delayed or never fires, fall back to whatever getSession() returned
+    fallbackTimer = setTimeout(() => {
+      if (cancelled || initialSessionHandled) {
+        return;
+      }
+      if (resolved) {
+        initialSessionHandled = true;
+        setSession(resolvedSession);
+      }
+      setLoading(false);
+    }, 5000);
+
     return () => {
       cancelled = true;
+      clearTimeout(fallbackTimer);
       subscription.unsubscribe();
     };
   }, []);

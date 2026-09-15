@@ -343,7 +343,7 @@ function UploadMenu({clip, start, end, onRefreshIndex, onSaveQueueEvent, onUploa
   const [tags, setTags] = useState([]);
   const [friendsInClip, setFriendsInClip] = useState([]);
   const [peopleInput, setPeopleInput] = useState('');
-  const { session } = useAuthSession();
+  const { session, loading: loadingSession } = useAuthSession();
   const [game, setGame] = useState(null);
   const [clipTitle, setClipTitle] = useState("");
   const [gameInput, setGameInput] = useState("");
@@ -357,50 +357,50 @@ function UploadMenu({clip, start, end, onRefreshIndex, onSaveQueueEvent, onUploa
     setVisibility(event.target.value);
   };
 
-useEffect(() => {
-  async function loadFriends() {
-    if (!userId) {
-      setFriendsOptions([]);
-      return;
-    }
-
-    const { data, error } = await supabase
-      .from("friendships")
-      .select("user_id, friend_id")
-      .eq("status", "accepted")
-      .or(`user_id.eq.${userId},friend_id.eq.${userId}`);
-
-    if (error) {
-      console.error("Failed to load friendships:", error);
-      return;
-    }
-
-    let friendIds = data.map(f => (f.user_id === userId ? f.friend_id : f.user_id));
-
-    if (friendIds.length === 0) {
-      setFriendsOptions([]);
-      return;
-    }
-
-    const { data: friendsData, error: friendsError } = await supabase
-      .from("users")
-      .select("id, username")
-      .in("id", friendIds)
-
-
-    let friendsOptionsArr = [];
-    for (const friendship of data) {
-      const friendId = friendship.user_id === userId ? friendship.friend_id : friendship.user_id;
-      const friendInfo = friendsData.find(f => f.id === friendId);
-      if (friendInfo) {
-        friendsOptionsArr.push({ id: friendId, label: friendInfo.username });
+  useEffect(() => {
+    async function loadFriends() {
+      if (!userId) {
+        setFriendsOptions([]);
+        return;
       }
-    }
-    setFriendsOptions(friendsOptionsArr);
-  }
 
-  loadFriends();
-}, [userId]);
+      const { data, error } = await supabase
+        .from("friendships")
+        .select("user_id, friend_id")
+        .eq("status", "accepted")
+        .or(`user_id.eq.${userId},friend_id.eq.${userId}`);
+
+      if (error) {
+        console.error("Failed to load friendships:", error);
+        return;
+      }
+
+      let friendIds = data.map(f => (f.user_id === userId ? f.friend_id : f.user_id));
+
+      if (friendIds.length === 0) {
+        setFriendsOptions([]);
+        return;
+      }
+
+      const { data: friendsData, error: friendsError } = await supabase
+        .from("users")
+        .select("id, username")
+        .in("id", friendIds)
+
+
+      let friendsOptionsArr = [];
+      for (const friendship of data) {
+        const friendId = friendship.user_id === userId ? friendship.friend_id : friendship.user_id;
+        const friendInfo = friendsData.find(f => f.id === friendId);
+        if (friendInfo) {
+          friendsOptionsArr.push({ id: friendId, label: friendInfo.username });
+        }
+      }
+      setFriendsOptions(friendsOptionsArr);
+    }
+
+    loadFriends();
+  }, [userId]);
 
   useEffect(() => {
     handleSearchGame();
