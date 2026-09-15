@@ -22,6 +22,8 @@ const appTheme = createTheme({
           textTransform: "none",
           fontWeight: 600,
           borderRadius: 999,
+          transition:
+            "box-shadow 150ms cubic-bezier(0.4, 0, 0.2, 1), border-color 250ms cubic-bezier(0.4, 0, 0.2, 1)",
           "&.Mui-disabled": {
             color: "rgba(255, 255, 255, 0.4)",
             borderColor: "rgba(255, 255, 255, 0.14)",
