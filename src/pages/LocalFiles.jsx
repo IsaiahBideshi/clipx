@@ -11,6 +11,7 @@ import { useNavigate } from "react-router-dom";
 import FolderOffIcon from "@mui/icons-material/FolderOff";
 import { Switch, TextField } from "@mui/material";
 import { isTextEntryActive } from "../lib/hotkeys.js";
+import { useAuthSession } from "../lib/authSession.js";
 
 import { OverlayScrollbarsComponent } from "overlayscrollbars-react";
 import "overlayscrollbars/overlayscrollbars.css";
@@ -115,6 +116,7 @@ export default function LocalFiles() {
   const scrollElementRef = useRef(null);
 
   const collection = useMemo(() => (showSavedFiles ? "saved" : "source"), [showSavedFiles]);
+  const { session } = useAuthSession();
   const queryClient = useQueryClient();
   const optionsQuery = useQuery({
     queryKey: ["localFiles", "options"],
@@ -688,6 +690,7 @@ export default function LocalFiles() {
       {clip && rootPath && (
         <ClipEditor
           clip={clip}
+          authSession={session}
           onSaveQueueEvent={handleSaveQueueEvent}
           onUploadQueueEvent={handleUploadQueueEvent}
           isSavedClipsView={showSavedFiles}

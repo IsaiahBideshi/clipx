@@ -8,7 +8,6 @@ import TextField from '@mui/material/TextField';
 import Button from '@mui/material/Button';
 import AutoComplete from '@mui/material/Autocomplete';
 import { supabase } from "../lib/supabase.js";
-import { useAuthSession } from "../lib/authSession.js";
 import { InputLabel, MenuItem, Select, FormControl, Typography } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import fallBackThumb from "../assets/thumbnail.svg";
@@ -66,6 +65,7 @@ export default function ClipEditor({
   onClose, 
   baseFolder,
   triggerClipIndexRefresh,
+  authSession,
   uploading,
   setUploading,
   saving,
@@ -290,6 +290,7 @@ export default function ClipEditor({
             clip={clip}
             start={inPoint}
             end={outPoint}
+            session={authSession}
             onSaveQueueEvent={onSaveQueueEvent}
             onUploadQueueEvent={onUploadQueueEvent}
             onDelete={onDelete}
@@ -339,11 +340,10 @@ async function searchGames(gameName) {
 }
 
 
-function UploadMenu({clip, start, end, onRefreshIndex, onSaveQueueEvent, onUploadQueueEvent, onDelete, uploading, setUploading, saving, setSaving}) {
+function UploadMenu({clip, start, end, onRefreshIndex, onSaveQueueEvent, onUploadQueueEvent, onDelete, uploading, setUploading, saving, setSaving, session}) {
   const [tags, setTags] = useState([]);
   const [friendsInClip, setFriendsInClip] = useState([]);
   const [peopleInput, setPeopleInput] = useState('');
-  const { session, loading: loadingSession } = useAuthSession();
   const [game, setGame] = useState(null);
   const [clipTitle, setClipTitle] = useState("");
   const [gameInput, setGameInput] = useState("");
