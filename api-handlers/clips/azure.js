@@ -57,33 +57,81 @@ export function getPublicBlobUrl(blobName, containerName = CONTAINER_NAME) {
   return `${getBlobServiceClient().url}${containerName}/${encodeBlobPath(blobName)}`;
 }
 
-export async function deleteBlob(blobName, containerName = CONTAINER_NAME) {
-  const container = getBlobServiceClient().getContainerClient(containerName)
-  await container.getBlobClient(blobName).deleteIfExists()
+function resolveBlobIdentifier(blobNameOrUrl, containerName = CONTAINER_NAME) {
+  if (typeof blobNameOrUrl !== 'string' || !blobNameOrUrl) {
+    throw new Error('Missing blob name or URL')
+  }
+  const trimmed = blobNameOrUrl.trim()
+  if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://')) {
+    return { blobName: trimmed, containerName }
+  }
+  const withoutQuery = trimmed.split('?')[0].split('#')[0]
+  try {
+    const parsed = new URL(withoutQuery)
+    const segments = parsed.pathname.split('/').filter(Boolean)
+    if (segments.length === 0) {
+      throw new Error(`Cannot parse blob URL "${trimmed}"`)
+    }
+    const [maybeContainer, ...rest] = segments
+    if (SUPPORTED_CONTAINERS.includes(maybeContainer)) {
+      const blobName = rest
+        .map((segment) => {
+          try {
+            return decodeURIComponent(segment)
+          } catch {
+            return segment
+          }
+        })
+        .join('/')
+      if (!blobName) {
+        throw new Error(`Cannot parse blob URL "${trimmed}"`)
+      }
+      return { blobName, containerName: maybeContainer }
+    }
+    return { blobName: trimmed, containerName }
+  } catch (err) {
+    if (err.message?.startsWith('Cannot parse blob URL')) throw err
+    return { blobName: trimmed, containerName }
+  }
 }
 
-export async function generateSasUrl(blobName, permissions = 'r', containerName = CONTAINER_NAME) {
+export function getSasToken(blobNameOrUrl, permissions = 'r', containerName = CONTAINER_NAME) {
+  const { blobName, containerName: resolvedContainer } = resolveBlobIdentifier(blobNameOrUrl, containerName)
   const perms = BlobSASPermissions.parse(permissions)
 
-  if (perms.read) {
-    const container = getBlobServiceClient().getContainerClient(containerName)
-    const exists = await container.getBlobClient(blobName).exists()
-    if (!exists) {
-      throw new BlobNotFoundError(blobName, containerName)
-    }
-  }
-
-  const sasToken = generateBlobSASQueryParameters(
+  return generateBlobSASQueryParameters(
     {
-      containerName,
+      containerName: resolvedContainer,
       blobName,
       permissions: perms,
       expiresOn: new Date(Date.now() + 3600 * 1000),
     },
     getCredential()
   ).toString()
+}
 
-  return `${getBlobServiceClient().url}${containerName}/${encodeBlobPath(blobName)}?${sasToken}`
+export async function getStreamUrl(blobNameOrUrl, containerName = CONTAINER_NAME, permissions = 'r') {
+  const { blobName, containerName: resolvedContainer } = resolveBlobIdentifier(blobNameOrUrl, containerName)
+  const perms = BlobSASPermissions.parse(permissions)
+
+  if (perms.read) {
+    const container = getBlobServiceClient().getContainerClient(resolvedContainer)
+    const exists = await container.getBlobClient(blobName).exists()
+    if (!exists) {
+      throw new BlobNotFoundError(blobName, resolvedContainer)
+    }
+  }
+
+  return `${getPublicBlobUrl(blobName, resolvedContainer)}?${getSasToken(blobName, perms.toString(), resolvedContainer)}`
+}
+
+export async function deleteBlob(blobName, containerName = CONTAINER_NAME) {
+  const container = getBlobServiceClient().getContainerClient(containerName)
+  await container.getBlobClient(blobName).deleteIfExists()
+}
+
+export async function generateSasUrl(blobName, permissions = 'r', containerName = CONTAINER_NAME) {
+  return getStreamUrl(blobName, containerName, permissions)
 }
 
 export class BlobNotFoundError extends Error {

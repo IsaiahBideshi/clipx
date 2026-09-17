@@ -1,4 +1,4 @@
-import { generateSasUrl, getPublicBlobUrl, BlobNotFoundError, SUPPORTED_CONTAINERS, CONTAINER_NAME, THUMBS_CONTAINER_NAME } from './azure.js'
+import { getStreamUrl, BlobNotFoundError, SUPPORTED_CONTAINERS, CONTAINER_NAME, THUMBS_CONTAINER_NAME } from './azure.js'
 import { getAuthenticatedUser, supabase } from '../auth.js'
 import { areFriends } from '../friendships.js'
 
@@ -47,10 +47,7 @@ export default async function handler(req, res) {
       return res.status(403).json({ data: null, error: 'You do not have permission to view this clip' })
     }
 
-    const url =
-      clip.visibility === 'public'
-        ? getPublicBlobUrl(blobName, requestedContainer)
-        : await generateSasUrl(blobName, 'r', requestedContainer)
+    const url = await getStreamUrl(blobName, requestedContainer, 'r')
     return res.status(200).json({ data: { url }, error: null })
   } catch (err) {
     console.error('Error generating stream URL:', err)
