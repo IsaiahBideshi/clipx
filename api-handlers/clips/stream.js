@@ -47,7 +47,7 @@ export default async function handler(req, res) {
       return res.status(403).json({ data: null, error: 'You do not have permission to view this clip' })
     }
 
-    const url = await getStreamUrl(blobName, requestedContainer, 'r')
+    const url = await getStreamUrl(blobName, 'r', requestedContainer)
     return res.status(200).json({ data: { url }, error: null })
   } catch (err) {
     console.error('Error generating stream URL:', err)

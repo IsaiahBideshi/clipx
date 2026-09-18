@@ -9,6 +9,12 @@ const CONTAINER_NAME = 'clips'
 const THUMBS_CONTAINER_NAME = 'clip-thumbnails'
 const SUPPORTED_CONTAINERS = [CONTAINER_NAME, THUMBS_CONTAINER_NAME]
 
+function assertSupportedContainer(containerName) {
+  if (!SUPPORTED_CONTAINERS.includes(containerName)) {
+    throw new Error(`Unsupported container "${containerName}"`)
+  }
+}
+
 function parseConnectionString(str) {
   const parts = {}
   for (const part of str.split(';')) {
@@ -54,6 +60,7 @@ export function encodeBlobPath(blobName) {
 }
 
 export function getPublicBlobUrl(blobName, containerName = CONTAINER_NAME) {
+  assertSupportedContainer(containerName)
   return `${getBlobServiceClient().url}${containerName}/${encodeBlobPath(blobName)}`;
 }
 
@@ -97,6 +104,7 @@ function resolveBlobIdentifier(blobNameOrUrl, containerName = CONTAINER_NAME) {
 
 export function getSasToken(blobNameOrUrl, permissions = 'r', containerName = CONTAINER_NAME) {
   const { blobName, containerName: resolvedContainer } = resolveBlobIdentifier(blobNameOrUrl, containerName)
+  assertSupportedContainer(resolvedContainer)
   const perms = BlobSASPermissions.parse(permissions)
 
   return generateBlobSASQueryParameters(
@@ -110,8 +118,9 @@ export function getSasToken(blobNameOrUrl, permissions = 'r', containerName = CO
   ).toString()
 }
 
-export async function getStreamUrl(blobNameOrUrl, containerName = CONTAINER_NAME, permissions = 'r') {
+export async function getStreamUrl(blobNameOrUrl, permissions = 'r', containerName = CONTAINER_NAME) {
   const { blobName, containerName: resolvedContainer } = resolveBlobIdentifier(blobNameOrUrl, containerName)
+  assertSupportedContainer(resolvedContainer)
   const perms = BlobSASPermissions.parse(permissions)
 
   if (perms.read) {
@@ -126,12 +135,13 @@ export async function getStreamUrl(blobNameOrUrl, containerName = CONTAINER_NAME
 }
 
 export async function deleteBlob(blobName, containerName = CONTAINER_NAME) {
+  assertSupportedContainer(containerName)
   const container = getBlobServiceClient().getContainerClient(containerName)
   await container.getBlobClient(blobName).deleteIfExists()
 }
 
 export async function generateSasUrl(blobName, permissions = 'r', containerName = CONTAINER_NAME) {
-  return getStreamUrl(blobName, containerName, permissions)
+  return getStreamUrl(blobName, permissions, containerName)
 }
 
 export class BlobNotFoundError extends Error {
