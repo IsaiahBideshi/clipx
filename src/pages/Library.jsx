@@ -569,8 +569,8 @@ function AzureClipThumb({clip}) {
       return url;
     },
     enabled: canFetch,
-    staleTime: 30 * 60 * 1000,
-    gcTime: 60 * 60 * 1000,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
   });
 
   if (thumbUrlQuery.data) {
