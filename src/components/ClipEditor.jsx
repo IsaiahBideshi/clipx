@@ -387,6 +387,15 @@ function UploadMenu({clip, start, end, onRefreshIndex, onSaveQueueEvent, onUploa
         .select("id, username")
         .in("id", friendIds)
 
+      if (friendsError) {
+        console.error("Failed to load friend usernames:", friendsError);
+        return;
+      }
+
+      if (!friendsData) {
+        setFriendsOptions([]);
+        return;
+      }
 
       let friendsOptionsArr = [];
       for (const friendship of data) {
