@@ -11,20 +11,7 @@ import { supabase } from "../lib/supabase.js";
 import { InputLabel, MenuItem, Select, FormControl, Typography } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import fallBackThumb from "../assets/thumbnail.svg";
-
-const VOLUME_STORAGE_KEY = "clipx:volume";
-const MUTED_STORAGE_KEY = "clipx:muted";
-
-function readSavedVolume() {
-  const stored = globalThis.localStorage?.getItem(VOLUME_STORAGE_KEY);
-  const value = Number(stored);
-  return Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : 1;
-}
-
-function readSavedMuted() {
-  const stored = globalThis.localStorage?.getItem(MUTED_STORAGE_KEY);
-  return stored === "true";
-}
+import { usePlayerPrefs } from "../lib/playerPrefs.js";
 
 
 function getEditableClipName(fileName) {
@@ -82,16 +69,7 @@ export default function ClipEditor({
 
   const [thumbSrc, setThumbSrc] = useState(fallBackThumb);
 
-  const [volume, setVolume] = useState(() => readSavedVolume());
-  const [isMuted, setIsMuted] = useState(() => readSavedMuted());
-
-  useEffect(() => {
-    globalThis.localStorage?.setItem(VOLUME_STORAGE_KEY, String(volume));
-  }, [volume]);
-
-  useEffect(() => {
-    globalThis.localStorage?.setItem(MUTED_STORAGE_KEY, String(isMuted));
-  }, [isMuted]);
+  const { volume, muted: isMuted, setVolume, setMuted: setIsMuted } = usePlayerPrefs();
 
   const [clipData, setClipData] = useState(null);
 

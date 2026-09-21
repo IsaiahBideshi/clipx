@@ -21,23 +21,13 @@ import "./library.css";
 import fallBackThumb from "../assets/thumbnail.svg";
 import VideoPlayer from "../components/VideoPlayer";
 import RefreshButton from "../components/RefreshButton.jsx";
+import { usePlayerPrefs } from "../lib/playerPrefs.js";
 
 const GRID_GAP = 20;
 const MIN_CARD_WIDTH = 270;
 const INITIAL_SKELETON_COUNT = 20;
 const LIBRARY_PAGE_SIZE = 50;
 const GAME_BY_ID = new Map(STOREDGAMES.map((game) => [game.id, game]));
-
-function readSavedVolume() {
-  const stored = globalThis.localStorage?.getItem("clipx:volume");
-  const value = stored === null ? 1 : Number(stored);
-  return Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : 1;
-}
-
-function readSavedMuted() {
-  const stored = globalThis.localStorage?.getItem("clipx:muted");
-  return stored === "true";
-}
 
 async function fetchLibraryClips(session, filters, offset = 0) {
   if (!session?.user?.id) {
@@ -641,16 +631,7 @@ export function VideoPreview({clip, onClose, onPrevClip, onNextClip}){
   const [gamesSrc, setGamesSrc] = useState(null);
   const { session } = useAuthSession();
 
-  const [volume, setVolume] = useState(() => readSavedVolume());
-  const [muted, setMuted] = useState(() => readSavedMuted());
-
-  useEffect(() => {
-    globalThis.localStorage?.setItem("clipx:volume", String(volume));
-  }, [volume]);
-
-  useEffect(() => {
-    globalThis.localStorage?.setItem("clipx:muted", String(muted));
-  }, [muted]);
+  const { volume, muted, setVolume, setMuted } = usePlayerPrefs();
 
   useEffect(() => {
     if (!isAzure || !clip.blob_name || !session?.access_token) return;
