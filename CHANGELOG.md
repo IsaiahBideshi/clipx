@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.2.1
+
+- Fix: Volume and mute settings are remembered between restarts.
+- Fix: Sharing a clip no longer breaks when friend usernames fail to load.
+- Fix: Library thumbnails refresh sooner instead of showing stale images.
+
 ## v1.2.0
 
 - New: Clips now stored in Cloud instead of YouTube.
