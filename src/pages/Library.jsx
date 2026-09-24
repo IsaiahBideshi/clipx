@@ -368,12 +368,12 @@ export default function Library() {
       options={{ scrollbars: { autoHide: 'scroll', theme: 'os-theme-dark' } }}
     >
       <div className="library-hero">
-        <div>
+        <div className="library-hero-title">
           <h2>Library</h2>
-        </div>
-        <div className="library-hero-actions">
-          <div className="clip-count">{clipTotal} clip{clipTotal === 1 ? "" : "s"}</div>
-          <RefreshButton onRefresh={() => clipsQuery.refetch()} />
+          <div className="library-hero-actions">
+            <div className="clip-count">{clipTotal} clip{clipTotal === 1 ? "" : "s"}</div>
+            <RefreshButton onRefresh={() => clipsQuery.refetch()} />
+          </div>
         </div>
       </div>
       
