@@ -8,7 +8,7 @@ import { rename } from "fs/promises";
 
 import { uploadClipToYoutube } from "./youtubeService.js";
 import { resolveFfmpegPath } from "../utils/ffmpeg.js";
-import { getIndexedClipData, setIndexedClipMetadata, markIndexedClipMissing, getWatchedRootForPath, upsertIndexedClip } from "./clipIndexService.js";
+import { getIndexedClipData, setIndexedClipMetadata, markIndexedClipMissing, getWatchedRootForPath, upsertIndexedClip, getCachedThumbnailPath } from "./clipIndexService.js";
 import { getSupabaseAccessToken } from "../ipc/authStorage.js";
 
 ffmpeg.setFfmpegPath(resolveFfmpegPath(ffmpegPath));
@@ -446,7 +446,27 @@ export async function deleteClip(clipPath) {
   }
 
   try {
+    const clipx = path.join(app.getPath("appData"), "clipx");
+    const baseName = path.basename(clipPath, path.extname(clipPath));
+    const thumbnailPaths = [
+      getCachedThumbnailPath(clipPath),
+      path.join(clipx, "thumbs", `${baseName}.jpg`),
+      path.join(clipx, "saved clips thumbs", `${baseName}.jpg`),
+    ];
+
     await fs.promises.unlink(clipPath);
+
+    for (const thumbPath of thumbnailPaths) {
+      if (!thumbPath) continue;
+      try {
+        await fs.promises.unlink(thumbPath);
+      } catch (error) {
+        if (error.code !== "ENOENT") {
+          console.error(`Failed to delete thumbnail at ${thumbPath}:`, error);
+        }
+      }
+    }
+
     const clipDir = path.dirname(clipPath);
     markIndexedClipMissing(clipPath, { emitChange: true });
     const clipsData = await getClipDataFromDir(clipDir);
