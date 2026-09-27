@@ -18,7 +18,7 @@ export function getClipTagsError(tags) {
   if (tags.length > MAX_TAGS) {
     return `A clip can have at most ${MAX_TAGS} tags`;
   }
-  if (tags.some((tag) => typeof tag === "string" && tag.trim().length > MAX_LABEL_LENGTH)) {
+  if (tags.some((tag) => typeof tag === "string" && [...tag.trim()].length > MAX_LABEL_LENGTH)) {
     return `Tags must be ${MAX_LABEL_LENGTH} characters or fewer`;
   }
   return null;

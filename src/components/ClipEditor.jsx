@@ -440,7 +440,7 @@ export function UploadMenu({clip, start, end, onRefreshIndex, onSaveQueueEvent, 
       thumbnail_blob_name: clipData.thumbnailBlobName || "",
       youtube_video_id: clipData.youtubeID || "",
       user_ids: clipData.tags.filter((tag) => tag?.id).map((tag) => tag.id),
-      labels: clipData.tags.filter((tag) => typeof tag === "string"),
+      labels: clipData.tags.filter((tag) => typeof tag === "string").map((tag) => tag.trim()),
     });
     return error;
   }
