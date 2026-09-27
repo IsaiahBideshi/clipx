@@ -319,7 +319,7 @@ async function searchGames(gameName) {
 }
 
 
-function UploadMenu({clip, start, end, onRefreshIndex, onSaveQueueEvent, onUploadQueueEvent, onDelete, uploading, setUploading, saving, setSaving, session}) {
+export function UploadMenu({clip, start, end, onRefreshIndex, onSaveQueueEvent, onUploadQueueEvent, onDelete, uploading, setUploading, saving, setSaving, session}) {
   const [tags, setTags] = useState([]);
   const [friendsInClip, setFriendsInClip] = useState([]);
   const [peopleInput, setPeopleInput] = useState('');
