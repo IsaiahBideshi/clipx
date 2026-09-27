@@ -1,9 +1,9 @@
-import { supabase } from "./auth.js"
+import { supabase, getAuthenticatedUser } from "./auth.js"
 
 export async function areFriends(userId1, userId2) {
   const { data, error } = await supabase
     .from('friendships')
-    .select('id')
+    .select('user_id')
     .eq('status', 'accepted')
     .or(`and(user_id.eq.${userId1},friend_id.eq.${userId2}),and(user_id.eq.${userId2},friend_id.eq.${userId1})`)
     .limit(1)
@@ -24,31 +24,29 @@ export default async function handler(req, res) {
     return res.status(204).end()
   }
 
+  const { user, error: authError } = await getAuthenticatedUser(req)
+  if (authError) {
+    return res.status(401).json({ data: null, error: authError })
+  }
+
   switch (req.method) {
-    case 'GET':
-      if (req.query.userId) {
-        const userId = req.query.userId
-        const { data, error } = await supabase
-          .from('friendships')
-          .select('*')
-          .or(`user_id.eq.${userId},friend_id.eq.${userId}`)
-        
-        if (error) return res.status(500).json({ data: null, error: error.message })
-        return res.status(200).json({ data, error: null })
-      }
+    case 'GET': {
+      const { data, error } = await supabase
+        .from('friendships')
+        .select('*')
+        .or(`user_id.eq.${user.id},friend_id.eq.${user.id}`)
 
-      {
-        const { data, error } = await supabase
-          .from('friendships')
-          .select('*')
-
-        if (error) return res.status(500).json({ data: null, error: error.message })
-        return res.status(200).json({ data, error: null })
-      }
+      if (error) return res.status(500).json({ data: null, error: error.message })
+      return res.status(200).json({ data, error: null })
+    }
 
     case 'POST':
       if (!req.body || !req.body.user_id || !req.body.friend_id) {
         return res.status(400).json({ data: null, error: 'Missing user_id or friend_id' })
+      }
+
+      if (req.body.user_id !== user.id) {
+        return res.status(403).json({ data: null, error: 'You do not have permission to modify this friendship' })
       }
 
       if (req.body.user_id === req.body.friend_id) {
@@ -74,6 +72,10 @@ export default async function handler(req, res) {
     case 'DELETE':
       if (!req.body || !req.body.user_id || !req.body.friend_id) {
         return res.status(400).json({ data: null, error: 'Missing user_id or friend_id' })
+      }
+
+      if (req.body.user_id !== user.id) {
+        return res.status(403).json({ data: null, error: 'You do not have permission to modify this friendship' })
       }
 
       if (req.body.user_id === req.body.friend_id) {
@@ -128,6 +130,9 @@ export default async function handler(req, res) {
     case 'PUT':
       if (!req.body || !req.body.user_id || !req.body.friend_id) {
         return res.status(400).json({ data: null, error: 'Missing user_id or friend_id' })
+      }
+      if (req.body.user_id !== user.id) {
+        return res.status(403).json({ data: null, error: 'You do not have permission to modify this friendship' })
       }
       if (req.body.user_id === req.body.friend_id) {
         return res.status(400).json({ data: null, error: 'Cannot accept friendship with yourself' })
