@@ -8,6 +8,7 @@ import TextField from '@mui/material/TextField';
 import Button from '@mui/material/Button';
 import AutoComplete from '@mui/material/Autocomplete';
 import { supabase } from "../lib/supabase.js";
+import { getClipTagsError } from "../lib/clipsApi.js";
 import { InputLabel, MenuItem, Select, FormControl, Typography } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import fallBackThumb from "../assets/thumbnail.svg";
@@ -318,7 +319,7 @@ async function searchGames(gameName) {
 }
 
 
-function UploadMenu({clip, start, end, onRefreshIndex, onSaveQueueEvent, onUploadQueueEvent, onDelete, uploading, setUploading, saving, setSaving, session}) {
+export function UploadMenu({clip, start, end, onRefreshIndex, onSaveQueueEvent, onUploadQueueEvent, onDelete, uploading, setUploading, saving, setSaving, session}) {
   const [tags, setTags] = useState([]);
   const [friendsInClip, setFriendsInClip] = useState([]);
   const [peopleInput, setPeopleInput] = useState('');
@@ -431,23 +432,17 @@ function UploadMenu({clip, start, end, onRefreshIndex, onSaveQueueEvent, onUploa
       return new Error("No authenticated user found");
     }
   
-    const { data, error } = await supabase
-    .from('clips')
-    .insert({
-      owner_id: userId,
-      youtube_video_id: clipData.youtubeID || "",
+    const { error } = await supabase.rpc('create_clip_with_tags', {
+      title: clipData.title,
+      visibility: clipData.visibility,
+      game_id: clipData.game?.id ?? null,
       blob_name: clipData.blobName || "",
       thumbnail_blob_name: clipData.thumbnailBlobName || "",
-      title: clipData.title,
-      description: "",
-      visibility: clipData.visibility,
-      game_id: clipData.game?.id,
-      created_at: new Date().toISOString(),
+      youtube_video_id: clipData.youtubeID || "",
+      user_ids: clipData.tags.filter((tag) => tag?.id).map((tag) => tag.id),
+      labels: clipData.tags.filter((tag) => typeof tag === "string").map((tag) => tag.trim()),
     });
-    if (error) {
-      return error;
-    }
-    return null;
+    return error;
   }
 
   async function uploadClip(clip, start, end, title, game, tags) {
@@ -462,6 +457,12 @@ function UploadMenu({clip, start, end, onRefreshIndex, onSaveQueueEvent, onUploa
     onUploadQueueEvent?.({ type: "started", id: uploadId, name: displayName });
 
     try {
+      const tagsError = getClipTagsError(tags);
+      if (tagsError) {
+        onUploadQueueEvent?.({ type: "failed", id: uploadId, error: tagsError });
+        return;
+      }
+
       const response = await window.clipx.uploadClip({ clip, start, end, displayName, game, tags, userId });
       if (response?.status === 200) {
         const error  = await saveClipRecord({
@@ -488,7 +489,7 @@ function UploadMenu({clip, start, end, onRefreshIndex, onSaveQueueEvent, onUploa
           } catch (cleanupError) {
             console.error("Failed to clean up uploaded blobs after persistence failure:", cleanupError);
           }
-          onUploadQueueEvent?.({ type: "failed", id: uploadId, error: "Upload succeeded but could not be saved to your library. Please try again." });
+          onUploadQueueEvent?.({ type: "failed", id: uploadId, error: `Upload succeeded but could not be saved to your library: ${error.message || "Please try again."}` });
           return;
         }
 
