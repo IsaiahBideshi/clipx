@@ -448,10 +448,10 @@ export async function deleteClip(clipPath) {
   try {
     const clipx = path.join(app.getPath("appData"), "clipx");
     const baseName = path.basename(clipPath, path.extname(clipPath));
+    const thumbsDir = clipPath.toLowerCase().includes("clipx videos") ? "saved clips thumbs" : "thumbs";
     const thumbnailPaths = [
       getCachedThumbnailPath(clipPath),
-      path.join(clipx, "thumbs", `${baseName}.jpg`),
-      path.join(clipx, "saved clips thumbs", `${baseName}.jpg`),
+      path.join(clipx, thumbsDir, `${baseName}.jpg`),
     ];
 
     await fs.promises.unlink(clipPath);
