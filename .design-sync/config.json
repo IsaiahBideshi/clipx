@@ -1,0 +1,108 @@
+{
+  "projectId": "cd5d9d53-cf77-42bb-ab2a-9e3832b3be47",
+  "shape": "package",
+  "pkg": "clipx",
+  "globalName": "ClipX",
+  "srcDir": "src/components",
+  "componentSrcMap": {
+    "ClipCard": "src/components/ClipCard.jsx",
+    "ClipGrid": "src/components/ClipGrid.jsx",
+    "NavBar": "src/components/NavBar.jsx",
+    "MenuBar": "src/components/MenuBar.jsx",
+    "RefreshButton": "src/components/RefreshButton.jsx",
+    "ChangelogModal": "src/components/ChangelogModal.jsx",
+    "ChangelogPanel": "src/components/ChangelogPanel.jsx",
+    "SavingClipsWidget": "src/components/SavingClipsWidget.jsx",
+    "UploadingClipsWidget": "src/components/UploadingClipsWidget.jsx",
+    "UploadingClips": "src/components/UploadingClips.jsx",
+    "ClipEditor": "src/components/ClipEditor.jsx",
+    "UploadMenu": "src/components/ClipEditor.jsx",
+    "EditorTimeline": "src/components/EditorTimeline.jsx",
+    "VideoPlayer": "src/components/VideoPlayer.jsx",
+    "ClipPreview": "src/components/ClipPreview.jsx",
+    "ClipContextMenu": "src/components/ClipContextMenu.jsx"
+  },
+  "provider": {
+    "component": "ClipXProvider"
+  },
+  "runtimeFontPrefixes": [
+    "Sora",
+    "Avenir",
+    "Trebuchet MS"
+  ],
+  "dtsPropsFor": {
+    "ClipCard": "clip: { id?: string | number; name: string; path: string; createdAt: string; thumbnailPath?: string | null }; baseFolder?: string; onClick?: () => void; onContextMenuAction: (clip: { id?: string | number; name: string; path: string; createdAt: string; thumbnailPath?: string | null }, position: { x: number; y: number }) => void;",
+    "ClipGrid": "clips: Array<{ id?: string | number; name: string; path: string; createdAt: string; thumbnailPath?: string | null }>; baseFolder?: string; onSelect: (clip: { id?: string | number; name: string; path: string; createdAt: string; thumbnailPath?: string | null }) => void; onDelete?: (clip: { id?: string | number; name: string; path: string; createdAt: string; thumbnailPath?: string | null }) => void; onContextMenuAction: (clip: { id?: string | number; name: string; path: string; createdAt: string; thumbnailPath?: string | null }, position: { x: number; y: number }) => void; contextMenuRef?: React.Ref<HTMLDivElement>; loading?: boolean; loadingMore?: boolean; hasMore?: boolean; onLoadMore?: () => void; scrollElement?: HTMLElement | null;",
+    "NavBar": "showUpdateButton?: boolean; updateStatus?: \"available\" | \"downloading\" | \"downloaded\" | \"error\" | null; updateErrorMessage?: string | null; onUpdateClick?: () => void;",
+    "RefreshButton": "onRefresh?: () => void; fontSize?: \"inherit\" | \"small\" | \"medium\" | \"large\"; className?: string;",
+    "ChangelogModal": "changelog: string; currentVersion?: string; fromVersion?: string; onClose: () => void;",
+    "ChangelogPanel": "changelog: string; highlightedVersion?: string; highlightedLabel?: string; fromVersion?: string;",
+    "SavingClipsWidget": "clips: Array<{ id: string; name: string; status: \"saving\" | \"saved\" | \"failed\"; error?: string }>; expanded: boolean; onToggleExpanded: () => void; onDismiss: () => void;",
+    "UploadingClipsWidget": "clips: Array<{ id: string; name: string; status: \"uploading\" | \"uploaded\" | \"failed\"; error?: string; youtubeUrl?: string }>; expanded: boolean; onToggleExpanded: () => void; onDismiss: () => void;",
+    "UploadingClips": "clips: Array<{ id: string; name: string; progress: number }>;",
+    "ClipEditor": "clip: { id?: string | number; name: string; path: string; createdAt: string; thumbnailPath?: string | null }; onClose: () => void; onNextClip?: () => void; onPrevClip?: () => void; onSaveQueueEvent?: (event: { type: \"started\" | \"success\" | \"failed\"; id: string; name?: string; error?: string }) => void; onUploadQueueEvent?: (event: { type: \"started\" | \"success\" | \"failed\"; id: string; name?: string; error?: string; youtubeUrl?: string; videoId?: string }) => void; onDelete: (clip: { id?: string | number; name: string; path: string; createdAt: string; thumbnailPath?: string | null }) => void; isSavedClipsView?: boolean; baseFolder?: string; triggerClipIndexRefresh?: () => void; authSession?: { user: { id: string } } | null; uploading: boolean; setUploading: (value: boolean) => void; saving: boolean; setSaving: (value: boolean) => void;",
+    "UploadMenu": "clip: { id?: string | number; name: string; path: string; createdAt: string; thumbnailPath?: string | null }; start: number; end: number; session?: { user: { id: string } } | null; onSaveQueueEvent?: (event: { type: \"started\" | \"success\" | \"failed\"; id: string; name?: string; error?: string }) => void; onUploadQueueEvent?: (event: { type: \"started\" | \"success\" | \"failed\"; id: string; name?: string; error?: string; youtubeUrl?: string; videoId?: string }) => void; onDelete: (clip: { id?: string | number; name: string; path: string; createdAt: string; thumbnailPath?: string | null }) => void; onRefreshIndex?: () => void; uploading: boolean; setUploading: (value: boolean) => void; saving: boolean; setSaving: (value: boolean) => void;",
+    "EditorTimeline": "duration: number; currentTime: number; inPoint: number; outPoint: number; onSeek: (time: number) => void; onSetIn: (time: number) => void; onSetOut: (time: number) => void;",
+    "VideoPlayer": "ref?: React.Ref<{ play(): void; pause(): void; togglePlay(): void; seek(time: number): void; readonly duration: number; readonly currentTime: number; readonly paused: boolean }>; src: string; poster?: string; volume?: number; muted?: boolean; startTime?: number; endTime?: number; showSkipButtons?: boolean; className?: string; autoPlay?: boolean; onNextClip?: () => void; onPrevClip?: () => void; onLoadedMetadata?: (duration: number) => void; onTimeUpdate?: (time: number) => void; onPlay?: () => void; onPause?: () => void; onEnded?: () => void; onVolumeChange?: (state: { volume: number; muted: boolean }) => void; onKeyDown?: (event: KeyboardEvent) => void;",
+    "ClipPreview": "clip: { path: string } | null; onClose: () => void;",
+    "ClipContextMenu": "clip?: { id?: string | number; name: string; path: string; createdAt: string; thumbnailPath?: string | null }; position: { x: number; y: number }; ref?: React.Ref<HTMLDivElement>; onOpen?: () => void; onDelete?: () => void; onRename?: () => void; onOpenInExplorer?: () => void; disabled?: boolean;"
+  },
+  "overrides": {
+    "ClipEditor": {
+      "cardMode": "single",
+      "viewport": "1440x900",
+      "primaryStory": "SignedIn"
+    },
+    "ChangelogModal": {
+      "cardMode": "single",
+      "primaryStory": "Default"
+    },
+    "ClipGrid": {
+      "cardMode": "column"
+    },
+    "NavBar": {
+      "cardMode": "column"
+    },
+    "MenuBar": {
+      "cardMode": "column"
+    },
+    "ChangelogPanel": {
+      "cardMode": "column"
+    },
+    "ClipCard": {
+      "cardMode": "column"
+    },
+    "ClipPreview": {
+      "cardMode": "column"
+    },
+    "EditorTimeline": {
+      "cardMode": "column"
+    },
+    "RefreshButton": {
+      "cardMode": "column"
+    },
+    "UploadingClips": {
+      "cardMode": "column"
+    },
+    "UploadMenu": {
+      "cardMode": "column"
+    },
+    "VideoPlayer": {
+      "cardMode": "column"
+    },
+    "ClipContextMenu": {
+      "cardMode": "single",
+      "primaryStory": "Default"
+    },
+    "SavingClipsWidget": {
+      "cardMode": "single",
+      "primaryStory": "Expanded"
+    },
+    "UploadingClipsWidget": {
+      "cardMode": "single",
+      "primaryStory": "Expanded"
+    }
+  },
+  "readmeHeader": ".design-sync/conventions.md",
+  "buildCmd": "(none - bundles src/ via .design-sync/entry.js)"
+}
