@@ -2,6 +2,7 @@ import latestVersion from "../api-handlers/latest-version.js";
 import users from "../api-handlers/users.js";
 import friendships from "../api-handlers/friendships.js";
 import keys from "../api-handlers/keys.js";
+import games from "../api-handlers/games.js";
 import clips from "../api-handlers/clips/clips.js";
 import clipsFiles from "../api-handlers/clips/files.js";
 import clipsStream from "../api-handlers/clips/stream.js";
@@ -14,6 +15,7 @@ const routes = {
   "/api/users": users,
   "/api/friendships": friendships,
   "/api/keys": keys,
+  "/api/games": games,
   "/api/clips": clips,
   "/api/clips/files": clipsFiles,
   "/api/clips/stream": clipsStream,

@@ -1,8 +1,27 @@
 import { app, BrowserWindow, ipcMain } from "electron";
 import fs from "fs";
 import path from "path";
+import { getSupabaseAccessToken } from "./authStorage.js";
 
 const STARTUP_MINIMIZED_ARG = "--clipx-startup-minimized";
+const API_BASE = (process.env.VITE_DATABASE_URL || "https://clipx.bideshi.tech").replace(/\/+$/, "");
+
+async function fetchGames(params) {
+  const accessToken = await getSupabaseAccessToken();
+  if (!accessToken) {
+    return null;
+  }
+
+  const response = await fetch(`${API_BASE}/api/games?${new URLSearchParams(params)}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  const { data, error } = await response.json().catch(() => ({ data: null, error: "Invalid server response." }));
+  if (!response.ok || error) {
+    console.error("ClipX: Failed to fetch games:", error || response.status);
+    return null;
+  }
+  return data;
+}
 
 function getLoginItemOptions(openAtLogin, { includeStartupArg = true } = {}) {
   const options = {};
@@ -75,12 +94,6 @@ export function registerSettingsIpcHandlers() {
       console.error("No game ID provided for get-game-data");
       return null;
     }
-    const headers = {
-      "Client-ID": process.env.IGDB_CLIENT_ID,
-      Authorization: "Bearer " + process.env.IGDB_ACCESS_TOKEN,
-      "Content-Type": "text/plain",
-      Accept: "application/json",
-    };
 
     const idNum = Number(gameId);
     if (!Number.isFinite(idNum)) {
@@ -88,22 +101,12 @@ export function registerSettingsIpcHandlers() {
       return null;
     }
 
-    const response = await fetch("https://api.igdb.com/v4/games", {
-      method: "POST",
-      headers,
-      body: `
-        fields name, cover.image_id, first_release_date;
-        where id = ${idNum} & game_type = 0;
-        limit 1;
-      `,
-    });
-
-    const data = await response.json();
-    if (data.length > 0) {
+    const game = await fetchGames({ id: idNum });
+    if (game) {
       return {
-        image: data[0].cover.image_id ? `https://images.igdb.com/igdb/image/upload/t_cover_big/${data[0].cover.image_id}.jpg` : null,
-        label: data[0].name,
-        first_release_date: data[0].first_release_date
+        image: game.cover?.image_id ? `https://images.igdb.com/igdb/image/upload/t_cover_big/${game.cover.image_id}.jpg` : null,
+        label: game.name,
+        first_release_date: game.first_release_date
       };
     }
 
@@ -116,31 +119,7 @@ export function registerSettingsIpcHandlers() {
       return [];
     }
 
-    const headers = {
-      "Client-ID": process.env.IGDB_CLIENT_ID,
-      Authorization: "Bearer " + process.env.IGDB_ACCESS_TOKEN,
-      "Content-Type": "text/plain",
-      Accept: "application/json",
-    };
-
-
-    const response = await fetch("https://api.igdb.com/v4/games", {
-      method: "POST",
-      headers,
-      body: `
-      fields name,cover.url, cover.image_id, total_rating_count, first_release_date;
-      search "${query}";
-      where game_type = 0;
-      limit 5;
-    `,
-    });
-    if (!response.ok) {
-      console.error("IGDB API error:", response.status, await response.text());
-      return [];
-    }
-    const data = await response.json();
-    data.sort((a, b) => (b.total_rating_count || 0) - (a.total_rating_count || 0));
-    return data;
+    return (await fetchGames({ search: query })) || [];
   });
 
   ipcMain.handle("get-options", async () => {

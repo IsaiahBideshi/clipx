@@ -23,6 +23,7 @@ PowerShell here has execution-policy disabled, so **`npm` fails; always use `npm
 - `electron/main.js` loads `.env` via `dotenv/config`; the renderer gets `VITE_*` from the same `.env` at build time. No service loads `.env.local`, so nothing can clobber `process.env`.
 - Renderer-side API base: `import.meta.env.VITE_DATABASE_URL`, defaulting to `https://clipx.bideshi.tech` (see `src/lib/accountApi.js`).
 - Google OAuth client ID/secret are fetched at runtime by the main process from `{API_BASE}/api/keys`, not read from env directly.
+- IGDB game search/lookup goes through `{API_BASE}/api/games` (signed-in users only). The server reads `IGDB_CLIENT_ID` + `IGDB_ACCESS_TOKEN` from its env, so the Electron app needs no IGDB keys. Twitch app tokens expire after ~60 days; when game search breaks with IGDB 401s, update `IGDB_ACCESS_TOKEN` in Vercel.
 - Auth in the renderer uses Supabase with a custom storage adapter that persists sessions via IPC (`window.clipx.authStorage*`), falling back to `localStorage` outside Electron.
 
 ## Gotchas
