@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.2.2
+
+- New: Tag friends or anyone else in a clip when uploading.
+- New: Tags you type are remembered and offered next time, with an X to remove ones you no longer want.
+- New: Search the library by tag, including tags you type in.
+- Fix: Library search shows an error message instead of an empty page when a search fails.
+- Fix: Deleting a clip also removes its thumbnail.
+- Fix: Clip count and refresh button line up with the library title.
+
 ## v1.2.1
 
 - Fix: Volume and mute settings are remembered between restarts.
