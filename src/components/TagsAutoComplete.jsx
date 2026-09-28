@@ -4,6 +4,7 @@ import IconButton from '@mui/material/IconButton';
 import CloseIcon from '@mui/icons-material/Close';
 
 const CUSTOM_TAGS_KEY = ["customTags"];
+let customTagsUpdate = Promise.resolve();
 
 async function getCustomTags() {
   if (typeof window?.clipx?.getTaglist !== "function") return [];
@@ -15,19 +16,24 @@ export default function TagsAutoComplete({ options, onChange, saveNewTags = fals
   const queryClient = useQueryClient();
   const { data: customTags = [] } = useQuery({ queryKey: CUSTOM_TAGS_KEY, queryFn: getCustomTags });
 
-  async function updateCustomTags(update) {
-    try {
-      const tags = update(await getCustomTags());
-      await window.clipx.saveTaglist(tags);
-      queryClient.setQueryData(CUSTOM_TAGS_KEY, tags);
-    } catch (error) {
-      console.error("Failed to save custom tags:", error);
-    }
+  function updateCustomTags(update) {
+    customTagsUpdate = customTagsUpdate.then(async () => {
+      try {
+        const tags = update(await getCustomTags());
+        await window.clipx.saveTaglist(tags);
+        queryClient.setQueryData(CUSTOM_TAGS_KEY, tags);
+      } catch (error) {
+        console.error("Failed to save custom tags:", error);
+      }
+    });
   }
 
   function handleChange(event, newValue, reason, details) {
-    const tag = saveNewTags && reason === "createOption" ? details.option.trim() : "";
-    if (tag) {
+    const tag = reason === "createOption" ? details.option.trim() : null;
+    if (tag === "") {
+      return;
+    }
+    if (tag && saveNewTags) {
       updateCustomTags((tags) => tags.some((t) => t.toLowerCase() === tag.toLowerCase()) ? tags : [...tags, tag]);
     }
     onChange(event, newValue, reason, details);

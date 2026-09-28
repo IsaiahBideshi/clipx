@@ -83,6 +83,9 @@ export default async function handler(req, res) {
           .map((id) => id.trim())
           .filter(Boolean)
         const tagLabels = parseTagLabels(req.query.tagLabels)
+        if (tagLabels.length > 20) {
+          return res.status(400).json({ data: null, error: 'You can search at most 20 tags' })
+        }
         if (tagIds.length > 0 || tagLabels.length > 0) {
           const tagQueries = tagLabels.map((label) =>
             supabase
@@ -273,7 +276,6 @@ function parseTagLabels(value) {
       .filter((label) => typeof label === 'string')
       .map((label) => label.trim())
       .filter(Boolean)
-      .slice(0, 20)
   } catch {
     return []
   }
