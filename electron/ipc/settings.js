@@ -43,7 +43,7 @@ export function registerSettingsIpcHandlers() {
 
     try {
       const data = await fs.promises.readFile(taglistPath, "utf-8");
-      return JSON.parse(data);
+      return data.trim() ? JSON.parse(data) : [];
     } catch (error) {
       if (error && error.code === "ENOENT") {
         const appDataDir = path.dirname(taglistPath);
