@@ -82,16 +82,28 @@ export default async function handler(req, res) {
           .split(',')
           .map((id) => id.trim())
           .filter(Boolean)
-        if (tagIds.length > 0) {
-          const { data: taggedClips, error: tagError } = await supabase
-            .from('clip_tags')
-            .select('clip_id')
-            .in('user_id', tagIds)
+        const tagLabels = parseTagLabels(req.query.tagLabels)
+        if (tagLabels.length > 20) {
+          return res.status(400).json({ data: null, error: 'You can search at most 20 tags' })
+        }
+        if (tagIds.length > 0 || tagLabels.length > 0) {
+          const tagQueries = tagLabels.map((label) =>
+            supabase
+              .from('clip_tags')
+              .select('clip_id')
+              .ilike('label', label.replace(/[\\%_]/g, (match) => `\\${match}`))
+          )
+          if (tagIds.length > 0) {
+            tagQueries.push(supabase.from('clip_tags').select('clip_id').in('user_id', tagIds))
+          }
+          const tagResults = await Promise.all(tagQueries)
+          const tagError = tagResults.find((result) => result.error)?.error
           if (tagError) {
             console.error('Error fetching tagged clip ids:', tagError)
             return res.status(500).json({ data: null, error: tagError.message })
           }
-          const clipIds = Array.from(new Set((taggedClips || []).map((t) => t.clip_id).filter(Boolean)))
+          const taggedClips = tagResults.flatMap((result) => result.data || [])
+          const clipIds = Array.from(new Set(taggedClips.map((t) => t.clip_id).filter(Boolean)))
           if (clipIds.length === 0) {
             return res.status(200).json({ data: [], error: null, count: 0 })
           }
@@ -251,6 +263,21 @@ export default async function handler(req, res) {
 
     default:
       return res.status(405).json({ data: null, error: 'Method not allowed' })
+  }
+}
+
+function parseTagLabels(value) {
+  try {
+    const labels = JSON.parse(value || '[]')
+    if (!Array.isArray(labels)) {
+      return []
+    }
+    return labels
+      .filter((label) => typeof label === 'string')
+      .map((label) => label.trim())
+      .filter(Boolean)
+  } catch {
+    return []
   }
 }
 

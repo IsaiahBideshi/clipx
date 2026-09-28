@@ -21,6 +21,7 @@ import "./library.css";
 import fallBackThumb from "../assets/thumbnail.svg";
 import VideoPlayer from "../components/VideoPlayer";
 import RefreshButton from "../components/RefreshButton.jsx";
+import TagsAutoComplete from "../components/TagsAutoComplete.jsx";
 import { usePlayerPrefs } from "../lib/playerPrefs.js";
 
 const GRID_GAP = 20;
@@ -49,7 +50,8 @@ async function fetchLibraryClips(session, filters, offset = 0) {
     query.ownerId = filters.owner.id;
   }
   if (filters.tags?.length) {
-    query.tagIds = filters.tags.map((tag) => tag.id).join(",");
+    query.tagIds = filters.tags.filter((tag) => tag?.id).map((tag) => tag.id).join(",");
+    query.tagLabels = JSON.stringify(filters.tags.filter((tag) => typeof tag === "string"));
   }
 
   const { data, error, count } = await listClips(session, query);
@@ -69,7 +71,7 @@ function libraryClipsKey(userId, filters) {
     filters.title?.trim() || "",
     filters.game?.id ?? null,
     filters.owner?.id ?? null,
-    (filters.tags || []).map((tag) => tag.id).join(","),
+    (filters.tags || []).map((tag) => tag?.id ?? tag),
   ];
 }
 
@@ -465,12 +467,11 @@ export default function Library() {
           </div>
           <div className="field">
             <label className="field-label" htmlFor="search-tags">Tags</label>
-            <AutoComplete
-              multiple
+            <TagsAutoComplete
               options={friendsOptions}
               value={draftTags}
               onChange={(_e, newValue) => setDraftTags(newValue)}
-              filterSelectedOptions
+              freeSolo
               renderInput={(params) => (
                 <TextField
                   {...params}
@@ -485,6 +486,9 @@ export default function Library() {
           <Button variant={"contained"} onClick={applyFilters}>Filter</Button>
           <Button variant={"outlined"} onClick={clearFilters}>Clear</Button>
         </div>
+        {clipsQuery.isError && (
+          <p className="search-error" role="alert">{String(clipsQuery.error?.message ?? clipsQuery.error)}</p>
+        )}
       </section>
 
       <div className="clip-grid library-clip-grid" ref={containerRef}>

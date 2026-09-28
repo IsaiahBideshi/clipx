@@ -4,6 +4,7 @@ import STOREDGAMES from "../data/games.json"
 
 import EditorTimeline from "./EditorTimeline.jsx";
 import VideoPlayer from "./VideoPlayer";
+import TagsAutoComplete from "./TagsAutoComplete.jsx";
 import TextField from '@mui/material/TextField';
 import Button from '@mui/material/Button';
 import AutoComplete from '@mui/material/Autocomplete';
@@ -567,15 +568,14 @@ export function UploadMenu({clip, start, end, onRefreshIndex, onSaveQueueEvent, 
             )}
           />
         </div>
-        <AutoComplete
+        <TagsAutoComplete
           disablePortal
-          multiple
           id="tags-outlined"
           options={friendsOptions}
           value={tags}
           onChange={(_e, newValue) => setTags(newValue)}
-          filterSelectedOptions
           freeSolo
+          saveNewTags
           renderInput={(params) => (
             <TextField
               {...params}
