@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.2.3
+
+- New: Library clip redesign.
+- New: Library clip cards show who is tagged in each clip.
+- New: Your private clips are marked with a Private badge in the library.
+- Fix: The game now shows under a clip when watching it in the library.
+- Fix: Game search finds more games when uploading a clip or filtering the library.
+
 ## v1.2.2
 
 - New: Tag friends or anyone else in a clip when uploading.
