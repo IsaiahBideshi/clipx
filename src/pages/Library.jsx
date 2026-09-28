@@ -486,6 +486,9 @@ export default function Library() {
           <Button variant={"contained"} onClick={applyFilters}>Filter</Button>
           <Button variant={"outlined"} onClick={clearFilters}>Clear</Button>
         </div>
+        {clipsQuery.isError && (
+          <p className="search-error" role="alert">{String(clipsQuery.error?.message ?? clipsQuery.error)}</p>
+        )}
       </section>
 
       <div className="clip-grid library-clip-grid" ref={containerRef}>

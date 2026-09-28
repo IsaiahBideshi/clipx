@@ -253,6 +253,13 @@
   margin-top: 18px;
 }
 
+.search-error {
+  margin: 12px 0 0;
+  color: #f87171;
+  font-size: 14px;
+  text-align: right;
+}
+
 .library .library-clip-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(270px, 100%), 1fr));
