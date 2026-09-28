@@ -80,7 +80,7 @@ function getThumbUrl(thumbPath) {
   return thumbPath ? `clipx://image?path=${encodeURIComponent(thumbPath)}` : null;
 }
 
-function formatDate(dateStr) {
+export function formatDate(dateStr) {
   const date = new Date(dateStr);
   const now = new Date();
   const diff = Math.floor((now - date) / 1000); // in seconds

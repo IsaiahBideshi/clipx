@@ -9,6 +9,7 @@ import { isTextEntryActive } from '../lib/hotkeys.js';
 import { useNavigate } from "react-router-dom";
 
 import CloseIcon from '@mui/icons-material/Close';
+import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import TextField from '@mui/material/TextField';
 import AutoComplete from '@mui/material/Autocomplete';
 import InputAdornment from '@mui/material/InputAdornment';
@@ -22,12 +23,14 @@ import fallBackThumb from "../assets/thumbnail.svg";
 import VideoPlayer from "../components/VideoPlayer";
 import RefreshButton from "../components/RefreshButton.jsx";
 import TagsAutoComplete from "../components/TagsAutoComplete.jsx";
+import { formatDate } from "../components/ClipCard.jsx";
 import { usePlayerPrefs } from "../lib/playerPrefs.js";
 
 const GRID_GAP = 20;
 const MIN_CARD_WIDTH = 270;
 const INITIAL_SKELETON_COUNT = 20;
 const LIBRARY_PAGE_SIZE = 50;
+const MAX_TAG_AVATARS = 3;
 const GAME_BY_ID = new Map(STOREDGAMES.map((game) => [game.id, game]));
 
 async function fetchLibraryClips(session, filters, offset = 0) {
@@ -59,7 +62,23 @@ async function fetchLibraryClips(session, filters, offset = 0) {
     throw error;
   }
 
-  return { clips: data || [], count: count ?? (data || []).length };
+  const clips = data || [];
+  let tags = [];
+  if (clips.length > 0) {
+    const { data: tagRows, error: tagsError } = await supabase
+      .from("clip_tags")
+      .select("clip_id, user_id, label")
+      .in("clip_id", clips.map((clip) => clip.id));
+    if (tagsError) {
+      console.error("Failed to load clip tags:", tagsError);
+    }
+    tags = tagRows || [];
+  }
+
+  return {
+    clips: clips.map((clip) => ({ ...clip, tags: tags.filter((tag) => tag.clip_id === clip.id) })),
+    count: count ?? clips.length,
+  };
 }
 
 function libraryClipsKey(userId, filters) {
@@ -197,29 +216,31 @@ export default function Library() {
   const friendsOptions = friendsOptionsQuery.data || [];
   const loadingClips = clipsQuery.isInitialLoading;
 
-  const ownerIds = useMemo(
-    () => Array.from(new Set(clips.map((clip) => clip.owner_id).filter(Boolean))),
+  const userIds = useMemo(
+    () => Array.from(new Set(
+      clips.flatMap((clip) => [clip.owner_id, ...clip.tags.map((tag) => tag.user_id)]).filter(Boolean)
+    )),
     [clips]
   );
-  const ownersQuery = useQuery({
-    queryKey: ["library", "owners", ownerIds.join(",")],
+  const usersQuery = useQuery({
+    queryKey: ["library", "users", userIds.join(",")],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("users")
         .select("id, username, avatar_url")
-        .in("id", ownerIds);
+        .in("id", userIds);
       if (error) {
         throw error;
       }
       return data || [];
     },
-    enabled: ownerIds.length > 0,
+    enabled: userIds.length > 0,
     placeholderData: [],
     refetchOnMount: "always",
   });
-  const ownerMap = useMemo(
-    () => Object.fromEntries((ownersQuery.data || []).map((user) => [user.id, user])),
-    [ownersQuery.data]
+  const userMap = useMemo(
+    () => Object.fromEntries((usersQuery.data || []).map((user) => [user.id, user])),
+    [usersQuery.data]
   );
 
   const queryClient = useQueryClient();
@@ -500,7 +521,7 @@ export default function Library() {
               <ClipCard
                 key={clip.id}
                 clip={clip}
-                owner={ownerMap[clip.owner_id]}
+                userMap={userMap}
                 onSelect={setSelectedClip}
               />
             ))}
@@ -577,52 +598,86 @@ function AzureClipThumb({clip}) {
 }
 
 
-export function ClipCard({clip, owner, onSelect}) {
+export function ClipCard({clip, userMap, onSelect}) {
   const clipDate = new Date(clip.created_at).toLocaleString( undefined, { dateStyle: 'long', timeStyle: 'short' });
   const isAzure = Boolean(clip.blob_name);
   const game = clip.game_id != null ? GAME_BY_ID.get(clip.game_id) : null;
-  const gameCover = game?.cover?.url
-    ? ("https:" + game.cover.url).replace("/t_thumb/", "/t_cover_big/")
-    : null;
+  const owner = userMap[clip.owner_id];
+  const tagged = clip.tags
+    .map((tag) => (tag.user_id ? userMap[tag.user_id] : { username: tag.label }))
+    .filter(Boolean);
 
   return (
     <div className="clip-card" onClick={() => onSelect(clip)}>
-      {isAzure ? (
-        <AzureClipThumb clip={clip} />
-      ) : (
-        <img src={`https://img.youtube.com/vi/${clip.youtube_video_id}/mqdefault.jpg`} alt="thumb" className="clip-thumb" />
-      )}
-      <div className="clip-info">
-        <div className="clip-text">
-          <div className="clip-name" title={clip.title}>{clip.title}</div>
-          {owner && (
-            <div className="clip-owner">
-              {owner.avatar_url ? (
-                <img src={owner.avatar_url} alt={owner.username} className="clip-owner-avatar" />
-              ) : (
-                <div className="clip-owner-avatar" aria-hidden="true">
-                  {getOwnerInitials(owner.username)}
-                </div>
-              )}
-              <span className="clip-owner-name">{owner.username}</span>
-            </div>
-          )}
-          <div className="clip-date">{clipDate}</div>
-        </div>
-        {gameCover && (
-          <img className="clip-game-thumb" src={gameCover} alt={game.name} title={game.name} />
+      <div className="clip-thumb-wrap">
+        {isAzure ? (
+          <AzureClipThumb clip={clip} />
+        ) : (
+          <img src={`https://img.youtube.com/vi/${clip.youtube_video_id}/mqdefault.jpg`} alt="thumb" className="clip-thumb" />
+        )}
+        {clip.visibility === "private" && (
+          <div className="clip-private-badge" title="Private — only you can see this clip">
+            <LockOutlinedIcon />
+            <span>Private</span>
+          </div>
         )}
       </div>
+      <div className="clip-name" title={clip.title}>{clip.title}</div>
+      <div className="clip-meta">
+        {owner && (
+          <>
+            <span className="clip-owner" title={`Owner: ${owner.username}`}>
+              <UserAvatar user={owner} className="clip-owner-avatar" />
+              <span className="clip-owner-name">{owner.username?.split(" ")[0]}</span>
+            </span>
+            <span>·</span>
+          </>
+        )}
+        {game && (
+          <>
+            <span className="clip-game" title={game.name}>{game.name}</span>
+            <span>·</span>
+          </>
+        )}
+        <span title={clipDate}>{formatDate(clip.created_at)}</span>
+      </div>
+      {tagged.length > 0 && (
+        <div className="clip-tagged" title={`Tagged: ${tagged.map((user) => user.username).join(", ")}`}>
+          <div className="clip-tag-stack">
+            {tagged.slice(0, MAX_TAG_AVATARS).map((user, index) => (
+              <UserAvatar key={index} user={user} className="clip-tag-avatar" />
+            ))}
+            {tagged.length > MAX_TAG_AVATARS && (
+              <div className="clip-tag-avatar clip-tag-more">+{tagged.length - MAX_TAG_AVATARS}</div>
+            )}
+          </div>
+          <div className="clip-tag-label">
+            {tagged.length === 1
+              ? tagged[0].username
+              : `${tagged[0].username?.split(" ")[0]} and ${tagged.length - 1} other${tagged.length > 2 ? "s" : ""}`}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-function getOwnerInitials(name) {
+function UserAvatar({user, className}) {
+  return user.avatar_url ? (
+    <img src={user.avatar_url} alt={user.username} className={className} />
+  ) : (
+    <div className={className} aria-hidden="true">
+      {getInitials(user.username)}
+    </div>
+  );
+}
+
+function getInitials(name) {
   return String(name || "?")
     .split(/[\s@._-]+/)
     .filter(Boolean)
     .slice(0, 2)
-    .map((part) => part[0])
+    .map((part) => [...part][0])
     .join("")
     .toUpperCase() || "?";
 }

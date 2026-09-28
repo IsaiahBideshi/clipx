@@ -16,13 +16,14 @@ createRoot(document.getElementById('root')).render(
       persistOptions={{
         persister: queryPersister,
         maxAge: QUERY_CACHE_MAX_AGE_MS,
+        buster: "library-clip-tags",
         dehydrateOptions: {
           shouldDehydrateQuery: (query) => {
             const [scope, resource, , , cursor] = query.queryKey;
             if (scope === "localFiles" && resource === "clips" && cursor !== null) {
               return false;
             }
-            if (scope === "library" && (resource === "clipThumb" || resource === "owners")) {
+            if (scope === "library" && (resource === "clipThumb" || resource === "users")) {
               return false;
             }
 
