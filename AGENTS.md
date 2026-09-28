@@ -37,6 +37,7 @@ PowerShell here has execution-policy disabled, so **`npm` fails; always use `npm
 
 - `master` push/tag `v*` triggers `release.yml`: builds, then creates a GitHub release from the `## vX.Y.Z` section in `CHANGELOG.md` (absent section ⇒ workflow fails). Bumper version in `package.json` must match a `## vX.Y.Z` heading.
 - Pushing a version bump alone (no tag) releases as `v{version}`; the `dist/latest.yml` artifact powers in-app auto-updates.
+- Only cut a release (version bump, `CHANGELOG.md` release section, `v*` tag) when the user explicitly asks for one. Every other push to `master`, including PR merges, must have `[skip ci]` in the head commit message so `release.yml` doesn't run.
 
 ## Docs
 
