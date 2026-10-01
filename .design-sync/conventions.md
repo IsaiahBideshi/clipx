@@ -19,7 +19,7 @@ const { ClipXProvider, NavBar, ClipGrid } = window.ClipX;
 
 - The UI is always dark. Put content on `var(--page-surface)`, never on white.
 - `ClipEditor` and `ChangelogModal` are full-screen overlays (`position: fixed`). Render them on top of a page, not inside a card.
-- `SavingClipsWidget` and `UploadingClipsWidget` are pinned to the bottom-right of the window (`position: fixed`). Render them once at app level.
+- Render `UploadingClipsWidget` and `SavingClipsWidget` once at app level, inside a `<div className="clip-widgets">`. That wrapper pins them to the bottom-right of the window (`position: fixed`) and stacks them.
 - `ClipContextMenu` is also fixed-positioned: pass the cursor position `{ x, y }` in window coordinates.
 - Clip thumbnails and video only load inside the desktop app (`clipx://` URLs). In designs, cards show the grey placeholder thumbnail and the player shows its loading state. That's expected.
 

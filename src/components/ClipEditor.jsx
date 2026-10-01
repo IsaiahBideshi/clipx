@@ -9,7 +9,7 @@ import TextField from '@mui/material/TextField';
 import Button from '@mui/material/Button';
 import AutoComplete from '@mui/material/Autocomplete';
 import { supabase } from "../lib/supabase.js";
-import { getClipTagsError } from "../lib/clipsApi.js";
+import { getClipTagsError, getClipShareUrl } from "../lib/clipsApi.js";
 import { InputLabel, MenuItem, Select, FormControl, Typography } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import fallBackThumb from "../assets/thumbnail.svg";
@@ -93,7 +93,7 @@ export default function ClipEditor({
           !editorRef.current.contains(event.target) && 
           uploadMenuRef.current && 
           !uploadMenuRef.current.contains(event.target) &&
-          !event.target.closest?.(".MuiPopover-root, .MuiPopper-root")
+          !event.target.closest?.(".MuiPopover-root, .MuiPopper-root, .clip-widgets")
       ) {
         onClose();
       }
@@ -430,10 +430,10 @@ export function UploadMenu({clip, start, end, onRefreshIndex, onSaveQueueEvent, 
 
   async function saveClipRecord(clipData) {
     if (!userId) {
-      return new Error("No authenticated user found");
+      return { data: null, error: new Error("No authenticated user found") };
     }
-  
-    const { error } = await supabase.rpc('create_clip_with_tags', {
+
+    return supabase.rpc('create_clip_with_tags', {
       title: clipData.title,
       visibility: clipData.visibility,
       game_id: clipData.game?.id ?? null,
@@ -443,7 +443,6 @@ export function UploadMenu({clip, start, end, onRefreshIndex, onSaveQueueEvent, 
       user_ids: clipData.tags.filter((tag) => tag?.id).map((tag) => tag.id),
       labels: clipData.tags.filter((tag) => typeof tag === "string").map((tag) => tag.trim()),
     });
-    return error;
   }
 
   async function uploadClip(clip, start, end, title, game, tags) {
@@ -466,7 +465,7 @@ export function UploadMenu({clip, start, end, onRefreshIndex, onSaveQueueEvent, 
 
       const response = await window.clipx.uploadClip({ clip, start, end, displayName, game, tags, userId });
       if (response?.status === 200) {
-        const error  = await saveClipRecord({
+        const { data: clipId, error } = await saveClipRecord({
           id: uploadId,
           name: displayName,
           game: game,
@@ -497,8 +496,7 @@ export function UploadMenu({clip, start, end, onRefreshIndex, onSaveQueueEvent, 
         onUploadQueueEvent?.({
           type: "success",
           id: uploadId,
-          youtubeUrl: response.youtubeUrl,
-          videoId: response.videoId,
+          shareUrl: visibility === "public" && clipId ? getClipShareUrl(clipId) : null,
         });
         return;
       }

@@ -6,7 +6,7 @@
 - `ClipXProvider` (`.design-sync/ClipXProvider.jsx`) wraps the app's MUI `appTheme` plus a `MemoryRouter`. It mirrors `src/main.jsx` minus the query client, which none of the synced components use.
 - The bundle includes the real `src/lib/supabase.js` (via `ClipEditor` -> `UploadMenu`), including the publishable Supabase key and `pages/signup.jsx`/`auth.css`. Previews pass a fake session id; friend loading makes a harmless failing request.
 - Fonts: the theme names "Sora", but the app never loads it, so ClipX renders in Segoe UI. The user chose to match the app, not ship Sora: `runtimeFontPrefixes` suppresses `[FONT_MISSING]` for Sora/Avenir/Trebuchet MS.
-- Preview harness: components use `position: fixed` (widgets, context menu, overlays). Previews wrap them in a `transform: translateZ(0)` surface so the fixed positioning stays inside the card. `ClipEditor`/`ChangelogModal` use `cardMode: single`.
+- Preview harness: components use `position: fixed` (the `clip-widgets` wrapper, context menu, overlays). Previews wrap them in a `transform: translateZ(0)` surface so the fixed positioning stays inside the card. `ClipEditor`/`ChangelogModal` use `cardMode: single`.
 - `VideoPlayer` controls only show on hover/focus, so its preview focuses `.mute-button` on mount to make them visible.
 - With no Electron (`window.clipx`), thumbnails show the placeholder and players stay in their loading state. This is expected, not a bug.
 

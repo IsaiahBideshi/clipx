@@ -10,8 +10,8 @@ function Surface({ children }) {
 
 const clips = [
   { id: "1", name: "Ace on Ascent", status: "uploading" },
-  { id: "2", name: "1v4 clutch on Mirage", status: "uploaded", youtubeUrl: "https://youtu.be/dQw4w9WgXcQ" },
-  { id: "3", name: "Rocket League ceiling shot", status: "failed", error: "YouTube quota exceeded" },
+  { id: "2", name: "1v4 clutch on Mirage", status: "uploaded", shareUrl: "https://clipx.bideshi.tech/clip/3f1c2b7a-9d4e-4c1a-8b2f-1a2b3c4d5e6f" },
+  { id: "3", name: "Rocket League ceiling shot", status: "failed", error: "Azure upload failed (503)" },
 ];
 
 export const Expanded = () => (
