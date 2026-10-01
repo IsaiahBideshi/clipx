@@ -2,6 +2,9 @@ import "./widgets.css";
 import CloseIcon from "@mui/icons-material/Close";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import CheckIcon from "@mui/icons-material/Check";
+import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
+import SaveOutlinedIcon from "@mui/icons-material/SaveOutlined";
 
 export default function SavingClipsWidget({ clips, expanded, onToggleExpanded, onDismiss }) {
   if (!clips?.length) return null;
@@ -9,52 +12,53 @@ export default function SavingClipsWidget({ clips, expanded, onToggleExpanded, o
   const savingCount = clips.filter((clip) => clip.status === "saving").length;
 
   return (
-    <div className="saving-clips-widget">
-      <div className="saving-clips-header" onClick={onToggleExpanded}>
-        <button type="button" className="saving-clips-header-toggle">
-          <span className="saving-clips-header-left">
-            {savingCount > 0 && <span className="saving-spinner" />}
-            <span className="saving-clips-title">
-              {savingCount > 0
-                ? `Saving ${savingCount} clip${savingCount > 1 ? "s" : ""}`
-                : "Recent save updates"}
-            </span>
+    <div className="clip-widget">
+      <div className="clip-widget-header">
+        <button type="button" className="clip-widget-toggle" aria-expanded={expanded} onClick={onToggleExpanded}>
+          <span className="clip-widget-badge">
+            {savingCount > 0 ? <span className="clip-widget-spinner" /> : <SaveOutlinedIcon />}
           </span>
+          <span className="clip-widget-title">
+            {savingCount > 0
+              ? `Saving ${savingCount} clip${savingCount > 1 ? "s" : ""}`
+              : "Recent saves"}
+          </span>
+          {expanded ? <ExpandMoreIcon className="clip-widget-chevron" /> : <ExpandLessIcon className="clip-widget-chevron" />}
         </button>
-        <div className="saving-clips-actions" onClick={(e) => e.stopPropagation()}>
-          <button
-            type="button"
-            className="saving-clips-action"
-            aria-label={expanded ? "Minimize" : "Expand"}
-            onClick={onToggleExpanded}
-          >
-            {expanded ? <ExpandMoreIcon /> : <ExpandLessIcon />}
-          </button>
-          <button
-            type="button"
-            className="saving-clips-action"
-            aria-label="Dismiss"
-            onClick={onDismiss}
-          >
+        {savingCount === 0 && (
+          <button type="button" className="clip-widget-action" aria-label="Dismiss" onClick={onDismiss}>
             <CloseIcon />
           </button>
-        </div>
+        )}
       </div>
 
       {expanded && (
-        <div className="saving-clips-list">
+        <ul className="clip-widget-list">
           {clips.map((clip) => (
-            <div key={clip.id} className="saving-clip-item">
-              <span className="saving-clip-name">{clip.name}</span>
-              <span className={`saving-clip-status ${clip.status === "failed" ? "failed" : ""}`}>
-                {clip.status}
-                {clip.status === "failed" && (
-                  <span>{clip.error ? ` — ${clip.error}` : ""}</span>
-                )}
+            <li key={clip.id} className="clip-widget-item">
+              <span className={`clip-widget-status ${clip.status}`}>
+                {clip.status === "saving" && <span className="clip-widget-spinner" />}
+                {clip.status === "saved" && <CheckIcon />}
+                {clip.status === "failed" && <ErrorOutlineIcon />}
               </span>
-            </div>
+              <div className="clip-widget-item-body">
+                <span className="clip-widget-item-name">{clip.name}</span>
+                {clip.status === "saving" && (
+                  <>
+                    <span className="clip-widget-item-detail">Saving…</span>
+                    <span className="clip-widget-progress" />
+                  </>
+                )}
+                {clip.status === "saved" && (
+                  <span className="clip-widget-item-detail">Saved to your Saved Clips</span>
+                )}
+                {clip.status === "failed" && (
+                  <span className="clip-widget-item-detail failed">{clip.error || "Save failed."}</span>
+                )}
+              </div>
+            </li>
           ))}
-        </div>
+        </ul>
       )}
     </div>
   );

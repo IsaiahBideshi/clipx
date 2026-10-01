@@ -584,10 +584,6 @@ export default function LocalFiles() {
     );
   }
 
-  function removeSavingClip(id) {
-    setSavingClips((prev) => prev.filter((item) => item.id !== id));
-  }
-
   function upsertUploadingClip(id, nextValues) {
     setUploadingClips((prev) =>
       prev.map((item) => (item.id === id ? { ...item, ...nextValues } : item))
@@ -607,7 +603,7 @@ export default function LocalFiles() {
     }
 
     if (event.type === "success") {
-      removeSavingClip(event.id);
+      upsertSavingClip(event.id, { status: "saved" });
       return;
     }
 
@@ -628,11 +624,7 @@ export default function LocalFiles() {
     }
 
     if (event.type === "success") {
-      upsertUploadingClip(event.id, {
-        status: "uploaded",
-        youtubeUrl: event.youtubeUrl,
-        videoId: event.videoId,
-      });
+      upsertUploadingClip(event.id, { status: "uploaded", shareUrl: event.shareUrl });
       return;
     }
 
@@ -743,18 +735,20 @@ export default function LocalFiles() {
         </div>
       )}
 
-      <SavingClipsWidget
-        clips={savingClips}
-        expanded={showSavingList}
-        onToggleExpanded={() => setShowSavingList((prev) => !prev)}
-        onDismiss={() => setSavingClips([])}
-      />
-      <UploadingClipsWidget
-        clips={uploadingClips}
-        expanded={showUploadingList}
-        onToggleExpanded={() => setShowUploadingList((prev) => !prev)}
-        onDismiss={() => setUploadingClips([])}
-      />
+      <div className="clip-widgets">
+        <UploadingClipsWidget
+          clips={uploadingClips}
+          expanded={showUploadingList}
+          onToggleExpanded={() => setShowUploadingList((prev) => !prev)}
+          onDismiss={() => setUploadingClips([])}
+        />
+        <SavingClipsWidget
+          clips={savingClips}
+          expanded={showSavingList}
+          onToggleExpanded={() => setShowSavingList((prev) => !prev)}
+          onDismiss={() => setSavingClips([])}
+        />
+      </div>
       {deleteClipModalOpen && (
         <div className="delete-modal">
           <div className="delete-modal-content" ref={deleteModalRef}>

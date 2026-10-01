@@ -1,92 +1,108 @@
 import "./widgets.css";
+import { useRef, useState } from "react";
 import CloseIcon from "@mui/icons-material/Close";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import CheckIcon from "@mui/icons-material/Check";
+import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
+import ContentCopyIcon from "@mui/icons-material/ContentCopy";
+import CloudUploadOutlinedIcon from "@mui/icons-material/CloudUploadOutlined";
 
 export default function UploadingClipsWidget({ clips, expanded, onToggleExpanded, onDismiss }) {
+  const [copiedId, setCopiedId] = useState(null);
+  const copiedTimeoutRef = useRef(null);
+
   if (!clips?.length) return null;
 
   const uploadingCount = clips.filter((clip) => clip.status === "uploading").length;
 
-  async function handleCopyLink(youtubeUrl) {
+  async function handleCopyLink(clip) {
     try {
-      if (navigator?.clipboard?.writeText) {
-        await navigator.clipboard.writeText(youtubeUrl);
-        return;
-      }
-
+      await navigator.clipboard.writeText(clip.shareUrl);
+    } catch (e) {
       const textArea = document.createElement("textarea");
-      textArea.value = youtubeUrl;
+      textArea.value = clip.shareUrl;
       textArea.style.position = "fixed";
       textArea.style.opacity = "0";
       document.body.appendChild(textArea);
       textArea.focus();
       textArea.select();
-      document.execCommand("copy");
+      const copied = document.execCommand("copy");
       document.body.removeChild(textArea);
-    } catch (e) {
-      console.error("Failed to copy YouTube link:", e);
+      if (!copied) {
+        console.error("Failed to copy share link:", e);
+        return;
+      }
     }
+
+    setCopiedId(clip.id);
+    clearTimeout(copiedTimeoutRef.current);
+    copiedTimeoutRef.current = setTimeout(() => setCopiedId(null), 2000);
   }
 
   return (
-    <div className="uploading-clips-widget">
-      <div className="uploading-clips-header" onClick={onToggleExpanded}>
-        <button type="button" className="uploading-clips-header-toggle">
-          <span className="uploading-clips-header-left">
-            {uploadingCount > 0 && <span className="uploading-spinner" />}
-            <span className="uploading-clips-title">
-              {uploadingCount > 0
-                ? `Uploading ${uploadingCount} clip${uploadingCount > 1 ? "s" : ""}`
-                : "Recent upload updates"}
-            </span>
+    <div className="clip-widget">
+      <div className="clip-widget-header">
+        <button type="button" className="clip-widget-toggle" aria-expanded={expanded} onClick={onToggleExpanded}>
+          <span className="clip-widget-badge">
+            {uploadingCount > 0 ? <span className="clip-widget-spinner" /> : <CloudUploadOutlinedIcon />}
           </span>
+          <span className="clip-widget-title">
+            {uploadingCount > 0
+              ? `Uploading ${uploadingCount} clip${uploadingCount > 1 ? "s" : ""}`
+              : "Recent uploads"}
+          </span>
+          {expanded ? <ExpandMoreIcon className="clip-widget-chevron" /> : <ExpandLessIcon className="clip-widget-chevron" />}
         </button>
-        <div className="uploading-clips-actions" onClick={(e) => e.stopPropagation()}>
-          <button
-            type="button"
-            className="uploading-clips-action"
-            aria-label={expanded ? "Minimize" : "Expand"}
-            onClick={onToggleExpanded}
-          >
-            {expanded ? <ExpandMoreIcon /> : <ExpandLessIcon />}
-          </button>
-          <button
-            type="button"
-            className="uploading-clips-action"
-            aria-label="Dismiss"
-            onClick={onDismiss}
-          >
+        {uploadingCount === 0 && (
+          <button type="button" className="clip-widget-action" aria-label="Dismiss" onClick={onDismiss}>
             <CloseIcon />
           </button>
-        </div>
+        )}
       </div>
 
       {expanded && (
-        <div className="uploading-clips-list">
+        <ul className="clip-widget-list">
           {clips.map((clip) => (
-            <div key={clip.id} className="uploading-clip-item">
-              <div className="uploading-clip-main">
-                <span className="uploading-clip-name">{clip.name}</span>
-                {clip.status === "uploaded" && clip.youtubeUrl && (
-                  <button
-                    type="button"
-                    className="uploading-clip-link"
-                    onClick={() => handleCopyLink(clip.youtubeUrl)}
-                  >
-                    Copy Link
-                  </button>
+            <li key={clip.id} className="clip-widget-item">
+              <span className={`clip-widget-status ${clip.status}`}>
+                {clip.status === "uploading" && <span className="clip-widget-spinner" />}
+                {clip.status === "uploaded" && <CheckIcon />}
+                {clip.status === "failed" && <ErrorOutlineIcon />}
+              </span>
+              <div className="clip-widget-item-body">
+                <span className="clip-widget-item-name">{clip.name}</span>
+                {clip.status === "uploading" && (
+                  <>
+                    <span className="clip-widget-item-detail">Uploading…</span>
+                    <span className="clip-widget-progress" />
+                  </>
+                )}
+                {clip.status === "failed" && (
+                  <span className="clip-widget-item-detail failed">{clip.error || "Upload failed."}</span>
+                )}
+                {clip.status === "uploaded" && !clip.shareUrl && (
+                  <span className="clip-widget-item-detail">Uploaded. Only public clips get a share link.</span>
+                )}
+                {clip.status === "uploaded" && clip.shareUrl && (
+                  <div className="clip-widget-link">
+                    <span className="clip-widget-link-url" title={clip.shareUrl}>
+                      {clip.shareUrl.replace(/^https?:\/\//, "")}
+                    </span>
+                    <button
+                      type="button"
+                      className={`clip-widget-copy ${copiedId === clip.id ? "copied" : ""}`}
+                      onClick={() => handleCopyLink(clip)}
+                    >
+                      {copiedId === clip.id ? <CheckIcon /> : <ContentCopyIcon />}
+                      {copiedId === clip.id ? "Copied" : "Copy link"}
+                    </button>
+                  </div>
                 )}
               </div>
-              <span className={`uploading-clip-status ${clip.status === "failed" ? "failed" : ""}`}>
-                {clip.status}
-                {clip.status === "failed" && (
-                  <span>{clip.error ? ` — ${clip.error}` : "! Ensure google account is linked."}</span>
-                )}
-              </span>
-            </div>
+            </li>
           ))}
-        </div>
+        </ul>
       )}
     </div>
   );

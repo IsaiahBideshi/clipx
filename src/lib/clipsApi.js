@@ -14,6 +14,10 @@ export async function listClips(session, query = {}) {
   return response.json().catch(() => ({ data: null, error: "Invalid server response." }));
 }
 
+export function getClipShareUrl(clipId) {
+  return `${getApiBase()}/clip/${clipId}`;
+}
+
 export function getClipTagsError(tags) {
   if (tags.length > MAX_TAGS) {
     return `A clip can have at most ${MAX_TAGS} tags`;
