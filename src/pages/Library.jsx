@@ -4,7 +4,7 @@ import Fuse from "fuse.js";
 import STOREDGAMES from "../data/games.json";
 import { supabase } from '../lib/supabase.js';
 import { useAuthSession } from "../lib/authSession.js";
-import { listClips } from "../lib/clipsApi.js";
+import { listClips, getClipShareUrl } from "../lib/clipsApi.js";
 import { isTextEntryActive } from '../lib/hotkeys.js';
 import { useNavigate } from "react-router-dom";
 
@@ -22,6 +22,7 @@ import "./library.css";
 import fallBackThumb from "../assets/thumbnail.svg";
 import VideoPlayer from "../components/VideoPlayer";
 import RefreshButton from "../components/RefreshButton.jsx";
+import CopyLinkButton from "../components/CopyLinkButton.jsx";
 import TagsAutoComplete from "../components/TagsAutoComplete.jsx";
 import { formatDate } from "../components/ClipCard.jsx";
 import { usePlayerPrefs } from "../lib/playerPrefs.js";
@@ -621,6 +622,9 @@ export function ClipCard({clip, userMap, onSelect}) {
             <span>Private</span>
           </div>
         )}
+        {isAzure && clip.visibility === "public" && (
+          <CopyLinkButton url={getClipShareUrl(clip.id)} className="clip-copy-link" />
+        )}
       </div>
       <div className="clip-name" title={clip.title}>{clip.title}</div>
       <div className="clip-meta">
@@ -763,7 +767,12 @@ export function VideoPreview({clip, onClose, onPrevClip, onNextClip}){
             />
           </div>
           <div className="video-metadata">
-            <h2 className="video-title">{clip?.title || "No Video Selected"}</h2>
+            <div className="video-title-row">
+              <h2 className="video-title">{clip?.title || "No Video Selected"}</h2>
+              {clip.visibility === "public" && (
+                <CopyLinkButton url={getClipShareUrl(clip.id)} className="video-copy-link" />
+              )}
+            </div>
             {gamesSrc && (<div className="video-game-row">
               <img className="video-game-image" src={gamesSrc.image} alt="game"/>
               <div className="video-game-label">{gamesSrc.label || "Unknown Game"}</div>

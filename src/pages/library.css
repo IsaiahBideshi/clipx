@@ -138,6 +138,39 @@
   font-size: clamp(1.05rem, 1.6vw, 1.35rem);
 }
 
+.video-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.video-copy-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  cursor: pointer;
+  transition: background 180ms ease, border-color 180ms ease, transform 180ms ease;
+}
+
+.video-copy-link:hover {
+  border-color: rgba(144, 202, 249, 0.6);
+  background: rgba(144, 202, 249, 0.16);
+  transform: translateY(-1px);
+}
+
+.video-copy-link svg {
+  font-size: 18px;
+}
+
 .video-date{
   font-size: 0.8rem;
   color: rgba(255, 255, 255, 0.58);
@@ -334,6 +367,38 @@
 
 .library .clip-private-badge svg {
   font-size: 13px;
+}
+
+.library .clip-copy-link {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 7px;
+  background: rgba(10, 12, 16, 0.78);
+  backdrop-filter: blur(4px);
+  color: #fff;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s, border-color 0.15s;
+}
+
+.library .clip-card:hover .clip-copy-link,
+.library .clip-copy-link:focus-visible {
+  opacity: 1;
+}
+
+.library .clip-copy-link:hover {
+  border-color: rgba(144, 202, 249, 0.6);
+}
+
+.library .clip-copy-link svg {
+  font-size: 16px;
 }
 
 .library .library-clip-grid .clip-name {

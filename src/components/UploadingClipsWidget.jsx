@@ -7,6 +7,7 @@ import CheckIcon from "@mui/icons-material/Check";
 import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import CloudUploadOutlinedIcon from "@mui/icons-material/CloudUploadOutlined";
+import { copyText } from "../lib/clipboard.js";
 
 export default function UploadingClipsWidget({ clips, expanded, onToggleExpanded, onDismiss }) {
   const [copiedId, setCopiedId] = useState(null);
@@ -17,25 +18,7 @@ export default function UploadingClipsWidget({ clips, expanded, onToggleExpanded
   const uploadingCount = clips.filter((clip) => clip.status === "uploading").length;
 
   async function handleCopyLink(clip) {
-    try {
-      await navigator.clipboard.writeText(clip.shareUrl);
-    } catch (e) {
-      const textArea = document.createElement("textarea");
-      textArea.value = clip.shareUrl;
-      textArea.style.position = "fixed";
-      textArea.style.opacity = "0";
-      document.body.appendChild(textArea);
-      textArea.focus();
-      textArea.select();
-      try {
-        if (!document.execCommand("copy")) throw e;
-      } catch (copyError) {
-        console.error("Failed to copy share link:", copyError);
-        return;
-      } finally {
-        textArea.remove();
-      }
-    }
+    if (!(await copyText(clip.shareUrl))) return;
 
     setCopiedId(clip.id);
     clearTimeout(copiedTimeoutRef.current);
