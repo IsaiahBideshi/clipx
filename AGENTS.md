@@ -3,7 +3,7 @@
 ## What this repo is
 
 - **ClipX** = Windows Electron desktop app (React 19 + Vite renderer) + a Vercel deployment (`clipx.bideshi.tech`) that serves the marketing site (`public/landing/`) and serverless API functions (`api/`). Supabase is the database and auth provider.
-- The React app in `src/` **only runs inside Electron** — it is never served in a browser. Packaged builds serve `dist/index.html` from a local HTTP server started in `electron/main.js` (with SPA fallback). Routes use `HashRouter` (`#/`, `#/settings`, `#/library`, `#/profile`, `#/signup`, `#/login`).
+- The React app in `src/` **only runs inside Electron** — it is never served in a browser. The one exception is `src/sharePlayer.jsx`, which bundles `VideoPlayer` for the public `/clip/<id>` share page (see `build:player`). Packaged builds serve `dist/index.html` from a local HTTP server started in `electron/main.js` (with SPA fallback). Routes use `HashRouter` (`#/`, `#/settings`, `#/library`, `#/profile`, `#/signup`, `#/login`).
 - Renderer ↔ main process communication goes through `window.clipx.*` IPC methods exposed in `electron/preload.js`. Anything new in preload must be mirrored in the renderer, and vice versa.
 - Main process is ESM (`"type": "module"`) — use `import`/`export` everywhere, including `api/`.
 
@@ -14,6 +14,7 @@ PowerShell here has execution-policy disabled, so **`npm` fails; always use `npm
 - `npm.cmd run dev` — starts Vite on `127.0.0.1:5173` then launches Electron (loads the dev server URL). This is the dev loop; Electron must open for most features to work (IPC, keytar, better-sqlite3).
 - `npm.cmd run build` — `vite build` then `electron-builder --win`; outputs `dist/ClipX-Setup.exe` + `latest.yml` (used by electron-updater).
 - `npm.cmd run build:react` / `build:electron` — the two halves separately.
+- `npm.cmd run build:player` — bundles `src/sharePlayer.jsx` into `public/clip-player/` for the `/clip/<id>` share page. Vercel has no build step, so the output is committed: re-run it and commit after changing `VideoPlayer.jsx`, `player.css` or `playerPrefs.js`.
 - **No tests exist** and there is no test script.
 - `eslint.config.js` exists but the eslint packages are **not installed** and there is no lint script — do not claim to run lint.
 

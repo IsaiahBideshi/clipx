@@ -6,6 +6,7 @@ import games from "../api-handlers/games.js";
 import clips from "../api-handlers/clips/clips.js";
 import clipsFiles from "../api-handlers/clips/files.js";
 import clipsStream from "../api-handlers/clips/stream.js";
+import clipShare from "../api-handlers/clips/share.js";
 import google from "../api-handlers/account/google.js";
 import googleToken from "../api-handlers/google/token.js";
 import account from "../api-handlers/account/account.js";
@@ -30,6 +31,10 @@ export default function handler(req, res) {
 
   if (route) {
     return route(req, res);
+  }
+
+  if (path.startsWith("/clip/")) {
+    return clipShare(req, res);
   }
 
   if (path === "/api") {

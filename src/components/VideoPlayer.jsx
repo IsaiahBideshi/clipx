@@ -111,7 +111,7 @@ export default function VideoPlayer({
       callbacksRef.current.onTimeUpdate?.(start);
     }
 
-    el.play();
+    el.play().catch(() => {});
   }
 
   function pause() {
