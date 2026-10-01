@@ -1,5 +1,6 @@
 import { supabase } from '../auth.js'
-import { getStreamUrl, BlobNotFoundError } from './azure.js'
+import { getStreamUrl, BlobNotFoundError, containerClient } from './azure.js'
+import { extractAvatarBlobName } from '../account/azure.js'
 
 const CLIP_PATH = /^\/clip\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(\/video)?$/i
 const PLAYER_ASSETS = `
@@ -31,7 +32,7 @@ export default async function handler(req, res) {
 
   try {
     const clip = clipId ? await findPublicClip(clipId) : null
-    if (!clip) {
+    if (!clip || !(await containerClient.getBlobClient(clip.blob_name).exists())) {
       return sendPage(res, 404, 'Clip unavailable', renderUnavailable())
     }
 
@@ -70,9 +71,17 @@ function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, (char) => `&#${char.charCodeAt(0)};`)
 }
 
+function isTrustedAvatar(url) {
+  try {
+    return new URL(url).hostname === 'lh3.googleusercontent.com' || Boolean(extractAvatarBlobName(url))
+  } catch {
+    return false
+  }
+}
+
 function renderClip(clip, owner) {
   const username = owner?.username || 'ClipX user'
-  const avatar = owner?.avatar_url
+  const avatar = isTrustedAvatar(owner?.avatar_url)
     ? `<img class="clip-owner-avatar" src="${escapeHtml(owner.avatar_url)}" alt="" />`
     : `<span class="clip-owner-avatar">${escapeHtml([...username][0].toUpperCase())}</span>`
   const uploadedAt = new Date(clip.created_at).toLocaleDateString('en-US', {

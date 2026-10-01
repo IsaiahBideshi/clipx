@@ -27,11 +27,13 @@ export default function UploadingClipsWidget({ clips, expanded, onToggleExpanded
       document.body.appendChild(textArea);
       textArea.focus();
       textArea.select();
-      const copied = document.execCommand("copy");
-      document.body.removeChild(textArea);
-      if (!copied) {
-        console.error("Failed to copy share link:", e);
+      try {
+        if (!document.execCommand("copy")) throw e;
+      } catch (copyError) {
+        console.error("Failed to copy share link:", copyError);
         return;
+      } finally {
+        textArea.remove();
       }
     }
 
