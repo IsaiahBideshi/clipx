@@ -11,6 +11,7 @@
     "build:react": "vite build",
     "build:electron": "electron-builder build --win --publish never",
     "build:player": "vite build --config vite.player.config.js",
+    "test": "node --test --experimental-test-module-mocks tests/share.test.js",
     "build": "node scripts/build.js",
     "preview": "vite preview"
   },
