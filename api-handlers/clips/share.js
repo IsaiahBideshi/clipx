@@ -1,8 +1,8 @@
 import { supabase } from '../auth.js'
-import { getStreamUrl, BlobNotFoundError, containerClient } from './azure.js'
+import { getStreamUrl, BlobNotFoundError, containerClient, CONTAINER_NAME, THUMBS_CONTAINER_NAME } from './azure.js'
 import { extractAvatarBlobName } from '../account/azure.js'
 
-const CLIP_PATH = /^\/clip\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(\/video)?$/i
+const CLIP_PATH = /^\/clip\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:\/(video|thumbnail))?$/i
 const PLAYER_ASSETS = `
     <link rel="stylesheet" href="/clip-player/player.css" />
     <script type="module" src="/clip-player/player.js"></script>`
@@ -12,15 +12,17 @@ export default async function handler(req, res) {
     return res.status(405).json({ data: null, error: 'Method not allowed' })
   }
 
-  const [, clipId, video] = req.url.split('?')[0].match(CLIP_PATH) || []
+  const [, clipId, asset] = req.url.split('?')[0].match(CLIP_PATH) || []
 
-  if (video) {
+  if (asset) {
+    const thumbnail = asset.toLowerCase() === 'thumbnail'
     try {
       const clip = await findPublicClip(clipId)
-      if (!clip) {
+      const blobName = thumbnail ? clip?.thumbnail_blob_name : clip?.blob_name
+      if (!blobName) {
         return res.status(404).json({ data: null, error: 'Clip not found' })
       }
-      return res.redirect(302, await getStreamUrl(clip.blob_name))
+      return res.redirect(302, await getStreamUrl(blobName, 'r', thumbnail ? THUMBS_CONTAINER_NAME : CONTAINER_NAME))
     } catch (err) {
       console.error('Error generating shared clip stream URL:', err)
       if (err instanceof BlobNotFoundError) {
@@ -45,7 +47,9 @@ export default async function handler(req, res) {
       console.error('Error fetching shared clip owner:', ownerError)
     }
 
-    return sendPage(res, 200, clip.title || 'Untitled clip', renderClip(clip, owner), PLAYER_ASSETS)
+    const username = owner?.username || 'ClipX user'
+    const embed = renderEmbed(clip, username, `https://${req.headers.host}/clip/${clip.id}`)
+    return sendPage(res, 200, clip.title || 'Untitled clip', renderClip(clip, owner, username), embed + PLAYER_ASSETS)
   } catch (err) {
     console.error('Error loading shared clip:', err)
     return sendPage(res, 500, 'Clip unavailable', renderUnavailable())
@@ -55,7 +59,7 @@ export default async function handler(req, res) {
 async function findPublicClip(clipId) {
   const { data, error } = await supabase
     .from('clips')
-    .select('id, title, blob_name, owner_id, created_at')
+    .select('id, title, blob_name, thumbnail_blob_name, owner_id, created_at')
     .eq('id', clipId)
     .eq('visibility', 'public')
     .neq('blob_name', '')
@@ -79,8 +83,29 @@ function isTrustedAvatar(url) {
   }
 }
 
-function renderClip(clip, owner) {
-  const username = owner?.username || 'ClipX user'
+function renderEmbed(clip, username, pageUrl) {
+  const url = escapeHtml(pageUrl)
+  const image = clip.thumbnail_blob_name
+    ? `
+    <meta property="og:image" content="${url}/thumbnail" />`
+    : ''
+
+  return `
+    <meta property="og:type" content="video.other" />
+    <meta property="og:site_name" content="ClipX" />
+    <meta property="og:url" content="${url}" />
+    <meta property="og:title" content="${escapeHtml(clip.title || 'Untitled clip')}" />
+    <meta property="og:description" content="Clip by ${escapeHtml(username)}" />${image}
+    <meta property="og:video" content="${url}/video" />
+    <meta property="og:video:secure_url" content="${url}/video" />
+    <meta property="og:video:type" content="video/mp4" />
+    <meta property="og:video:width" content="1280" />
+    <meta property="og:video:height" content="720" />
+    <meta name="twitter:card" content="player" />
+    <meta name="theme-color" content="#90caf9" />`
+}
+
+function renderClip(clip, owner, username) {
   const avatar = isTrustedAvatar(owner?.avatar_url)
     ? `<img class="clip-owner-avatar" src="${escapeHtml(owner.avatar_url)}" alt="" />`
     : `<span class="clip-owner-avatar">${escapeHtml([...username][0].toUpperCase())}</span>`
