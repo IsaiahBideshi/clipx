@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.2.4
+
+- New: Share links for public clips. Anyone can watch the clip in their browser, no ClipX needed.
+- New: Shared clip links show a playable video preview when posted in Discord.
+- New: Copy a public clip's link from the upload popup once it finishes, from its library card, or while watching it in the library.
+- New: Redesigned upload and save popups with progress and a "Saved" confirmation.
+- Fix: The upload and save popups no longer overlap.
+- Fix: Clicking the upload or save popups no longer closes the clip editor.
+
 ## v1.2.3
 
 - New: Library clip redesign.
