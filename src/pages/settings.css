@@ -62,6 +62,13 @@
   white-space: nowrap;
 }
 
+.settings-update-status {
+  align-self: center;
+  margin-right: auto;
+  color: #d4d7dd;
+  font-size: 0.9rem;
+}
+
 
 .settings-grid {
   display: grid;

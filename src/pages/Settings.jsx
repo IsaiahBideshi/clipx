@@ -84,16 +84,34 @@ async function unlinkYoutube() {
     }
 }
 
-async function getAppVersion() {
+const UPDATE_BUSY_STATUSES = new Set(["checking", "available", "downloading", "installing"]);
+
+const UPDATE_STATUS_MESSAGES = {
+  checking: "Checking for updates...",
+  available: "Downloading update...",
+  downloading: "Downloading update...",
+  downloaded: "Update ready to install.",
+  installing: "Restarting to install the update...",
+  "not-available": "You're on the latest version.",
+};
+
+function getUpdateStatusMessage(updateState) {
+  if (updateState?.status === "error") {
+    return updateState.message || "Update check failed.";
+  }
+
+  return UPDATE_STATUS_MESSAGES[updateState?.status] || null;
+}
+
+async function getUpdateState() {
   if (!window.clipx?.getUpdateState) {
     return null;
   }
 
   try {
-    const updateState = await window.clipx.getUpdateState();
-    return updateState?.currentVersion || null;
+    return await window.clipx.getUpdateState();
   } catch (err) {
-    console.error("Failed to load app version:", err);
+    console.error("Failed to load update state:", err);
     return null;
   }
 }
@@ -114,7 +132,9 @@ async function getLaunchAtStartup() {
 export default function Settings() {
   const [options, setOptions] = useState();
   const [defaultOptions, setDefaultOptions] = useState();
-  const [appVersion, setAppVersion] = useState(null);
+  const [updateState, setUpdateState] = useState(null);
+  const appVersion = updateState?.currentVersion || null;
+  const updateStatusMessage = getUpdateStatusMessage(updateState);
   const [launchAtStartup, setLaunchAtStartup] = useState(false);
   const [loadingLaunchAtStartup, setLoadingLaunchAtStartup] = useState(true);
   const [savingLaunchAtStartup, setSavingLaunchAtStartup] = useState(false);
@@ -213,6 +233,24 @@ export default function Settings() {
     }
   }
 
+  async function handleCheckForUpdates() {
+    if (updateState?.status === "downloaded") {
+      window.clipx?.installUpdate?.();
+      return;
+    }
+
+    if (!window.clipx?.checkForUpdates) {
+      return;
+    }
+
+    try {
+      setUpdateState(await window.clipx.checkForUpdates());
+    } catch (err) {
+      console.error("Failed to check for updates:", err);
+      setUpdateState((prevState) => ({ ...prevState, status: "error", message: "Failed to check for updates." }));
+    }
+  }
+
   useEffect(() => {
     let cancelled = false;
 
@@ -226,10 +264,10 @@ export default function Settings() {
         if (!cancelled) setOptions({});
       }
     }
-    async function loadAppVersion() {
-      const version = await getAppVersion();
+    async function loadUpdateState() {
+      const state = await getUpdateState();
       if (!cancelled) {
-        setAppVersion(version);
+        setUpdateState(state);
       }
     }
     async function loadLaunchAtStartup() {
@@ -249,11 +287,19 @@ export default function Settings() {
     }
 
     loadOptions();
-    loadAppVersion();
+    loadUpdateState();
     loadLaunchAtStartup();
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window.clipx?.onUpdateState !== "function") {
+      return undefined;
+    }
+
+    return window.clipx.onUpdateState(setUpdateState);
   }, []);
 
   useEffect(() => {
@@ -437,7 +483,18 @@ export default function Settings() {
           changelog={changelog}
           currentVersion={appVersion}
           onClose={() => setShowChangelog(false)}
-        />
+        >
+          {updateStatusMessage && (
+            <span className="settings-update-status" role="status">{updateStatusMessage}</span>
+          )}
+          <Button
+            variant="outlined"
+            disabled={UPDATE_BUSY_STATUSES.has(updateState?.status) || !window.clipx?.checkForUpdates}
+            onClick={handleCheckForUpdates}
+          >
+            {updateState?.status === "downloaded" ? "Restart to update" : "Check for updates"}
+          </Button>
+        </ChangelogModal>
       )}
     </>
   );
