@@ -388,7 +388,7 @@ if (!hasSingleInstanceLock) {
     if (updateInstalled) {
       return;
     }
-    await createWindow({ show: !launchMinimized });
+    await createWindow({ show: !launchMinimized || Boolean(updateWindow) });
     updateWindow?.close();
     scheduleUpdateChecks();
     startVersionPolling();
