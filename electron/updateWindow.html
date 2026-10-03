@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'" />
+  <title>Updating ClipX</title>
+  <style>
+    body {
+      box-sizing: border-box;
+      height: 100vh;
+      margin: 0;
+      padding: 0 24px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 12px;
+      background: #1e1f22;
+      color: #ffffff;
+      font-family: "Segoe UI", "Trebuchet MS", sans-serif;
+      user-select: none;
+      -webkit-app-region: drag;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 1rem;
+    }
+
+    p {
+      margin: 0;
+      color: #d4d7dd;
+      font-size: 0.85rem;
+    }
+
+    .update-bar {
+      height: 6px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .update-bar-fill {
+      width: 0;
+      height: 100%;
+      background: linear-gradient(90deg, #51cfff, #5eead4);
+      transition: width 200ms ease;
+    }
+  </style>
+</head>
+<body>
+  <h1>Updating ClipX</h1>
+  <div class="update-bar"><div class="update-bar-fill" id="update-bar-fill"></div></div>
+  <p id="update-status">Downloading update...</p>
+  <script>
+    const fill = document.getElementById("update-bar-fill");
+    const status = document.getElementById("update-status");
+
+    function render(state) {
+      if (state?.status === "error") {
+        status.textContent = "Update failed. Opening ClipX...";
+        return;
+      }
+
+      if (state?.status === "downloaded" || state?.status === "installing") {
+        fill.style.width = "100%";
+        status.textContent = "Restarting to install...";
+        return;
+      }
+
+      const progress = state?.progress || 0;
+      const version = state?.update?.version ? `version ${state.update.version}` : "update";
+      fill.style.width = `${progress}%`;
+      status.textContent = `Downloading ${version}... ${progress}%`;
+    }
+
+    window.clipx.getUpdateState().then(render);
+    window.clipx.onUpdateState(render);
+  </script>
+</body>
+</html>

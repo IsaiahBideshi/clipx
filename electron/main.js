@@ -30,6 +30,7 @@ const distPath = path.join(app.getAppPath(), "dist");
 const STARTUP_MINIMIZED_ARG = "--clipx-startup-minimized";
 let rendererServer = null;
 export let mainWindow = null;
+let updateWindow = null;
 let tray = null;
 let isQuitting = false;
 let shouldMaximizeOnFirstShow = false;
@@ -182,6 +183,12 @@ function ensureTray() {
 }
 
 async function showMainWindow() {
+  if (updateWindow) {
+    updateWindow.show();
+    updateWindow.focus();
+    return;
+  }
+
   if (!mainWindow || mainWindow.isDestroyed()) {
     await createWindow();
   }
@@ -318,6 +325,33 @@ async function createWindow({ show = true } = {}) {
   return win;
 }
 
+function createUpdateWindow() {
+  const win = new BrowserWindow({
+    width: 380,
+    height: 130,
+    frame: false,
+    resizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    backgroundColor: "#1e1f22",
+    icon: appIconPath,
+    webPreferences: {
+      preload: path.join(__dirname, "preload.js"),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+  updateWindow = win;
+
+  win.on("closed", () => {
+    if (updateWindow === win) {
+      updateWindow = null;
+    }
+  });
+
+  void win.loadFile(path.join(__dirname, "updateWindow.html"));
+}
+
 function registerIpcHandlers() {
   registerWindowControlIpcHandlers();
   registerAuthStorageIpcHandlers();
@@ -350,11 +384,12 @@ if (!hasSingleInstanceLock) {
     if (launchMinimized) {
       ensureTray();
     }
-    const updateInstalled = await checkForUpdatesAndInstall();
+    const updateInstalled = await checkForUpdatesAndInstall({ onDownloadStart: createUpdateWindow });
     if (updateInstalled) {
       return;
     }
-    await createWindow({ show: !launchMinimized });
+    await createWindow({ show: !launchMinimized || Boolean(updateWindow) });
+    updateWindow?.close();
     scheduleUpdateChecks();
     startVersionPolling();
   });

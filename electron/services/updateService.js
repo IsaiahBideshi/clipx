@@ -99,7 +99,7 @@ export async function checkForUpdates() {
   return latestState;
 }
 
-export function checkForUpdatesAndInstall({ checkTimeoutMs = 10000, downloadTimeoutMs = 10 * 60 * 1000 } = {}) {
+export function checkForUpdatesAndInstall({ checkTimeoutMs = 10000, downloadTimeoutMs = 10 * 60 * 1000, onDownloadStart } = {}) {
   if (!app.isPackaged || isChecking || hasDownloadedUpdate) {
     return Promise.resolve(false);
   }
@@ -134,6 +134,7 @@ export function checkForUpdatesAndInstall({ checkTimeoutMs = 10000, downloadTime
     const onAvailable = () => {
       downloadStarted = true;
       clearTimeout(checkTimer);
+      onDownloadStart?.();
     };
 
     const onDownloaded = (info) => {
