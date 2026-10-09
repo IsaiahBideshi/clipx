@@ -8,7 +8,7 @@ import {useNavigate} from "react-router-dom";
 
 import {logout, supabase, signInWithGoogle} from '../lib/supabase.js';
 import { useAuthSession } from "../lib/authSession.js";
-import { getAccount, updateAccountEmail, updateAccountPassword, updateAccountProfile } from "../lib/accountApi.js";
+import { getAccountInitials, loadAccountData, updateAccountEmail, updateAccountPassword, updateAccountProfile } from "../lib/accountApi.js";
 import SearchIcon from '@mui/icons-material/Search';
 import CircularProgress from '@mui/material/CircularProgress';
 import GoogleIcon from '@mui/icons-material/Google';
@@ -29,47 +29,6 @@ const EMPTY_ACCOUNT_FORM = {
 };
 
 const AVATAR_FILE_LIMIT_BYTES = 1500 * 1024;
-
-function getAccountInitials(account) {
-  const source = account?.username || account?.email || "User";
-  return source
-    .split(/[\s@._-]+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join("")
-    .toUpperCase() || "U";
-}
-
-async function loadAccountData(session, userId) {
-  try {
-    return await getAccount(session);
-  } catch (err) {
-    console.error("Error fetching account:", err);
-    const fallbackAccount = {
-      id: session.user.id,
-      username: session.user.user_metadata?.displayName || session.user.user_metadata?.name || "User",
-      email: session.user.email || "",
-      emailConfirmed: Boolean(session.user.email_confirmed_at),
-      avatarUrl: session.user.user_metadata?.avatar_url || session.user.user_metadata?.picture || "",
-      hasCustomAvatar: Boolean(session.user.user_metadata?.avatar_url),
-      providers: session.user.app_metadata?.providers || [],
-      hasPassword: session.user.app_metadata?.providers?.includes("email") || false,
-    };
-
-    const { data, error } = await supabase
-      .from("users")
-      .select("username")
-      .eq("id", userId)
-      .single();
-
-    if (!error && data?.username) {
-      fallbackAccount.username = data.username;
-    }
-
-    return fallbackAccount;
-  }
-}
 
 async function fetchFriendships(userId) {
   if (!userId) {
