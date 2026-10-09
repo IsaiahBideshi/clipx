@@ -1,7 +1,7 @@
 // `src/components/NavBar.jsx`
 import './navbar.css';
 
-import { Link } from "react-router-dom";
+import { NavLink } from "react-router-dom";
 
 import SettingsIcon from '@mui/icons-material/Settings';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
@@ -17,77 +17,73 @@ export default function NavBar({ showUpdateButton = true, updateStatus = null, u
   const isDownloading = updateStatus === "downloading";
 
   return (
-    <div className="nav-bar">
+    <nav className="nav-bar" aria-label="Main">
       <div className="left-nav-bar">
-        <Link to="/" className="nav-icon" aria-label="Local Files" title="Local Files">
-          <FolderIcon fontSize="medium" />
-        </Link>
+        <NavLink to="/" className="nav-link">
+          <FolderIcon fontSize="small" />
+          Local Files
+        </NavLink>
 
-        <Link to="/library" className="nav-icon" aria-label="Library" title="Library">
-          <VideoLibraryIcon fontSize="medium" />
-        </Link>
+        <NavLink to="/library" className="nav-link">
+          <VideoLibraryIcon fontSize="small" />
+          Library
+        </NavLink>
       </div>
-
-      <h2 className="nav-bar__app-name">ClipX</h2>
 
       <div className="right-nav-bar">
         {showUpdateButton && (
           isDownloading ? (
             <Tooltip title="Downloading update">
               <IconButton
-                className="nav-icon nav-update-button"
+                className="nav-update-button"
                 aria-label="Downloading update"
                 onClick={onUpdateClick}
-                size="medium"
               >
                 <CircularProgress size={18} color="inherit" />
               </IconButton>
             </Tooltip>
           ) : updateStatus === "downloaded" ? (
-            <Tooltip title="Update ready!" className="nav-icon">
-              <Button
-                className="nav-update-ready"
-                aria-label="Update ready"
-                onClick={onUpdateClick}
-                startIcon={<DownloadIcon />}
-              />
-            </Tooltip>
+            <Button
+              className="nav-update-ready"
+              onClick={onUpdateClick}
+              startIcon={<DownloadIcon />}
+            >
+              Restart to update
+            </Button>
           ) : updateStatus === "error" ? (
             <Tooltip
               title={updateErrorMessage || "Update failed"}
               componentsProps={{ tooltip: { sx: { color: "red" } } }}
             >
               <IconButton
-                className="nav-icon nav-update-button"
+                className="nav-update-button nav-update-button--error"
                 aria-label="Update failed"
                 onClick={onUpdateClick}
-                size="medium"
               >
-                <DownloadIcon fontSize="medium" />
+                <DownloadIcon fontSize="small" />
               </IconButton>
             </Tooltip>
           ) : (
             <Tooltip title="Update available">
               <IconButton
-                className="nav-icon nav-update-button"
+                className="nav-update-button"
                 aria-label="Update available"
                 onClick={onUpdateClick}
-                size="medium"
               >
-                <DownloadIcon fontSize="medium" />
+                <DownloadIcon fontSize="small" />
               </IconButton>
             </Tooltip>
           )
         )}
 
-        <Link to={"/profile"} className="nav-icon" aria-label="Account" title="Account">
-          <AccountCircleIcon fontSize="medium" />
-        </Link>
+        <NavLink to="/profile" className="nav-link nav-link--icon" aria-label="Account" title="Account">
+          <AccountCircleIcon fontSize="small" />
+        </NavLink>
 
-        <Link to="/settings" className="nav-icon" aria-label="Settings" title="Settings">
-          <SettingsIcon fontSize="medium" />
-        </Link>
+        <NavLink to="/settings" className="nav-link nav-link--icon" aria-label="Settings" title="Settings">
+          <SettingsIcon fontSize="small" />
+        </NavLink>
       </div>
-    </div>
+    </nav>
   );
 }

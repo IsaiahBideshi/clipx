@@ -698,7 +698,7 @@
   .settings-container.profile-page {
     width: 95vw;
     margin-top: 18px;
-    height: calc(100dvh - 8vh - 28px);
+    height: calc(100dvh - var(--nav-height) - 28px);
     padding: 16px;
     border-radius: 18px;
   }
