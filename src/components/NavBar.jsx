@@ -1,7 +1,8 @@
 // `src/components/NavBar.jsx`
 import './navbar.css';
 
-import { NavLink } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { NavLink, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 
 import { useAuthSession } from "../lib/authSession.js";
@@ -17,8 +18,43 @@ import CircularProgress from '@mui/material/CircularProgress';
 import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 
+const CLIP_TABS = [
+  { path: "/", label: "Local Files", Icon: FolderIcon },
+  { path: "/library", label: "Library", Icon: VideoLibraryIcon },
+];
+
 export default function NavBar({ showUpdateButton = true, updateStatus = null, updateErrorMessage = null, onUpdateClick }) {
   const isDownloading = updateStatus === "downloading";
+  const { pathname } = useLocation();
+  const [newClips, setNewClips] = useState({ "/": 0, "/library": 0 });
+
+  function clearNewClips(path) {
+    setNewClips((counts) => (counts[path] ? { ...counts, [path]: 0 } : counts));
+  }
+
+  useEffect(() => {
+    clearNewClips(pathname);
+
+    function addNewClip(path) {
+      if (pathname !== path || !document.hasFocus()) {
+        setNewClips((counts) => ({ ...counts, [path]: counts[path] + 1 }));
+      }
+    }
+
+    const handleClipUploaded = () => addNewClip("/library");
+    window.addEventListener("clipx:clip-uploaded", handleClipUploaded);
+    const unsubscribe = window.clipx?.onLocalClipIndexChanged?.((event) => {
+      if (event?.type === "added") {
+        addNewClip("/");
+      }
+    });
+
+    return () => {
+      window.removeEventListener("clipx:clip-uploaded", handleClipUploaded);
+      unsubscribe?.();
+    };
+  }, [pathname]);
+
   const { session } = useAuthSession();
   const userId = session?.user?.id;
   const { data: account } = useQuery({
@@ -30,15 +66,18 @@ export default function NavBar({ showUpdateButton = true, updateStatus = null, u
   return (
     <nav className="nav-bar" aria-label="Main">
       <div className="left-nav-bar">
-        <NavLink to="/" className="nav-link" aria-label="Local Files" title="Local Files">
-          <FolderIcon fontSize="small" />
-          <span className="nav-link__label">Local Files</span>
-        </NavLink>
+        {CLIP_TABS.map(({ path, label, Icon }) => {
+          const count = newClips[path];
+          const title = count ? `${label} (${count} new)` : label;
 
-        <NavLink to="/library" className="nav-link" aria-label="Library" title="Library">
-          <VideoLibraryIcon fontSize="small" />
-          <span className="nav-link__label">Library</span>
-        </NavLink>
+          return (
+            <NavLink key={path} to={path} className="nav-link" aria-label={title} title={title} onClick={() => clearNewClips(path)}>
+              <Icon fontSize="small" />
+              <span className="nav-link__label">{label}</span>
+              {count > 0 && <span className="nav-badge">{count > 99 ? "99+" : count}</span>}
+            </NavLink>
+          );
+        })}
       </div>
 
       <div className="right-nav-bar">
