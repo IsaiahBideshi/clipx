@@ -100,7 +100,6 @@
   background: rgba(4, 7, 14, 0.8);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  pointer-events: none;
 }
 
 .video-player-container{

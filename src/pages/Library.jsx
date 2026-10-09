@@ -746,7 +746,7 @@ export function VideoPreview({clip, onClose, onPrevClip, onNextClip}){
   if (isAzure) {
     return (
       <>
-        <div className="library-video-preview-overlay" />
+        <div className="library-video-preview-overlay" onClick={onClose} />
         <div className="library-video-preview">
           <button type="button" onClick={onClose} className="close-preview-btn">
             <CloseIcon fontSize={"large"} />
@@ -788,7 +788,7 @@ export function VideoPreview({clip, onClose, onPrevClip, onNextClip}){
 
   return (
     <>
-      <div className="library-video-preview-overlay" />
+      <div className="library-video-preview-overlay" onClick={onClose} />
       <div className="library-video-preview">
         <button
           type="button"
