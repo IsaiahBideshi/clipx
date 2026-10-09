@@ -3,7 +3,7 @@ import './navbar.css';
 
 import { useEffect, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { useAuthSession } from "../lib/authSession.js";
 import { getAccountInitials, loadAccountData } from "../lib/accountApi.js";
@@ -26,6 +26,7 @@ const CLIP_TABS = [
 export default function NavBar({ showUpdateButton = true, updateStatus = null, updateErrorMessage = null, onUpdateClick }) {
   const isDownloading = updateStatus === "downloading";
   const { pathname } = useLocation();
+  const queryClient = useQueryClient();
   const [newClips, setNewClips] = useState({ "/": 0, "/library": 0 });
 
   function clearNewClips(path) {
@@ -44,7 +45,8 @@ export default function NavBar({ showUpdateButton = true, updateStatus = null, u
     const handleClipUploaded = () => addNewClip("/library");
     window.addEventListener("clipx:clip-uploaded", handleClipUploaded);
     const unsubscribe = window.clipx?.onLocalClipIndexChanged?.((event) => {
-      if (event?.type === "added") {
+      const rootPath = String(queryClient.getQueryData(["localFiles", "options"])?.clipsFolder || "").replace(/[\\/]+$/, "");
+      if (event?.type === "added" && event.rootPath === rootPath) {
         addNewClip("/");
       }
     });
@@ -53,7 +55,7 @@ export default function NavBar({ showUpdateButton = true, updateStatus = null, u
       window.removeEventListener("clipx:clip-uploaded", handleClipUploaded);
       unsubscribe?.();
     };
-  }, [pathname]);
+  }, [pathname, queryClient]);
 
   const { session } = useAuthSession();
   const userId = session?.user?.id;
