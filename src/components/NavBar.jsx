@@ -30,14 +30,14 @@ export default function NavBar({ showUpdateButton = true, updateStatus = null, u
   return (
     <nav className="nav-bar" aria-label="Main">
       <div className="left-nav-bar">
-        <NavLink to="/" className="nav-link">
+        <NavLink to="/" className="nav-link" aria-label="Local Files" title="Local Files">
           <FolderIcon fontSize="small" />
-          Local Files
+          <span className="nav-link__label">Local Files</span>
         </NavLink>
 
-        <NavLink to="/library" className="nav-link">
+        <NavLink to="/library" className="nav-link" aria-label="Library" title="Library">
           <VideoLibraryIcon fontSize="small" />
-          Library
+          <span className="nav-link__label">Library</span>
         </NavLink>
       </div>
 
@@ -56,10 +56,12 @@ export default function NavBar({ showUpdateButton = true, updateStatus = null, u
           ) : updateStatus === "downloaded" ? (
             <Button
               className="nav-update-ready"
+              aria-label="Restart to update"
+              title="Restart to update"
               onClick={onUpdateClick}
               startIcon={<DownloadIcon />}
             >
-              Restart to update
+              <span className="nav-link__label">Restart to update</span>
             </Button>
           ) : updateStatus === "error" ? (
             <Tooltip

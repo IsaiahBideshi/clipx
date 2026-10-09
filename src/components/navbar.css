@@ -86,3 +86,18 @@
 .nav-update-ready.MuiButton-root:hover {
   background-color: rgba(var(--accent-rgb), 0.22);
 }
+
+@media (max-width: 560px) {
+  .nav-link__label {
+    display: none;
+  }
+
+  .nav-update-ready.MuiButton-root {
+    min-width: 34px;
+    padding: 0;
+  }
+
+  .nav-update-ready.MuiButton-root .MuiButton-startIcon {
+    margin: 0;
+  }
+}
