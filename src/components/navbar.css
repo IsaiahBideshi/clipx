@@ -51,6 +51,14 @@
   justify-content: center;
 }
 
+.nav-link .account-avatar {
+  width: 24px;
+  height: 24px;
+  flex-basis: 24px;
+  font-size: 0.62rem;
+  letter-spacing: 0;
+}
+
 .nav-update-button.MuiIconButton-root {
   width: 34px;
   height: 34px;

@@ -2,6 +2,10 @@
 import './navbar.css';
 
 import { NavLink } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+
+import { useAuthSession } from "../lib/authSession.js";
+import { getAccountInitials, loadAccountData } from "../lib/accountApi.js";
 
 import SettingsIcon from '@mui/icons-material/Settings';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
@@ -15,6 +19,13 @@ import Tooltip from '@mui/material/Tooltip';
 
 export default function NavBar({ showUpdateButton = true, updateStatus = null, updateErrorMessage = null, onUpdateClick }) {
   const isDownloading = updateStatus === "downloading";
+  const { session } = useAuthSession();
+  const userId = session?.user?.id;
+  const { data: account } = useQuery({
+    queryKey: ["profile", "account", userId],
+    queryFn: () => loadAccountData(session, userId),
+    enabled: Boolean(session && userId),
+  });
 
   return (
     <nav className="nav-bar" aria-label="Main">
@@ -77,7 +88,13 @@ export default function NavBar({ showUpdateButton = true, updateStatus = null, u
         )}
 
         <NavLink to="/profile" className="nav-link nav-link--icon" aria-label="Account" title="Account">
-          <AccountCircleIcon fontSize="small" />
+          {account ? (
+            <span className="account-avatar">
+              {account.avatarUrl ? <img src={account.avatarUrl} alt="" /> : getAccountInitials(account)}
+            </span>
+          ) : (
+            <AccountCircleIcon fontSize="small" />
+          )}
         </NavLink>
 
         <NavLink to="/settings" className="nav-link nav-link--icon" aria-label="Settings" title="Settings">
