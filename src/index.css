@@ -11,6 +11,7 @@
   --accent: #90caf9;
   --accent-rgb: 144, 202, 249;
   --border: rgba(255, 255, 255, 0.12);
+  --nav-height: 48px;
   --app-font: "Sora", "Segoe UI", "Trebuchet MS", sans-serif;
   --page-surface:
     radial-gradient(circle at 10% 10%, rgba(255, 176, 101, 0.16) 0%, rgba(255, 176, 101, 0) 44%),

@@ -41,6 +41,11 @@ PowerShell here has execution-policy disabled, so **`npm` fails; always use `npm
 - Pushing a version bump alone (no tag) releases as `v{version}`; the `dist/latest.yml` artifact powers in-app auto-updates.
 - Only cut a release (version bump, `CHANGELOG.md` release section, `v*` tag) when the user explicitly asks for one. Every other push to `master`, including PR merges, must have `[skip ci]` in the head commit message so `release.yml` doesn't run.
 
+## Pull request reviews
+
+- Greptile does not reliably review on push. After pushing to a PR, comment `@greptileai` on it to trigger a re-review; closing and reopening the PR is not needed.
+- Each trigger leaves an `@greptileai` comment on the PR under the user's account.
+
 ## Docs
 
 Before writing any code concerning electron, read the following documentation:
