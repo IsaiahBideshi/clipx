@@ -3,10 +3,11 @@ import './navbar.css';
 
 import { useEffect, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 
 import { useAuthSession } from "../lib/authSession.js";
 import { getAccountInitials, loadAccountData } from "../lib/accountApi.js";
+import { fetchLocalOptions } from "../lib/localOptions.js";
 
 import SettingsIcon from '@mui/icons-material/Settings';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
@@ -26,7 +27,12 @@ const CLIP_TABS = [
 export default function NavBar({ showUpdateButton = true, updateStatus = null, updateErrorMessage = null, onUpdateClick }) {
   const isDownloading = updateStatus === "downloading";
   const { pathname } = useLocation();
-  const queryClient = useQueryClient();
+  const { data: options } = useQuery({
+    queryKey: ["localFiles", "options"],
+    queryFn: fetchLocalOptions,
+    staleTime: 10 * 60 * 1000,
+  });
+  const rootPath = String(options?.clipsFolder || "").replace(/[\\/]+$/, "");
   const [newClips, setNewClips] = useState({ "/": 0, "/library": 0 });
 
   function clearNewClips(path) {
@@ -45,7 +51,6 @@ export default function NavBar({ showUpdateButton = true, updateStatus = null, u
     const handleClipUploaded = () => addNewClip("/library");
     window.addEventListener("clipx:clip-uploaded", handleClipUploaded);
     const unsubscribe = window.clipx?.onLocalClipIndexChanged?.((event) => {
-      const rootPath = String(queryClient.getQueryData(["localFiles", "options"])?.clipsFolder || "").replace(/[\\/]+$/, "");
       if (event?.type === "added" && event.rootPath === rootPath) {
         addNewClip("/");
       }
@@ -55,7 +60,7 @@ export default function NavBar({ showUpdateButton = true, updateStatus = null, u
       window.removeEventListener("clipx:clip-uploaded", handleClipUploaded);
       unsubscribe?.();
     };
-  }, [pathname, queryClient]);
+  }, [pathname, rootPath]);
 
   const { session } = useAuthSession();
   const userId = session?.user?.id;
