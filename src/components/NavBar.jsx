@@ -8,6 +8,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuthSession } from "../lib/authSession.js";
 import { getAccountInitials, loadAccountData } from "../lib/accountApi.js";
 import { fetchLocalOptions } from "../lib/localOptions.js";
+import { useNewLibraryClips } from "../lib/newLibraryClips.js";
 
 import SettingsIcon from '@mui/icons-material/Settings';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
@@ -33,37 +34,33 @@ export default function NavBar({ showUpdateButton = true, updateStatus = null, u
     staleTime: 10 * 60 * 1000,
   });
   const rootPath = String(options?.clipsFolder || "").replace(/[\\/]+$/, "");
-  const [newClips, setNewClips] = useState({ "/": 0, "/library": 0 });
+  const { session } = useAuthSession();
+  const userId = session?.user?.id;
+  const [newLocalClips, setNewLocalClips] = useState(0);
+  const newLibraryClips = useNewLibraryClips(session);
+  const newClips = { "/": newLocalClips, "/library": newLibraryClips.count };
 
   function clearNewClips(path) {
-    setNewClips((counts) => (counts[path] ? { ...counts, [path]: 0 } : counts));
+    if (path === "/") {
+      setNewLocalClips(0);
+    }
+    if (path === "/library") {
+      newLibraryClips.markSeen();
+    }
   }
 
   useEffect(() => {
     clearNewClips(pathname);
 
-    function addNewClip(path) {
-      if (pathname !== path || !document.hasFocus()) {
-        setNewClips((counts) => ({ ...counts, [path]: counts[path] + 1 }));
-      }
-    }
-
-    const handleClipUploaded = () => addNewClip("/library");
-    window.addEventListener("clipx:clip-uploaded", handleClipUploaded);
     const unsubscribe = window.clipx?.onLocalClipIndexChanged?.((event) => {
-      if (event?.type === "added" && event.rootPath === rootPath) {
-        addNewClip("/");
+      if (event?.type === "added" && event.rootPath === rootPath && (pathname !== "/" || !document.hasFocus())) {
+        setNewLocalClips((count) => count + 1);
       }
     });
 
-    return () => {
-      window.removeEventListener("clipx:clip-uploaded", handleClipUploaded);
-      unsubscribe?.();
-    };
+    return () => unsubscribe?.();
   }, [pathname, rootPath]);
 
-  const { session } = useAuthSession();
-  const userId = session?.user?.id;
   const { data: account } = useQuery({
     queryKey: ["profile", "account", userId],
     queryFn: () => loadAccountData(session, userId),

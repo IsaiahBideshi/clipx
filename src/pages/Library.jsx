@@ -200,6 +200,7 @@ export default function Library() {
     queryKey: libraryClipsKey(userId, filters),
     queryFn: ({ pageParam = 0 }) => fetchLibraryClips(session, filters, pageParam),
     enabled: Boolean(session),
+    refetchOnMount: (query) => query.state.isInvalidated,
     initialPageParam: 0,
     getNextPageParam: (lastPage, allPages) => {
       const loaded = allPages.reduce((n, p) => n + (p?.clips?.length || 0), 0);

@@ -618,7 +618,7 @@ export default function LocalFiles() {
 
     if (event.type === "success") {
       upsertUploadingClip(event.id, { status: "uploaded", shareUrl: event.shareUrl });
-      window.dispatchEvent(new Event("clipx:clip-uploaded"));
+      queryClient.invalidateQueries({ queryKey: ["library", "newClips"] });
       return;
     }
 
