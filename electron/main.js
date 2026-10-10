@@ -381,9 +381,7 @@ if (!hasSingleInstanceLock) {
     registerClipxProtocol(protocol);
     registerIpcHandlers();
     initializeUpdates();
-    if (launchMinimized) {
-      ensureTray();
-    }
+    ensureTray();
     const updateInstalled = await checkForUpdatesAndInstall({ onDownloadStart: createUpdateWindow });
     if (updateInstalled) {
       return;
