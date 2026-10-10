@@ -1,8 +1,6 @@
 import "./localfiles.css";
 import ClipGrid from "../components/ClipGrid.jsx";
 import ClipEditor from "../components/ClipEditor.jsx";
-import SavingClipsWidget from "../components/SavingClipsWidget.jsx";
-import UploadingClipsWidget from "../components/UploadingClipsWidget.jsx";
 import ClipContextMenu from "../components/ClipContextMenu.jsx";
 import RefreshButton from "../components/RefreshButton.jsx";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -62,7 +60,7 @@ function upsertClipInList(currentClips, clip) {
   return mergeClipLists(currentClips.filter((item) => item.path !== clip.path), [clip]);
 }
 
-export default function LocalFiles() {
+export default function LocalFiles({ onSaveQueueEvent, onUploadQueueEvent, uploading, setUploading, saving, setSaving }) {
   const navigate = useNavigate();
   const [rootPath, setRootPath] = useState("");
   const [folderPath, setFolderPath] = useState("");
@@ -72,10 +70,6 @@ export default function LocalFiles() {
   const [hasMore, setHasMore] = useState(true);
   const [refreshTick, setRefreshTick] = useState(0);
   const [clip, setClip] = useState(null);
-  const [savingClips, setSavingClips] = useState([]);
-  const [uploadingClips, setUploadingClips] = useState([]);
-  const [showSavingList, setShowSavingList] = useState(true);
-  const [showUploadingList, setShowUploadingList] = useState(true);
   const [loadingInitial, setLoadingInitial] = useState(true);
   const [loadingPage, setLoadingPage] = useState(false);
   const [indexing, setIndexing] = useState(false);
@@ -93,8 +87,6 @@ export default function LocalFiles() {
   const [renameModalOpen, setRenameModalOpen] = useState(false);
   const [renameValue, setRenameValue] = useState("");
   const [renameError, setRenameError] = useState("");
-  const [uploading, setUploading] = useState(false);
-  const [saving, setSaving] = useState(false);
   const renameModalRef = useRef(null);
   const contextMenuRef = useRef(null);
   const deleteModalRef = useRef(null);
@@ -571,63 +563,6 @@ export default function LocalFiles() {
       });
   }
 
-  function upsertSavingClip(id, nextValues) {
-    setSavingClips((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, ...nextValues } : item))
-    );
-  }
-
-  function upsertUploadingClip(id, nextValues) {
-    setUploadingClips((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, ...nextValues } : item))
-    );
-  }
-
-  function removeUploadingClip(id) {
-    setUploadingClips((prev) => prev.filter((item) => item.id !== id));
-  }
-
-  function handleSaveQueueEvent(event) {
-    if (!event?.id) return;
-
-    if (event.type === "started") {
-      setSavingClips((prev) => [...prev, { id: event.id, name: event.name || "Untitled Clip", status: "saving" }]);
-      return;
-    }
-
-    if (event.type === "success") {
-      upsertSavingClip(event.id, { status: "saved" });
-      return;
-    }
-
-    if (event.type === "failed") {
-      upsertSavingClip(event.id, { status: "failed", error: event.error });
-    }
-  }
-
-  function handleUploadQueueEvent(event) {
-    if (!event?.id) return;
-
-    if (event.type === "started") {
-      setUploadingClips((prev) => [
-        ...prev,
-        { id: event.id, name: event.name || "Untitled Clip", status: "uploading" },
-      ]);
-      return;
-    }
-
-    if (event.type === "success") {
-      upsertUploadingClip(event.id, { status: "uploaded", shareUrl: event.shareUrl });
-      queryClient.invalidateQueries({ queryKey: ["library", "newClips"] });
-      return;
-    }
-
-    if (event.type === "failed") {
-      upsertUploadingClip(event.id, { status: "failed", error: event.error });
-    }
-  }
-
-
   return (
     <OverlayScrollbarsComponent
       ref={setOverlayRef}
@@ -677,8 +612,8 @@ export default function LocalFiles() {
         <ClipEditor
           clip={clip}
           authSession={session}
-          onSaveQueueEvent={handleSaveQueueEvent}
-          onUploadQueueEvent={handleUploadQueueEvent}
+          onSaveQueueEvent={onSaveQueueEvent}
+          onUploadQueueEvent={onUploadQueueEvent}
           isSavedClipsView={showSavedFiles}
           onClose={() => setClip(null)}
           baseFolder={folderPath}
@@ -729,20 +664,6 @@ export default function LocalFiles() {
         </div>
       )}
 
-      <div className="clip-widgets">
-        <UploadingClipsWidget
-          clips={uploadingClips}
-          expanded={showUploadingList}
-          onToggleExpanded={() => setShowUploadingList((prev) => !prev)}
-          onDismiss={() => setUploadingClips([])}
-        />
-        <SavingClipsWidget
-          clips={savingClips}
-          expanded={showSavingList}
-          onToggleExpanded={() => setShowSavingList((prev) => !prev)}
-          onDismiss={() => setSavingClips([])}
-        />
-      </div>
       {deleteClipModalOpen && (
         <div className="delete-modal">
           <div className="delete-modal-content" ref={deleteModalRef}>
