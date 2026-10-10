@@ -1,11 +1,14 @@
 // `src/components/NavBar.jsx`
 import './navbar.css';
 
-import { NavLink } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { NavLink, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 
 import { useAuthSession } from "../lib/authSession.js";
 import { getAccountInitials, loadAccountData } from "../lib/accountApi.js";
+import { fetchLocalOptions } from "../lib/localOptions.js";
+import { useNewLibraryClips } from "../lib/newLibraryClips.js";
 
 import SettingsIcon from '@mui/icons-material/Settings';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
@@ -17,10 +20,55 @@ import CircularProgress from '@mui/material/CircularProgress';
 import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 
+const CLIP_TABS = [
+  { path: "/", label: "Local Files", Icon: FolderIcon },
+  { path: "/library", label: "Library", Icon: VideoLibraryIcon },
+];
+
 export default function NavBar({ showUpdateButton = true, updateStatus = null, updateErrorMessage = null, onUpdateClick }) {
   const isDownloading = updateStatus === "downloading";
+  const { pathname } = useLocation();
+  const { data: options } = useQuery({
+    queryKey: ["localFiles", "options"],
+    queryFn: fetchLocalOptions,
+    staleTime: 10 * 60 * 1000,
+  });
+  const rootPath = String(options?.clipsFolder || "").replace(/[\\/]+$/, "");
   const { session } = useAuthSession();
   const userId = session?.user?.id;
+  const [newLocalClips, setNewLocalClips] = useState(0);
+  const newLibraryClips = useNewLibraryClips(session);
+  const newClips = { "/": newLocalClips, "/library": newLibraryClips.count };
+
+  function clearNewClips(path) {
+    if (path === "/") {
+      setNewLocalClips(0);
+    }
+    if (path === "/library") {
+      newLibraryClips.markSeen();
+    }
+  }
+
+  useEffect(() => {
+    if (pathname === "/library" && document.hasFocus()) {
+      newLibraryClips.markSeen();
+    }
+  }, [pathname, newLibraryClips.count]);
+
+  useEffect(() => {
+    if (pathname === "/") {
+      setNewLocalClips(0);
+    }
+
+    const unsubscribe = window.clipx?.onLocalClipIndexChanged?.((event) => {
+      if (event?.type === "added" && event.rootPath === rootPath && (pathname !== "/" || !document.hasFocus())) {
+        setNewLocalClips((count) => count + 1);
+      }
+    });
+
+    return () => unsubscribe?.();
+  }, [pathname, rootPath]);
+
   const { data: account } = useQuery({
     queryKey: ["profile", "account", userId],
     queryFn: () => loadAccountData(session, userId),
@@ -30,15 +78,18 @@ export default function NavBar({ showUpdateButton = true, updateStatus = null, u
   return (
     <nav className="nav-bar" aria-label="Main">
       <div className="left-nav-bar">
-        <NavLink to="/" className="nav-link" aria-label="Local Files" title="Local Files">
-          <FolderIcon fontSize="small" />
-          <span className="nav-link__label">Local Files</span>
-        </NavLink>
+        {CLIP_TABS.map(({ path, label, Icon }) => {
+          const count = newClips[path];
+          const title = count ? `${label} (${count} new)` : label;
 
-        <NavLink to="/library" className="nav-link" aria-label="Library" title="Library">
-          <VideoLibraryIcon fontSize="small" />
-          <span className="nav-link__label">Library</span>
-        </NavLink>
+          return (
+            <NavLink key={path} to={path} className="nav-link" aria-label={title} title={title} onClick={() => clearNewClips(path)}>
+              <Icon fontSize="small" />
+              <span className="nav-link__label">{label}</span>
+              {count > 0 && <span className="nav-badge">{count > 99 ? "99+" : count}</span>}
+            </NavLink>
+          );
+        })}
       </div>
 
       <div className="right-nav-bar">

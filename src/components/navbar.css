@@ -51,6 +51,20 @@
   justify-content: center;
 }
 
+.nav-badge {
+  box-sizing: border-box;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--accent);
+  color: #0f1015;
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+}
+
 .nav-link .account-avatar {
   width: 24px;
   height: 24px;

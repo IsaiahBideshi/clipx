@@ -12,6 +12,7 @@ import FolderOffIcon from "@mui/icons-material/FolderOff";
 import { Switch, TextField } from "@mui/material";
 import { isTextEntryActive } from "../lib/hotkeys.js";
 import { useAuthSession } from "../lib/authSession.js";
+import { fetchLocalOptions } from "../lib/localOptions.js";
 
 import { OverlayScrollbarsComponent } from "overlayscrollbars-react";
 import "overlayscrollbars/overlayscrollbars.css";
@@ -20,14 +21,6 @@ const PAGE_SIZE = 60;
 const TOP_INSERT_THRESHOLD = 120;
 const LOAD_MORE_SCROLL_THRESHOLD = 700;
 const LOCAL_CLIPS_STALE_MS = 5 * 60 * 1000;
-
-async function fetchLocalOptions() {
-  if (typeof window.clipx?.getOptions !== "function") {
-    throw new Error("window.clipx.getOptions is not available (preload not wired?)");
-  }
-
-  return await window.clipx.getOptions();
-}
 
 function localClipsQueryKey(rootPath, collection, cursor = null) {
   return ["localFiles", "clips", rootPath, collection, cursor || null, PAGE_SIZE];
@@ -625,6 +618,7 @@ export default function LocalFiles() {
 
     if (event.type === "success") {
       upsertUploadingClip(event.id, { status: "uploaded", shareUrl: event.shareUrl });
+      queryClient.invalidateQueries({ queryKey: ["library", "newClips"] });
       return;
     }
 
