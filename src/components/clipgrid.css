@@ -169,15 +169,17 @@
   position: relative;
   flex-grow: 1;
   width: 270px;
-  border: 1px solid #ccc;
-  border-radius: 5px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
   padding: 10px;
+  background: rgba(255, 255, 255, 0.04);
   box-shadow: 2px 2px 5px rgb(30, 31, 34);
+  transition: transform 0.2s, border-color 0.2s;
 }
 .clip-card:hover {
   transform: scale(1.03);
+  border-color: rgba(144, 202, 249, 0.5);
   z-index: 2;
-  transition: transform 0.2s;
   cursor: pointer;
 }
 .clip-card.clip-menu-open {

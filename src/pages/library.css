@@ -311,20 +311,12 @@
   display: flex;
   flex-direction: column;
   width: min(270px, 100%);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.04);
-  transition: transform 0.2s, border-color 0.2s;
 }
 
 .library .library-clip-grid .clip-card {
   box-sizing: border-box;
   min-width: 0;
   width: auto;
-}
-
-.library .clip-card:hover {
-  border-color: rgba(144, 202, 249, 0.5);
 }
 
 .library .library-clip-grid .clip-thumb,

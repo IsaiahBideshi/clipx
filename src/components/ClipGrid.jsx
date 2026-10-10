@@ -49,9 +49,9 @@ function ClipGrid({
   }, [columnCount, containerWidth]);
 
   const rowHeight = useMemo(() => {
-    const thumbWidth = Math.max(160, cardWidth - 24);
+    const thumbWidth = Math.max(160, cardWidth - 20);
     const thumbnailHeight = (thumbWidth * 9) / 16;
-    return Math.ceil(thumbnailHeight + 98 + GAP);
+    return Math.ceil(thumbnailHeight + 94 + GAP);
   }, [cardWidth]);
 
   const itemCount = loading && clips.length === 0 ? INITIAL_SKELETON_COUNT : clips.length;

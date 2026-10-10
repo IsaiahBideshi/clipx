@@ -83,24 +83,8 @@
   gap: 16px;
 }
 
-.local-files-page .clip-card {
-  width: min(270px, 100%);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 14px;
-  padding: 12px;
-  background: linear-gradient(165deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.02));
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.26);
-  transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
-}
-
 .local-files-page .clip-grid-virtual .clip-card {
   width: auto;
-}
-
-.local-files-page .clip-card:hover {
-  transform: translateY(-2px);
-  border-color: rgba(144, 202, 249, 0.5);
-  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.35);
 }
 
 .local-files-page .clip-thumb,
@@ -109,13 +93,8 @@
   border-radius: 10px;
 }
 
-.local-files-page .clip-name {
-  color: #f7f8ff;
-  margin-top: 2px;
-}
-
 .local-files-page .clip-date {
-  color: rgba(255, 255, 255, 0.62);
+  color: rgba(255, 255, 255, 0.6);
 }
 
 .local-files-empty-state {
