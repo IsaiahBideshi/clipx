@@ -50,7 +50,15 @@ export default function NavBar({ showUpdateButton = true, updateStatus = null, u
   }
 
   useEffect(() => {
-    clearNewClips(pathname);
+    if (pathname === "/library" && document.hasFocus()) {
+      newLibraryClips.markSeen();
+    }
+  }, [pathname, newLibraryClips.count]);
+
+  useEffect(() => {
+    if (pathname === "/") {
+      setNewLocalClips(0);
+    }
 
     const unsubscribe = window.clipx?.onLocalClipIndexChanged?.((event) => {
       if (event?.type === "added" && event.rootPath === rootPath && (pathname !== "/" || !document.hasFocus())) {
