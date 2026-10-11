@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.2.5
+
+- New: Navigation bar redesign with labelled tabs and your profile picture.
+- New: Navigation bar tabs show how many new clips you haven't seen yet.
+- New: Download progress screen when ClipX updates on launch.
+- New: Check for updates button in the Settings changelog.
+- New: Local Files clip cards match the Library clip cards.
+- Fix: The upload and save widgets stay visible on every page.
+- Fix: The tray icon shows as soon as ClipX starts instead of after the first close.
+- Fix: Clicking a clip preview in the library no longer clicks what's behind it.
+
 ## v1.2.4
 
 - New: Share links for public clips. Anyone can watch the clip in their browser, no ClipX needed.
