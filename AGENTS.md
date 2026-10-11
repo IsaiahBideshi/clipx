@@ -32,7 +32,7 @@ PowerShell here has execution-policy disabled, so **`npm` fails; always use `npm
 - `better-sqlite3` and `keytar` are native modules and break under Electron's ABI after a fresh `npm install`. The error message in `electron/services/clipIndexService.js` tells users to run `npm.cmd run rebuild:electron`, but **that script does not exist** in `package.json`. `@electron/rebuild` is present transitively (via electron-builder); use `npm.cmd exec electron-rebuild -f -w better-sqlite3 -w keytar` (or add the missing script).
 - Clip metadata lives in SQLite at `%APPDATA%/clipx/clip-index.sqlite` (WAL mode, chokidar-watched folders), plus a legacy `clipsData.json` in `%APPDATA%/`. In dev, userData is redirected to `%APPDATA%/clipx-dev`.
 - FFmpeg: `ffmpeg-static` + fluent-ffmpeg; ffmpeg binary must stay unpacked (`asarUnpack`), handled by `electron/utils/ffmpeg.js` (`app.asar.unpacked` path rewrite).
-- Google OAuth uses a PKCE loopback flow on port **51723**; YouTube refresh tokens are stored in the OS keychain via keytar.
+- Google OAuth uses a PKCE loopback flow on an OS-assigned `127.0.0.1` port (a fixed port can land in a Windows excluded port range and fail with `EACCES`). The app sends its `redirect_uri` to `/api/google/token`, which falls back to port **51723** for builds up to v1.2.5 that don't send one. YouTube refresh tokens are stored in the OS keychain via keytar.
 - `api/` functions use `process.env.SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` (service role — never expose to the renderer) and authenticate callers with the user's Supabase access token as a Bearer token.
 
 ## Releases

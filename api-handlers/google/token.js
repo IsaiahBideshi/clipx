@@ -2,6 +2,7 @@ import { supabase, getAuthenticatedUser } from '../auth.js'
 
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token'
 const REDIRECT_URI = 'http://127.0.0.1:51723'
+const LOOPBACK_REDIRECT_URI = /^http:\/\/127\.0\.0\.1:\d+$/
 
 async function getStoredRefreshToken(userId) {
   const { data, error } = await supabase
@@ -48,7 +49,7 @@ export default async function handler(req, res) {
     if (!body.code || !body.code_verifier) {
       return res.status(400).json({ data: null, error: 'Missing code or code_verifier', ok: false })
     }
-    params.redirect_uri = REDIRECT_URI
+    params.redirect_uri = LOOPBACK_REDIRECT_URI.test(body.redirect_uri) ? body.redirect_uri : REDIRECT_URI
     params.code = body.code
     params.code_verifier = body.code_verifier
   } else if (body.grant_type === 'refresh_token') {

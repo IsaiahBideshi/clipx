@@ -9,8 +9,6 @@ import { getSupabaseAccessToken } from "../ipc/authStorage.js";
 const SERVICE = "ClipX";
 const ACCOUNT = "youtube_refresh_token";
 let clientId = null;
-const redirectPort = 51723;
-const redirectUri = `http://127.0.0.1:${redirectPort}`;
 const OAUTH_TIMEOUT_MS = 90_000;
 const { verifier, challenge } = generatePKCE();
 
@@ -138,7 +136,7 @@ export async function deleteRefreshToken(userId) {
   await keytar.deletePassword(SERVICE, ACCOUNT);
 }
 
-async function exchangeCodeForTokens(code, userId) {
+async function exchangeCodeForTokens(code, userId, redirectUri) {
   const response = await fetch(`${baseUrl}/api/google/token`, {
     method: "POST",
     headers: {
@@ -148,6 +146,7 @@ async function exchangeCodeForTokens(code, userId) {
       grant_type: "authorization_code",
       code,
       code_verifier: verifier,
+      redirect_uri: redirectUri,
     }),
   });
 
@@ -259,6 +258,7 @@ export async function linkYoutube(shell, userId) {
 
 
   return await new Promise((resolve, reject) => {
+    let redirectUri;
     const server = http.createServer(async (req, res) => {
       const queryObject = url.parse(req.url, true).query;
       try {
@@ -267,7 +267,7 @@ export async function linkYoutube(shell, userId) {
           server.removeAllListeners("request");
           server.close();
 
-          await exchangeCodeForTokens(queryObject.code, normalizedUserId);
+          await exchangeCodeForTokens(queryObject.code, normalizedUserId, redirectUri);
           const accessToken = await getAccessToken(normalizedUserId);
           const userInfo = await getGoogleUserInfo(accessToken);
           resolve(userInfo);
@@ -291,37 +291,34 @@ export async function linkYoutube(shell, userId) {
 
     server.on("error", (err) => {
       clearTimeout(timeoutId);
-      if (err?.code === "EADDRINUSE") {
-        resolve(null); // another flow still running
-        return;
-      }
       reject(err);
     });
 
-    server.listen(redirectPort);
+    server.listen(0, "127.0.0.1", () => {
+      redirectUri = `http://127.0.0.1:${server.address().port}`;
+      const params = new URLSearchParams({
+        client_id: clientId,
+        redirect_uri: redirectUri,
+        response_type: "code",
+        scope: [
+          "https://www.googleapis.com/auth/youtube",
+          "https://www.googleapis.com/auth/youtube.upload",
+          "https://www.googleapis.com/auth/userinfo.profile",
+          "https://www.googleapis.com/auth/userinfo.email",
+        ].join(" "),
+        access_type: "offline",
+        prompt: "consent",
+        code_challenge: challenge,
+        code_challenge_method: "S256",
+      });
 
-    const params = new URLSearchParams({
-      client_id: clientId,
-      redirect_uri: redirectUri,
-      response_type: "code",
-      scope: [
-        "https://www.googleapis.com/auth/youtube",
-        "https://www.googleapis.com/auth/youtube.upload",
-        "https://www.googleapis.com/auth/userinfo.profile",
-        "https://www.googleapis.com/auth/userinfo.email",
-      ].join(" "),
-      access_type: "offline",
-      prompt: "consent",
-      code_challenge: challenge,
-      code_challenge_method: "S256",
-    });
-
-    const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
-    shell.openExternal(authUrl).catch((err) => {
-      clearTimeout(timeoutId);
-      server.close();
-      console.error("Failed to open browser for YouTube linking:", err);
-      reject(err);
+      const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+      shell.openExternal(authUrl).catch((err) => {
+        clearTimeout(timeoutId);
+        server.close();
+        console.error("Failed to open browser for YouTube linking:", err);
+        reject(err);
+      });
     });
   });
 
@@ -377,7 +374,7 @@ export async function uploadClipToYoutube({ videoPath, title, tags, game, userId
   }
 
   const accessToken = await getAccessToken(userId);
-  const oauth2Client = new google.auth.OAuth2(clientId, "", redirectUri);
+  const oauth2Client = new google.auth.OAuth2(clientId);
   oauth2Client.setCredentials({ access_token: accessToken });
 
   const youtube = google.youtube({ version: "v3", auth: oauth2Client });

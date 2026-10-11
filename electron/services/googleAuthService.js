@@ -19,8 +19,6 @@ const supabase = createClient(
 
 const SERVICE = "ClipX";
 let clientId = null;
-const redirectPort = 51723;
-const redirectUri = `http://127.0.0.1:${redirectPort}`;
 const OAUTH_TIMEOUT_MS = 90_000;
 
 const baseUrl = (process.env.VITE_DATABASE_URL || "https://clipx.bideshi.tech").replace(/\/+$/, "");
@@ -52,7 +50,7 @@ async function fetchKeys() {
 
 const { verifier, challenge } = generatePKCE();
 
-async function exchangeCodeForTokens(code) {
+async function exchangeCodeForTokens(code, redirectUri) {
   const response = await fetch(`${baseUrl}/api/google/token`, {
     method: "POST",
     headers: {
@@ -62,6 +60,7 @@ async function exchangeCodeForTokens(code) {
       grant_type: "authorization_code",
       code,
       code_verifier: verifier,
+      redirect_uri: redirectUri,
     }),
   });
   const payload = response ? await response.json() : { data: null, error: "Failed to exchange code for tokens" };
@@ -97,6 +96,7 @@ export async function signInWithGoogle(shell) {
   }
 
   return await new Promise((resolve, reject) => {
+    let redirectUri;
     const server = http.createServer(async (req, res) => {
       const queryObject = url.parse(req.url, true).query;
       try {
@@ -105,8 +105,7 @@ export async function signInWithGoogle(shell) {
           server.removeAllListeners("request");
           server.close();
 
-          const oauth2Client = new google.auth.OAuth2(clientId, "", redirectUri);
-          const tokens = await exchangeCodeForTokens(queryObject.code);
+          const tokens = await exchangeCodeForTokens(queryObject.code, redirectUri);
           const { data, error } = await supabase.auth.signInWithIdToken({
             provider: 'google',
             token: tokens.id_token,
@@ -150,30 +149,27 @@ export async function signInWithGoogle(shell) {
 
     server.on("error", (err) => {
       clearTimeout(timeoutId);
-      if (err?.code === "EADDRINUSE") {
-        resolve(null); // another flow still running
-        return;
-      }
       reject(err);
     });
 
-    server.listen(redirectPort);
+    server.listen(0, "127.0.0.1", () => {
+      redirectUri = `http://127.0.0.1:${server.address().port}`;
+      const oauth2Client = new google.auth.OAuth2(clientId, "", redirectUri);
 
-    const oauth2Client = new google.auth.OAuth2(clientId, "", redirectUri);
+      const authUrl = oauth2Client.generateAuthUrl({
+        scope: [
+          "openid",
+          "email",
+          "profile"
+        ],
+        access_type: "offline",
+        prompt: "consent",
+        code_challenge: challenge,
+        code_challenge_method: "S256",
+      });
 
-    const authUrl = oauth2Client.generateAuthUrl({
-      scope: [
-        "openid",
-        "email",
-        "profile"
-      ],
-      access_type: "offline",
-      prompt: "consent",
-      code_challenge: challenge,
-      code_challenge_method: "S256",
+      shell.openExternal(authUrl);
     });
-
-    shell.openExternal(authUrl);
 
   });
 }
