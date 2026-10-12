@@ -56,6 +56,13 @@ export default function NavBar({ showUpdateButton = true, updateStatus = null, u
   }, [pathname, newLibraryClips.count]);
 
   useEffect(() => {
+    const handleFocus = () => clearNewClips(pathname);
+
+    window.addEventListener("focus", handleFocus);
+    return () => window.removeEventListener("focus", handleFocus);
+  }, [pathname, newLibraryClips.count]);
+
+  useEffect(() => {
     if (pathname === "/") {
       setNewLocalClips(0);
     }
