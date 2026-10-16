@@ -15,7 +15,7 @@ PowerShell here has execution-policy disabled, so **`npm` fails; always use `npm
 - `npm.cmd run build` — `vite build` then `electron-builder --win`; outputs `dist/ClipX-Setup.exe` + `latest.yml` (used by electron-updater).
 - `npm.cmd run build:react` / `build:electron` — the two halves separately.
 - `npm.cmd run build:player` — bundles `src/sharePlayer.jsx` into `public/clip-player/` for the `/clip/<id>` share page. Vercel has no build step, so the output is committed: re-run it and commit after changing `VideoPlayer.jsx`, `player.css` or `playerPrefs.js`.
-- **No tests exist** and there is no test script.
+- `npm.cmd test` — runs `tests/**/*.test.js` with Node's built-in test runner (`node:test`, no extra dependencies). Tests live in `tests/`, not next to the source, because electron-builder packages everything under `electron/`. Only import modules that load in plain Node: no `electron` import, no Supabase client created when the module loads (e.g. `api-handlers/auth.js`), and no `import.meta.env` at the top level.
 - `eslint.config.js` exists but the eslint packages are **not installed** and there is no lint script — do not claim to run lint.
 
 ## Env & secrets
@@ -35,8 +35,9 @@ PowerShell here has execution-policy disabled, so **`npm` fails; always use `npm
 - Google OAuth uses a PKCE loopback flow on an OS-assigned `127.0.0.1` port (a fixed port can land in a Windows excluded port range and fail with `EACCES`). The app sends its `redirect_uri` to `/api/google/token`, which falls back to port **51723** for builds up to v1.2.5 that don't send one. YouTube refresh tokens are stored in the OS keychain via keytar.
 - `api/` functions use `process.env.SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` (service role — never expose to the renderer) and authenticate callers with the user's Supabase access token as a Bearer token.
 
-## Releases
+## CI & releases
 
+- Pull requests to `master` run `ci.yml` on `windows-latest`. It runs `npm ci`, a `node --check` syntax pass over `api/`, `api-handlers/`, `electron/` and `scripts/`, then `npm test` and `build:react`. Last, it rebuilds the share player and fails if `public/clip-player/` differs from what's committed. GitHub also skips `pull_request` runs when the PR's head commit message contains `[skip ci]`, so only use `[skip ci]` on commits that land on `master`.
 - `master` push/tag `v*` triggers `release.yml`: builds, then creates a GitHub release from the `## vX.Y.Z` section in `CHANGELOG.md` (absent section ⇒ workflow fails). Bumper version in `package.json` must match a `## vX.Y.Z` heading.
 - Pushing a version bump alone (no tag) releases as `v{version}`; the `dist/latest.yml` artifact powers in-app auto-updates.
 - Only cut a release (version bump, `CHANGELOG.md` release section, `v*` tag) when the user explicitly asks for one. Every other push to `master`, including PR merges, must have `[skip ci]` in the head commit message so `release.yml` doesn't run.

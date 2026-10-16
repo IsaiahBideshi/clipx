@@ -3,6 +3,7 @@ dist
 src
 electron
 scripts
+tests
 .git
 .env
 .env.*

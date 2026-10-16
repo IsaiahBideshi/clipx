@@ -12,7 +12,8 @@
     "build:electron": "electron-builder build --win --publish never",
     "build:player": "vite build --config vite.player.config.js",
     "build": "node scripts/build.js",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "node --test \"tests/**/*.test.js\""
   },
   "build": {
     "appId": "com.isaiah.clipx",
