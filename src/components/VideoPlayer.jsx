@@ -8,6 +8,8 @@ import VolumeUpIcon from "@mui/icons-material/VolumeUp";
 import VolumeDownIcon from "@mui/icons-material/VolumeDown";
 import FullscreenIcon from "@mui/icons-material/Fullscreen";
 import FullscreenExitIcon from "@mui/icons-material/FullscreenExit";
+import HdIcon from "@mui/icons-material/Hd";
+import SdIcon from "@mui/icons-material/Sd";
 import { isTextEntryActive } from "../lib/hotkeys.js";
 import "./player.css";
 
@@ -23,6 +25,7 @@ function formatTime(timeInSeconds) {
 export default function VideoPlayer({
   ref,
   src,
+  originalSrc,
   poster,
   volume = 1,
   muted = false,
@@ -47,7 +50,9 @@ export default function VideoPlayer({
   const callbacksRef = useRef({});
   const autoplayedRef = useRef(false);
   const stateRef = useRef({});
+  const resumeRef = useRef(null);
 
+  const [useOriginal, setUseOriginal] = useState(false);
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -56,6 +61,7 @@ export default function VideoPlayer({
   const [loading, setLoading] = useState(true);
   const [hasDimensions, setHasDimensions] = useState(false);
 
+  const activeSrc = useOriginal && originalSrc ? originalSrc : src;
   const start = Math.max(0, startTime);
   const end = Number.isFinite(endTime) ? endTime : duration;
 
@@ -79,7 +85,7 @@ export default function VideoPlayer({
     setLoading(true);
     setHasDimensions(false);
     autoplayedRef.current = false;
-  }, [src]);
+  }, [activeSrc]);
 
   useEffect(() => {
     const el = videoRef.current;
@@ -140,6 +146,12 @@ export default function VideoPlayer({
   function handleVolumeChange(value) {
     const v = Math.max(0, Math.min(1, value));
     callbacksRef.current.onVolumeChange?.({ volume: v, muted: v === 0 });
+  }
+
+  function toggleQuality() {
+    const el = videoRef.current;
+    resumeRef.current = el ? { time: el.currentTime, paused: el.paused } : null;
+    setUseOriginal((value) => !value);
   }
 
   async function toggleFullscreen() {
@@ -334,9 +346,20 @@ export default function VideoPlayer({
       )}
       <video
         ref={videoRef}
-        src={src}
+        src={activeSrc}
         onLoadedMetadata={(e) => {
           const d = e.target.duration;
+          if (resumeRef.current) {
+            const { time, paused } = resumeRef.current;
+            resumeRef.current = null;
+            autoplayedRef.current = true;
+            e.target.currentTime = time;
+            if (paused) {
+              e.target.pause();
+            } else {
+              e.target.play().catch(() => {});
+            }
+          }
           setDuration(d);
           setHasDimensions(true);
           callbacksRef.current.onLoadedMetadata?.(d);
@@ -438,6 +461,12 @@ export default function VideoPlayer({
               aria-label="Volume"
               className="video-volume-slider"
             />
+
+            {originalSrc && (
+              <button className="play-button" title={useOriginal ? "Original quality: on" : "Original quality: off"} type="button" onClick={toggleQuality} aria-label="Original quality" aria-pressed={useOriginal}>
+                {useOriginal ? <HdIcon /> : <SdIcon />}
+              </button>
+            )}
 
             <button className="play-button" title="Fullscreen (F)" type="button" onClick={toggleFullscreen} aria-label={isFullscreen ? "Exit fullscreen" : "Fullscreen"}>
               {isFullscreen ? <FullscreenExitIcon /> : <FullscreenIcon />}

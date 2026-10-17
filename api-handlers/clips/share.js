@@ -1,8 +1,8 @@
 import { supabase } from '../auth.js'
-import { getStreamUrl, BlobNotFoundError, containerClient, CONTAINER_NAME, THUMBS_CONTAINER_NAME } from './azure.js'
+import { getStreamUrl, getClipStreamUrls, streamCopyExists, BlobNotFoundError, containerClient, CONTAINER_NAME, THUMBS_CONTAINER_NAME } from './azure.js'
 import { extractAvatarBlobName } from '../account/azure.js'
 
-const CLIP_PATH = /^\/clip\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:\/(video|thumbnail))?$/i
+const CLIP_PATH = /^\/clip\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:\/(video|original|thumbnail))?$/i
 const PLAYER_ASSETS = `
     <link rel="stylesheet" href="/clip-player/player.css" />
     <script type="module" src="/clip-player/player.js"></script>`
@@ -21,6 +21,9 @@ export default async function handler(req, res) {
       const blobName = thumbnail ? clip?.thumbnail_blob_name : clip?.blob_name
       if (!blobName) {
         return res.status(404).json({ data: null, error: 'Clip not found' })
+      }
+      if (asset.toLowerCase() === 'video') {
+        return res.redirect(302, (await getClipStreamUrls(blobName)).url)
       }
       return res.redirect(302, await getStreamUrl(blobName, 'r', thumbnail ? THUMBS_CONTAINER_NAME : CONTAINER_NAME))
     } catch (err) {
@@ -48,8 +51,9 @@ export default async function handler(req, res) {
     }
 
     const username = owner?.username || 'ClipX user'
+    const hasStreamCopy = await streamCopyExists(clip.blob_name)
     const embed = renderEmbed(clip, username, `https://${req.headers.host}/clip/${clip.id}`)
-    return sendPage(res, 200, clip.title || 'Untitled clip', renderClip(clip, owner, username), embed + PLAYER_ASSETS)
+    return sendPage(res, 200, clip.title || 'Untitled clip', renderClip(clip, owner, username, hasStreamCopy), embed + PLAYER_ASSETS)
   } catch (err) {
     console.error('Error loading shared clip:', err)
     return sendPage(res, 500, 'Clip unavailable', renderUnavailable())
@@ -105,7 +109,8 @@ function renderEmbed(clip, username, pageUrl) {
     <meta name="theme-color" content="#90caf9" />`
 }
 
-function renderClip(clip, owner, username) {
+function renderClip(clip, owner, username, hasStreamCopy) {
+  const originalSrc = hasStreamCopy ? ` data-original-src="/clip/${clip.id}/original"` : ''
   const avatar = isTrustedAvatar(owner?.avatar_url)
     ? `<img class="clip-owner-avatar" src="${escapeHtml(owner.avatar_url)}" alt="" />`
     : `<span class="clip-owner-avatar">${escapeHtml([...username][0].toUpperCase())}</span>`
@@ -117,7 +122,7 @@ function renderClip(clip, owner, username) {
   })
 
   return `
-      <div id="clip-player" class="video-player-container" data-src="/clip/${clip.id}/video"></div>
+      <div id="clip-player" class="video-player-container" data-src="/clip/${clip.id}/video"${originalSrc}></div>
       <div class="video-metadata">
         <h1 class="video-title">${escapeHtml(clip.title || 'Untitled clip')}</h1>
         <div class="clip-owner">
