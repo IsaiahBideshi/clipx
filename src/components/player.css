@@ -39,6 +39,10 @@
   transform: translateY(-1px);
   cursor: pointer;
 }
+.play-button[aria-pressed="true"] {
+  border-color: rgba(144, 202, 249, 0.6);
+  background: rgba(144, 202, 249, 0.16);
+}
 
 .mute-button {
   background-color: rgba(255, 255, 255, 0.06);

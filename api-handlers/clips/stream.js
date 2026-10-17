@@ -1,4 +1,4 @@
-import { getStreamUrl, BlobNotFoundError, SUPPORTED_CONTAINERS, CONTAINER_NAME, THUMBS_CONTAINER_NAME } from './azure.js'
+import { getStreamUrl, getClipStreamUrls, BlobNotFoundError, SUPPORTED_CONTAINERS, CONTAINER_NAME, THUMBS_CONTAINER_NAME } from './azure.js'
 import { getAuthenticatedUser, supabase } from '../auth.js'
 import { areFriends } from '../friendships.js'
 
@@ -45,6 +45,10 @@ export default async function handler(req, res) {
     const allowed = await canViewClip(clip, user)
     if (!allowed) {
       return res.status(403).json({ data: null, error: 'You do not have permission to view this clip' })
+    }
+
+    if (requestedContainer === CONTAINER_NAME) {
+      return res.status(200).json({ data: await getClipStreamUrls(blobName), error: null })
     }
 
     const url = await getStreamUrl(blobName, 'r', requestedContainer)

@@ -8,6 +8,7 @@ import { rename } from "fs/promises";
 
 import { uploadClipToYoutube } from "./youtubeService.js";
 import { resolveFfmpegPath } from "../utils/ffmpeg.js";
+import { STREAM_COPY_BITRATE, buildStreamBlobName, renderStreamCopy } from "../utils/streamCopy.js";
 import { getIndexedClipData, setIndexedClipMetadata, markIndexedClipMissing, getWatchedRootForPath, upsertIndexedClip, getCachedThumbnailPath } from "./clipIndexService.js";
 import { getSupabaseAccessToken } from "../ipc/authStorage.js";
 
@@ -235,9 +236,22 @@ export async function uploadClip(app, options) {
   const tempStamp = Date.now();
   const tempPath = path.join(tempDir, `${tempStamp}-${buildClipOutputName(clipTitle)}`);
   const tempThumbPath = path.join(tempDir, `${tempStamp}-${buildThumbnailOutputName(clipTitle)}`);
+  const tempStreamPath = path.join(tempDir, `${tempStamp}-stream-${buildClipOutputName(clipTitle)}`);
 
   try {
     await renderClipSegment(videoPath, startTime, endTime, tempPath);
+
+    let streamPath = null;
+    try {
+      const stat = await fs.promises.stat(tempPath);
+      const bitrate = (stat.size * 8) / (endTime - startTime);
+      if (bitrate > STREAM_COPY_BITRATE * 1.25) {
+        await renderStreamCopy(tempPath, tempStreamPath);
+        streamPath = tempStreamPath;
+      }
+    } catch (streamError) {
+      console.error("ClipX: Failed to render stream copy:", streamError);
+    }
 
     let thumbnailPath = null;
     try {
@@ -249,6 +263,7 @@ export async function uploadClip(app, options) {
 
     const result = await uploadClipToAzureBlobStorage({
       videoPath: tempPath,
+      streamPath,
       thumbnailPath,
       title: clipTitle,
       userId,
@@ -256,7 +271,7 @@ export async function uploadClip(app, options) {
     return { status: 200, ...result };
 
   } finally {
-    for (const filePath of [tempPath, tempThumbPath]) {
+    for (const filePath of [tempPath, tempThumbPath, tempStreamPath]) {
       try {
         await fs.promises.unlink(filePath);
       } catch (_error) {
@@ -294,7 +309,7 @@ async function uploadBlobToAzure({ token, name, contentType, filePath, container
   }
 }
 
-async function uploadClipToAzureBlobStorage({ videoPath, thumbnailPath, title, userId }) {
+async function uploadClipToAzureBlobStorage({ videoPath, streamPath, thumbnailPath, title, userId }) {
   const token = await getSupabaseAccessToken();
   if (!token || !userId) {
     throw new Error("Not authenticated. Please log in first.");
@@ -309,6 +324,19 @@ async function uploadClipToAzureBlobStorage({ videoPath, thumbnailPath, title, u
     contentType: "video/mp4",
     filePath: videoPath,
   });
+
+  if (streamPath) {
+    try {
+      await uploadBlobToAzure({
+        token,
+        name: buildStreamBlobName(videoBlobName),
+        contentType: "video/mp4",
+        filePath: streamPath,
+      });
+    } catch (streamError) {
+      console.error("ClipX: Failed to upload stream copy:", streamError);
+    }
+  }
 
   let thumbnailBlobName = null;
   if (thumbnailPath) {
@@ -360,6 +388,7 @@ export async function deleteClipBlob({ blobName, thumbnailBlobName }) {
   const names = [];
   if (blobName) {
     names.push({ name: blobName, container: AZURE_CLIPS_CONTAINER });
+    names.push({ name: buildStreamBlobName(blobName), container: AZURE_CLIPS_CONTAINER });
   }
   if (thumbnailBlobName) {
     names.push({ name: thumbnailBlobName, container: AZURE_THUMBS_CONTAINER });
