@@ -1,5 +1,5 @@
 import { supabase } from '../auth.js'
-import { getStreamUrl, getClipStreamUrls, getStreamBlobName, BlobNotFoundError, containerClient, CONTAINER_NAME, THUMBS_CONTAINER_NAME } from './azure.js'
+import { getStreamUrl, getClipStreamUrls, streamCopyExists, BlobNotFoundError, containerClient, CONTAINER_NAME, THUMBS_CONTAINER_NAME } from './azure.js'
 import { extractAvatarBlobName } from '../account/azure.js'
 
 const CLIP_PATH = /^\/clip\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:\/(video|original|thumbnail))?$/i
@@ -51,7 +51,7 @@ export default async function handler(req, res) {
     }
 
     const username = owner?.username || 'ClipX user'
-    const hasStreamCopy = await containerClient.getBlobClient(getStreamBlobName(clip.blob_name)).exists()
+    const hasStreamCopy = await streamCopyExists(clip.blob_name)
     const embed = renderEmbed(clip, username, `https://${req.headers.host}/clip/${clip.id}`)
     return sendPage(res, 200, clip.title || 'Untitled clip', renderClip(clip, owner, username, hasStreamCopy), embed + PLAYER_ASSETS)
   } catch (err) {

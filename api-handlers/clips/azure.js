@@ -138,13 +138,21 @@ export function getStreamBlobName(blobName) {
   return `${String(blobName).replace(/\.mp4$/, '')}.stream.mp4`
 }
 
+export async function streamCopyExists(blobName) {
+  try {
+    return await getContainerClient().getBlobClient(getStreamBlobName(blobName)).exists()
+  } catch (err) {
+    console.error('Error checking for stream copy:', err)
+    return false
+  }
+}
+
 export async function getClipStreamUrls(blobName) {
   const originalUrl = await getStreamUrl(blobName)
-  const streamBlobName = getStreamBlobName(blobName)
-  const hasStreamCopy = await getContainerClient().getBlobClient(streamBlobName).exists()
-  if (!hasStreamCopy) {
+  if (!(await streamCopyExists(blobName))) {
     return { url: originalUrl, originalUrl: null }
   }
+  const streamBlobName = getStreamBlobName(blobName)
   return { url: `${getPublicBlobUrl(streamBlobName)}?${getSasToken(streamBlobName)}`, originalUrl }
 }
 

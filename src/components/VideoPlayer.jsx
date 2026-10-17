@@ -50,7 +50,7 @@ export default function VideoPlayer({
   const callbacksRef = useRef({});
   const autoplayedRef = useRef(false);
   const stateRef = useRef({});
-  const resumeTimeRef = useRef(null);
+  const resumeRef = useRef(null);
 
   const [useOriginal, setUseOriginal] = useState(false);
   const [duration, setDuration] = useState(0);
@@ -149,7 +149,8 @@ export default function VideoPlayer({
   }
 
   function toggleQuality() {
-    resumeTimeRef.current = videoRef.current?.currentTime ?? null;
+    const el = videoRef.current;
+    resumeRef.current = el ? { time: el.currentTime, paused: el.paused } : null;
     setUseOriginal((value) => !value);
   }
 
@@ -348,9 +349,16 @@ export default function VideoPlayer({
         src={activeSrc}
         onLoadedMetadata={(e) => {
           const d = e.target.duration;
-          if (resumeTimeRef.current !== null) {
-            e.target.currentTime = resumeTimeRef.current;
-            resumeTimeRef.current = null;
+          if (resumeRef.current) {
+            const { time, paused } = resumeRef.current;
+            resumeRef.current = null;
+            autoplayedRef.current = true;
+            e.target.currentTime = time;
+            if (paused) {
+              e.target.pause();
+            } else {
+              e.target.play().catch(() => {});
+            }
           }
           setDuration(d);
           setHasDimensions(true);
