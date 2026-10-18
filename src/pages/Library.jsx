@@ -827,6 +827,12 @@ function EditClipDialog({clip, userMap, friendsOptions, onClose, onSaved}) {
   useEscapeKey(onClose, !saving);
 
   useEffect(() => {
+    setTags((current) =>
+      current.map((tag) => (tag?.id && !tag.label && userMap[tag.id] ? { ...tag, label: userMap[tag.id].username } : tag))
+    );
+  }, [userMap]);
+
+  useEffect(() => {
     if (clip.game_id == null || GAME_BY_ID.has(clip.game_id)) return;
 
     async function getGameLabel() {
