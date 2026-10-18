@@ -555,6 +555,7 @@ export default function Library() {
                 userMap={userMap}
                 onSelect={setSelectedClip}
                 onContextMenu={canManageClip(clip) ? (position) => setContextMenu({ clip, position }) : undefined}
+                onEdit={canManageClip(clip) ? () => setEditingClip(clip) : undefined}
               />
             ))}
           {Array.from({ length: fillerCount }).map((_, i) => (
@@ -678,7 +679,7 @@ function AzureClipThumb({clip}) {
 }
 
 
-export function ClipCard({clip, userMap, onSelect, onContextMenu}) {
+export function ClipCard({clip, userMap, onSelect, onContextMenu, onEdit}) {
   const clipDate = new Date(clip.created_at).toLocaleString( undefined, { dateStyle: 'long', timeStyle: 'short' });
   const isAzure = Boolean(clip.blob_name);
   const game = clip.game_id != null ? GAME_BY_ID.get(clip.game_id) : null;
@@ -709,9 +710,26 @@ export function ClipCard({clip, userMap, onSelect, onContextMenu}) {
             <span>Private</span>
           </div>
         )}
-        {isAzure && clip.visibility === "public" && (
-          <CopyLinkButton url={getClipShareUrl(clip.id)} className="clip-copy-link" />
-        )}
+        <div className="clip-card-actions">
+          {onEdit && (
+            <Tooltip title="Edit details">
+              <button
+                type="button"
+                className="clip-card-action"
+                aria-label="Edit details"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEdit();
+                }}
+              >
+                <EditIcon />
+              </button>
+            </Tooltip>
+          )}
+          {isAzure && clip.visibility === "public" && (
+            <CopyLinkButton url={getClipShareUrl(clip.id)} className="clip-card-action" />
+          )}
+        </div>
       </div>
       <div className="clip-name" title={clip.title}>{clip.title}</div>
       <div className="clip-meta">

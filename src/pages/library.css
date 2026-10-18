@@ -388,10 +388,15 @@
   font-size: 13px;
 }
 
-.library .clip-copy-link {
+.library .clip-card-actions {
   position: absolute;
   top: 6px;
   right: 6px;
+  display: flex;
+  gap: 6px;
+}
+
+.library .clip-card-action {
   display: grid;
   place-items: center;
   width: 28px;
@@ -407,16 +412,16 @@
   transition: opacity 0.15s, border-color 0.15s;
 }
 
-.library .clip-card:hover .clip-copy-link,
-.library .clip-copy-link:focus-visible {
+.library .clip-card:hover .clip-card-action,
+.library .clip-card-action:focus-visible {
   opacity: 1;
 }
 
-.library .clip-copy-link:hover {
+.library .clip-card-action:hover {
   border-color: rgba(144, 202, 249, 0.6);
 }
 
-.library .clip-copy-link svg {
+.library .clip-card-action svg {
   font-size: 16px;
 }
 
