@@ -29,7 +29,7 @@
 
 ## Table `clip_tags`
 
-Each row tags either a ClipX account (`user_id`) or custom text (`label`), never both. Unique per clip on `user_id` and on `lower(label)`. Rows are deleted with their clip or tagged user. Rows are only inserted by the `create_clip_with_tags` function, so there is no client INSERT policy.
+Each row tags either a ClipX account (`user_id`) or custom text (`label`), never both. Unique per clip on `user_id` and on `lower(label)`. Rows are deleted with their clip or tagged user. Rows are only inserted by the `create_clip_with_tags` and `update_clip_with_tags` functions, so there is no client INSERT policy.
 
 ### Columns
 
@@ -179,3 +179,91 @@ revoke execute on function public.create_clip_with_tags(text, text, bigint, text
 grant execute on function public.create_clip_with_tags(text, text, bigint, text, text, text, uuid[], text[]) to authenticated;
 ```
 
+### `update_clip_with_tags`
+
+Called by the Library's edit dialog (`supabase.rpc`). Updates the title, visibility and game of a clip the caller owns and replaces its tags in one transaction. It locks the clip row first, so two saves of the same clip run one after the other and the last one wins. It checks the same rules as `create_clip_with_tags`, except users who are already tagged stay allowed after they stop being friends. Returns the clip's new `clip_tags` rows.
+
+```sql
+create or replace function public.update_clip_with_tags(
+  clip_id uuid,
+  title text,
+  visibility text,
+  game_id bigint,
+  user_ids uuid[],
+  labels text[]
+)
+returns setof public.clip_tags
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  caller_id uuid := auth.uid();
+begin
+  if caller_id is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  perform 1 from public.clips c
+  where c.id = update_clip_with_tags.clip_id and c.owner_id = caller_id
+  for update;
+  if not found then
+    raise exception 'Clip not found';
+  end if;
+
+  if btrim(coalesce(update_clip_with_tags.title, '')) = '' then
+    raise exception 'Enter a title';
+  end if;
+
+  if update_clip_with_tags.visibility is null or update_clip_with_tags.visibility not in ('public', 'private', 'friends') then
+    raise exception 'Invalid visibility';
+  end if;
+
+  if exists (select 1 from unnest(labels) as l(label) where char_length(btrim(l.label)) > 50) then
+    raise exception 'Tags must be 50 characters or fewer';
+  end if;
+
+  if exists (
+    select 1 from unnest(user_ids) as t(user_id)
+    where not exists (
+      select 1 from public.clip_tags ct
+      where ct.clip_id = update_clip_with_tags.clip_id and ct.user_id = t.user_id
+    )
+    and not exists (
+      select 1 from public.friendships f
+      where f.status = 'accepted'
+        and ((f.user_id = caller_id and f.friend_id = t.user_id)
+          or (f.friend_id = caller_id and f.user_id = t.user_id))
+    )
+  ) then
+    raise exception 'You can only tag your friends';
+  end if;
+
+  update public.clips c
+  set title = btrim(update_clip_with_tags.title),
+      visibility = update_clip_with_tags.visibility,
+      game_id = update_clip_with_tags.game_id
+  where c.id = update_clip_with_tags.clip_id;
+
+  delete from public.clip_tags ct where ct.clip_id = update_clip_with_tags.clip_id;
+
+  insert into public.clip_tags (clip_id, user_id)
+  select update_clip_with_tags.clip_id, t.user_id from unnest(user_ids) as t(user_id)
+  on conflict do nothing;
+
+  insert into public.clip_tags (clip_id, label)
+  select update_clip_with_tags.clip_id, btrim(l.label) from unnest(labels) as l(label)
+  where btrim(l.label) <> ''
+  on conflict do nothing;
+
+  if (select count(*) from public.clip_tags ct where ct.clip_id = update_clip_with_tags.clip_id) > 20 then
+    raise exception 'A clip can have at most 20 tags';
+  end if;
+
+  return query select * from public.clip_tags ct where ct.clip_id = update_clip_with_tags.clip_id;
+end;
+$$;
+
+revoke execute on function public.update_clip_with_tags(uuid, text, text, bigint, uuid[], text[]) from public, anon;
+grant execute on function public.update_clip_with_tags(uuid, text, text, bigint, uuid[], text[]) to authenticated;
+```

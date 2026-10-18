@@ -4,7 +4,7 @@ import Fuse from "fuse.js";
 import STOREDGAMES from "../data/games.json";
 import { supabase } from '../lib/supabase.js';
 import { useAuthSession } from "../lib/authSession.js";
-import { listClips, getClipShareUrl, getClipTagsError, updateClip, deleteClip } from "../lib/clipsApi.js";
+import { listClips, getClipShareUrl, getClipTagsError, deleteClip } from "../lib/clipsApi.js";
 import { isTextEntryActive } from '../lib/hotkeys.js';
 import { useNavigate } from "react-router-dom";
 
@@ -284,13 +284,7 @@ export default function Library() {
     function onKeyDown(e) {
       if (isTextEntryActive(e)) return;
 
-      if (editingClip || clipToDelete) {
-        if (e.code === "Escape") {
-          setEditingClip(null);
-          setClipToDelete(null);
-        }
-        return;
-      }
+      if (editingClip || clipToDelete) return;
 
       if (e.code === "Escape") {
         setContextMenu(null);
@@ -769,8 +763,22 @@ function UserAvatar({user, className}) {
   );
 }
 
+function useEscapeKey(onEscape, enabled) {
+  useEffect(() => {
+    if (!enabled) return;
+
+    function onKeyDown(e) {
+      if (!isTextEntryActive(e) && e.code === "Escape") {
+        onEscape();
+      }
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onEscape, enabled]);
+}
+
 function EditClipDialog({clip, userMap, friendsOptions, onClose, onSaved}) {
-  const { session } = useAuthSession();
   const [title, setTitle] = useState(clip.title || "");
   const [game, setGame] = useState(
     clip.game_id != null ? { id: clip.game_id, label: GAME_BY_ID.get(clip.game_id)?.name ?? "" } : null
@@ -781,6 +789,8 @@ function EditClipDialog({clip, userMap, friendsOptions, onClose, onSaved}) {
   const [visibility, setVisibility] = useState(clip.visibility || "public");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  useEscapeKey(onClose, !saving);
 
   useEffect(() => {
     if (clip.game_id == null || GAME_BY_ID.has(clip.game_id)) return;
@@ -808,17 +818,18 @@ function EditClipDialog({clip, userMap, friendsOptions, onClose, onSaved}) {
     setSaving(true);
     setError("");
     try {
-      const { data, error } = await updateClip(session, clip.id, {
+      const { data, error } = await supabase.rpc("update_clip_with_tags", {
+        clip_id: clip.id,
         title,
         visibility,
-        gameId: game?.id ?? null,
-        userIds: tags.filter((tag) => tag?.id).map((tag) => tag.id),
-        labels: tags.filter((tag) => typeof tag === "string"),
+        game_id: game?.id ?? null,
+        user_ids: tags.filter((tag) => tag?.id).map((tag) => tag.id),
+        labels: tags.filter((tag) => typeof tag === "string").map((tag) => tag.trim()),
       });
       if (error) {
-        throw new Error(error);
+        throw error;
       }
-      onSaved(data);
+      onSaved({ ...clip, title: title.trim(), visibility, game_id: game?.id ?? null, tags: data });
     } catch (err) {
       console.error("Failed to update clip:", err);
       setError(err.message || "Failed to save clip.");
@@ -859,6 +870,8 @@ function DeleteClipDialog({clip, onClose, onDeleted}) {
   const { session } = useAuthSession();
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState("");
+
+  useEscapeKey(onClose, !deleting);
 
   async function handleDelete() {
     setDeleting(true);
