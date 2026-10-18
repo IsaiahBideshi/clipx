@@ -812,6 +812,21 @@ function useEscapeKey(onEscape, enabled) {
   }, [onEscape, enabled]);
 }
 
+function useBackdropClose(onClose, enabled) {
+  const pressedBackdropRef = useRef(false);
+
+  return {
+    onMouseDown: (e) => {
+      pressedBackdropRef.current = e.target === e.currentTarget;
+    },
+    onClick: (e) => {
+      if (enabled && pressedBackdropRef.current && e.target === e.currentTarget) {
+        onClose();
+      }
+    },
+  };
+}
+
 function EditClipDialog({clip, userMap, friendsOptions, onClose, onSaved}) {
   const [title, setTitle] = useState(clip.title || "");
   const [game, setGame] = useState(
@@ -825,6 +840,7 @@ function EditClipDialog({clip, userMap, friendsOptions, onClose, onSaved}) {
   const [error, setError] = useState("");
 
   useEscapeKey(onClose, !saving);
+  const backdropProps = useBackdropClose(onClose, !saving);
 
   useEffect(() => {
     setTags((current) =>
@@ -878,7 +894,7 @@ function EditClipDialog({clip, userMap, friendsOptions, onClose, onSaved}) {
   }
 
   return (
-    <div className="delete-modal library-clip-modal">
+    <div className="delete-modal library-clip-modal" {...backdropProps}>
       <div className="delete-modal-content library-edit-modal">
         <div className="delete-modal-message library-edit-title">Edit clip</div>
         <ClipDetailsFields
@@ -912,6 +928,7 @@ function DeleteClipDialog({clip, onClose, onDeleted}) {
   const [error, setError] = useState("");
 
   useEscapeKey(onClose, !deleting);
+  const backdropProps = useBackdropClose(onClose, !deleting);
 
   async function handleDelete() {
     setDeleting(true);
@@ -930,7 +947,7 @@ function DeleteClipDialog({clip, onClose, onDeleted}) {
   }
 
   return (
-    <div className="delete-modal library-clip-modal">
+    <div className="delete-modal library-clip-modal" {...backdropProps}>
       <div className="delete-modal-content">
         {deleting ? (
           <p>Deleting clip...</p>
