@@ -60,3 +60,4 @@ Before writing any code concerning electron, read the following documentation:
 - All code should match the already established style in this repo, do not stray from a pattern that is already here.
 - Do not make code too obscure and complicated, look for the simplest way to implement something while also satisfying common edge cases for the user.
 - When adding a feature, ask yourself whether it should have tests, and if it should, add them in `tests/` (see `npm.cmd test` above for what those tests can import).
+- When adding a modal, make sure clicking outside of it closes it and doesn't click any buttons behind the modal.
