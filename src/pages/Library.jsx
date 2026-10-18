@@ -556,6 +556,7 @@ export default function Library() {
                 onSelect={setSelectedClip}
                 onContextMenu={canManageClip(clip) ? (position) => setContextMenu({ clip, position }) : undefined}
                 onEdit={canManageClip(clip) ? () => setEditingClip(clip) : undefined}
+                onDelete={canManageClip(clip) ? () => setClipToDelete(clip) : undefined}
               />
             ))}
           {Array.from({ length: fillerCount }).map((_, i) => (
@@ -679,7 +680,7 @@ function AzureClipThumb({clip}) {
 }
 
 
-export function ClipCard({clip, userMap, onSelect, onContextMenu, onEdit}) {
+export function ClipCard({clip, userMap, onSelect, onContextMenu, onEdit, onDelete}) {
   const clipDate = new Date(clip.created_at).toLocaleString( undefined, { dateStyle: 'long', timeStyle: 'short' });
   const isAzure = Boolean(clip.blob_name);
   const game = clip.game_id != null ? GAME_BY_ID.get(clip.game_id) : null;
@@ -723,6 +724,21 @@ export function ClipCard({clip, userMap, onSelect, onContextMenu, onEdit}) {
                 }}
               >
                 <EditIcon />
+              </button>
+            </Tooltip>
+          )}
+          {onDelete && (
+            <Tooltip title="Delete clip">
+              <button
+                type="button"
+                className="clip-card-action danger"
+                aria-label="Delete clip"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete();
+                }}
+              >
+                <DeleteIcon />
               </button>
             </Tooltip>
           )}
