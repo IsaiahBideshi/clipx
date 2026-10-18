@@ -1,6 +1,7 @@
 import { supabase, getAuthenticatedUser } from '../auth.js'
-import { generateSasUrl, deleteBlob, BlobNotFoundError, SUPPORTED_CONTAINERS, CONTAINER_NAME, THUMBS_CONTAINER_NAME } from './azure.js'
+import { generateSasUrl, deleteBlob, getStreamBlobName, BlobNotFoundError, SUPPORTED_CONTAINERS, CONTAINER_NAME, THUMBS_CONTAINER_NAME } from './azure.js'
 import { areFriends } from '../friendships.js'
+import { parseClipDetails } from './clipDetails.js'
 
 export default async function handler(req, res) {
   const allowedOrigin = process.env.CORS_ORIGIN || '*'
@@ -237,9 +238,52 @@ export default async function handler(req, res) {
         return res.status(401).json({ data: null, error: authError })
       }
 
-      const { name, container = CONTAINER_NAME } = req.body || {}
+      const { id, name, container = CONTAINER_NAME } = req.body || {}
+      if (id) {
+        let clip
+        try {
+          clip = await findClip(id)
+        } catch (err) {
+          console.error('Error finding clip:', err)
+          return res.status(500).json({ data: null, error: 'Failed to find clip' })
+        }
+        if (!clip) {
+          return res.status(404).json({ data: null, error: 'Clip not found' })
+        }
+        if (clip.owner_id !== user.id) {
+          return res.status(403).json({ data: null, error: 'You do not have permission to delete this clip' })
+        }
+
+        try {
+          if (clip.blob_name) {
+            await deleteBlob(clip.blob_name)
+            await deleteBlob(getStreamBlobName(clip.blob_name))
+          }
+          if (clip.thumbnail_blob_name) {
+            await deleteBlob(clip.thumbnail_blob_name, THUMBS_CONTAINER_NAME)
+          }
+        } catch (err) {
+          console.error('Error deleting clip blobs:', err)
+          return res.status(500).json({ data: null, error: 'Failed to delete clip files' })
+        }
+
+        const { error: tagsError } = await supabase.from('clip_tags').delete().eq('clip_id', id)
+        if (tagsError) {
+          console.error('Error deleting clip tags:', tagsError)
+          return res.status(500).json({ data: null, error: tagsError.message })
+        }
+
+        const { error: deleteError } = await supabase.from('clips').delete().eq('id', id)
+        if (deleteError) {
+          console.error('Error deleting clip:', deleteError)
+          return res.status(500).json({ data: null, error: deleteError.message })
+        }
+
+        return res.status(200).json({ data: { deleted: true }, error: null })
+      }
+
       if (!name) {
-        return res.status(400).json({ data: null, error: 'Missing "name" in request body' })
+        return res.status(400).json({ data: null, error: 'Missing "id" or "name" in request body' })
       }
       if (!SUPPORTED_CONTAINERS.includes(container)) {
         return res.status(400).json({ data: null, error: `Unsupported container "${container}"` })
@@ -259,7 +303,103 @@ export default async function handler(req, res) {
       }
     }
 
-    case 'PUT':
+    case 'PUT': {
+      const { user, error: authError } = await getAuthenticatedUser(req)
+      if (authError) {
+        return res.status(401).json({ data: null, error: authError })
+      }
+
+      const { id } = req.body || {}
+      if (!id) {
+        return res.status(400).json({ data: null, error: 'Missing "id" in request body' })
+      }
+      const { details, userIds, labels, error: detailsError } = parseClipDetails(req.body)
+      if (detailsError) {
+        return res.status(400).json({ data: null, error: detailsError })
+      }
+
+      let clip
+      try {
+        clip = await findClip(id)
+      } catch (err) {
+        console.error('Error finding clip:', err)
+        return res.status(500).json({ data: null, error: 'Failed to find clip' })
+      }
+      if (!clip) {
+        return res.status(404).json({ data: null, error: 'Clip not found' })
+      }
+      if (clip.owner_id !== user.id) {
+        return res.status(403).json({ data: null, error: 'You do not have permission to edit this clip' })
+      }
+
+      const { data: existingTags, error: existingTagsError } = await supabase
+        .from('clip_tags')
+        .select('id, user_id, label')
+        .eq('clip_id', id)
+      if (existingTagsError) {
+        console.error('Error fetching clip tags:', existingTagsError)
+        return res.status(500).json({ data: null, error: existingTagsError.message })
+      }
+
+      const lowerLabels = labels.map((label) => label.toLowerCase())
+      const existingLabels = existingTags.filter((tag) => tag.label).map((tag) => tag.label.toLowerCase())
+      const addedUserIds = userIds.filter((userId) => !existingTags.some((tag) => tag.user_id === userId))
+      const addedLabels = labels.filter((label) => !existingLabels.includes(label.toLowerCase()))
+      const removedTagIds = existingTags
+        .filter((tag) => (tag.user_id ? !userIds.includes(tag.user_id) : !lowerLabels.includes(tag.label.toLowerCase())))
+        .map((tag) => tag.id)
+
+      try {
+        const friends = await Promise.all(addedUserIds.map((userId) => areFriends(user.id, userId)))
+        if (friends.includes(false)) {
+          return res.status(403).json({ data: null, error: 'You can only tag your friends' })
+        }
+      } catch (err) {
+        console.error('Error checking friendship:', err)
+        return res.status(500).json({ data: null, error: 'Failed to verify friendship' })
+      }
+
+      const { data: updatedClip, error: updateError } = await supabase
+        .from('clips')
+        .update(details)
+        .eq('id', id)
+        .select()
+        .single()
+      if (updateError) {
+        console.error('Error updating clip:', updateError)
+        return res.status(500).json({ data: null, error: updateError.message })
+      }
+
+      if (addedUserIds.length > 0 || addedLabels.length > 0) {
+        const { error: insertError } = await supabase.from('clip_tags').insert([
+          ...addedUserIds.map((userId) => ({ clip_id: id, user_id: userId })),
+          ...addedLabels.map((label) => ({ clip_id: id, label })),
+        ])
+        if (insertError) {
+          console.error('Error adding clip tags:', insertError)
+          return res.status(500).json({ data: null, error: insertError.message })
+        }
+      }
+
+      if (removedTagIds.length > 0) {
+        const { error: removeError } = await supabase.from('clip_tags').delete().in('id', removedTagIds)
+        if (removeError) {
+          console.error('Error removing clip tags:', removeError)
+          return res.status(500).json({ data: null, error: removeError.message })
+        }
+      }
+
+      const { data: tags, error: tagsError } = await supabase
+        .from('clip_tags')
+        .select('clip_id, user_id, label')
+        .eq('clip_id', id)
+      if (tagsError) {
+        console.error('Error fetching clip tags:', tagsError)
+        return res.status(500).json({ data: null, error: tagsError.message })
+      }
+
+      return res.status(200).json({ data: { ...updatedClip, tags }, error: null })
+    }
 
     default:
       return res.status(405).json({ data: null, error: 'Method not allowed' })
@@ -279,6 +419,19 @@ function parseTagLabels(value) {
   } catch {
     return []
   }
+}
+
+async function findClip(id) {
+  const { data, error } = await supabase
+    .from('clips')
+    .select('id, owner_id, blob_name, thumbnail_blob_name')
+    .eq('id', id)
+    .maybeSingle()
+
+  if (error) {
+    throw new Error(`Failed to find clip: ${error.message}`)
+  }
+  return data
 }
 
 async function findClipByBlob(blobName) {

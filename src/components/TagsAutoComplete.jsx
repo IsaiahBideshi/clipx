@@ -46,6 +46,7 @@ export default function TagsAutoComplete({ options, onChange, saveNewTags = fals
       filterSelectedOptions
       options={[...options, ...customTags]}
       getOptionKey={(option) => option.id ?? option}
+      isOptionEqualToValue={(option, value) => (option.id ?? option) === (value.id ?? value)}
       onChange={handleChange}
       renderOption={({ key, ...optionProps }, option) => (
         <li key={key} {...optionProps}>

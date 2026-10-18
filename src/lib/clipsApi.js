@@ -14,6 +14,26 @@ export async function listClips(session, query = {}) {
   return response.json().catch(() => ({ data: null, error: "Invalid server response." }));
 }
 
+export function updateClip(session, id, details) {
+  return sendClipRequest(session, "PUT", { id, ...details });
+}
+
+export function deleteClip(session, id) {
+  return sendClipRequest(session, "DELETE", { id });
+}
+
+async function sendClipRequest(session, method, body) {
+  const response = await fetch(`${getApiBase()}/api/clips`, {
+    method,
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${session?.access_token}`,
+    },
+    body: JSON.stringify(body),
+  });
+  return response.json().catch(() => ({ data: null, error: "Invalid server response." }));
+}
+
 export function getClipShareUrl(clipId) {
   return `${getApiBase()}/clip/${clipId}`;
 }

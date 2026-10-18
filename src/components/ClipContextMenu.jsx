@@ -3,7 +3,7 @@ import FolderIcon from '@mui/icons-material/Folder';
 import FileOpenIcon from '@mui/icons-material/FileOpen';
 import EditIcon from '@mui/icons-material/Edit';
 
-export default function ClipContextMenu({ clip, position, ref, onOpen, onDelete, onRename, onOpenInExplorer, disabled = false }) {
+export default function ClipContextMenu({ clip, position, ref, onOpen, onEdit, onDelete, onRename, onOpenInExplorer, disabled = false }) {
   return (
     <div className="clip-context-menu"
       style={{
@@ -18,14 +18,24 @@ export default function ClipContextMenu({ clip, position, ref, onOpen, onDelete,
         <FileOpenIcon />
         <span style={{ }}>Open</span>
       </div>
-      <div className={`clip-context-menu-item${disabled ? " disabled" : ""}`} onClick={disabled ? undefined : onRename}>
-        <EditIcon />
-        Rename
-      </div>
-      <div className="clip-context-menu-item" onClick={onOpenInExplorer}>
-        <FolderIcon />
-        Open in Explorer
-      </div>
+      {onEdit && (
+        <div className={`clip-context-menu-item${disabled ? " disabled" : ""}`} onClick={disabled ? undefined : onEdit}>
+          <EditIcon />
+          Edit
+        </div>
+      )}
+      {onRename && (
+        <div className={`clip-context-menu-item${disabled ? " disabled" : ""}`} onClick={disabled ? undefined : onRename}>
+          <EditIcon />
+          Rename
+        </div>
+      )}
+      {onOpenInExplorer && (
+        <div className="clip-context-menu-item" onClick={onOpenInExplorer}>
+          <FolderIcon />
+          Open in Explorer
+        </div>
+      )}
       <div className={`clip-context-menu-item${disabled ? " disabled" : ""}`} style={{ color: "red",  }} onClick={disabled ? undefined : onDelete}>
         <DeleteIcon />
         Delete

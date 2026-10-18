@@ -4,11 +4,14 @@ import Fuse from "fuse.js";
 import STOREDGAMES from "../data/games.json";
 import { supabase } from '../lib/supabase.js';
 import { useAuthSession } from "../lib/authSession.js";
-import { listClips, getClipShareUrl } from "../lib/clipsApi.js";
+import { listClips, getClipShareUrl, getClipTagsError, updateClip, deleteClip } from "../lib/clipsApi.js";
 import { isTextEntryActive } from '../lib/hotkeys.js';
 import { useNavigate } from "react-router-dom";
 
 import CloseIcon from '@mui/icons-material/Close';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
+import Tooltip from '@mui/material/Tooltip';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import TextField from '@mui/material/TextField';
 import AutoComplete from '@mui/material/Autocomplete';
@@ -24,6 +27,8 @@ import VideoPlayer from "../components/VideoPlayer";
 import RefreshButton from "../components/RefreshButton.jsx";
 import CopyLinkButton from "../components/CopyLinkButton.jsx";
 import TagsAutoComplete from "../components/TagsAutoComplete.jsx";
+import ClipDetailsFields from "../components/ClipDetailsFields.jsx";
+import ClipContextMenu from "../components/ClipContextMenu.jsx";
 import { formatDate } from "../components/ClipCard.jsx";
 import { usePlayerPrefs } from "../lib/playerPrefs.js";
 
@@ -183,6 +188,10 @@ async function searchGames(gameName) {
 
 export default function Library() {
   const [selectedClip, setSelectedClip] = useState(null);
+  const [editingClip, setEditingClip] = useState(null);
+  const [clipToDelete, setClipToDelete] = useState(null);
+  const [contextMenu, setContextMenu] = useState(null);
+  const contextMenuRef = useRef(null);
   const [draftTitle, setDraftTitle] = useState("");
   const [draftGame, setDraftGame] = useState(null);
   const [draftGameInput, setDraftGameInput] = useState("");
@@ -247,6 +256,10 @@ export default function Library() {
 
   const queryClient = useQueryClient();
 
+  function canManageClip(clip) {
+    return Boolean(clip.blob_name) && clip.owner_id === userId;
+  }
+
   function moveSelectedClip(direction) {
     if (!filteredClips.length) return;
 
@@ -271,7 +284,16 @@ export default function Library() {
     function onKeyDown(e) {
       if (isTextEntryActive(e)) return;
 
+      if (editingClip || clipToDelete) {
+        if (e.code === "Escape") {
+          setEditingClip(null);
+          setClipToDelete(null);
+        }
+        return;
+      }
+
       if (e.code === "Escape") {
+        setContextMenu(null);
         setSelectedClip(null);
         return;
       }
@@ -291,7 +313,20 @@ export default function Library() {
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [filteredClips, selectedClip]);
+  }, [filteredClips, selectedClip, editingClip, clipToDelete]);
+
+  useEffect(() => {
+    if (!contextMenu) return;
+
+    function handleClickOutside(event) {
+      if (contextMenuRef.current && !contextMenuRef.current.contains(event.target)) {
+        setContextMenu(null);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [contextMenu]);
 
   useEffect(() => {
     if (!loadingSession && !session) {
@@ -525,6 +560,7 @@ export default function Library() {
                 clip={clip}
                 userMap={userMap}
                 onSelect={setSelectedClip}
+                onContextMenu={canManageClip(clip) ? (position) => setContextMenu({ clip, position }) : undefined}
               />
             ))}
           {Array.from({ length: fillerCount }).map((_, i) => (
@@ -551,6 +587,54 @@ export default function Library() {
           onClose={() => setSelectedClip(null)}
           onPrevClip={() => moveSelectedClip(-1)}
           onNextClip={() => moveSelectedClip(1)}
+          onEdit={canManageClip(selectedClip) ? () => setEditingClip(selectedClip) : undefined}
+          onDelete={canManageClip(selectedClip) ? () => setClipToDelete(selectedClip) : undefined}
+        />
+      )}
+
+      {contextMenu && (
+        <ClipContextMenu
+          ref={contextMenuRef}
+          clip={contextMenu.clip}
+          position={contextMenu.position}
+          onOpen={() => {
+            setSelectedClip(contextMenu.clip);
+            setContextMenu(null);
+          }}
+          onEdit={() => {
+            setEditingClip(contextMenu.clip);
+            setContextMenu(null);
+          }}
+          onDelete={() => {
+            setClipToDelete(contextMenu.clip);
+            setContextMenu(null);
+          }}
+        />
+      )}
+
+      {editingClip && (
+        <EditClipDialog
+          clip={editingClip}
+          userMap={userMap}
+          friendsOptions={friendsOptions}
+          onClose={() => setEditingClip(null)}
+          onSaved={(updatedClip) => {
+            setEditingClip(null);
+            setSelectedClip((current) => (current?.id === updatedClip.id ? updatedClip : current));
+            queryClient.invalidateQueries({ queryKey: ["library", "clips"] });
+          }}
+        />
+      )}
+
+      {clipToDelete && (
+        <DeleteClipDialog
+          clip={clipToDelete}
+          onClose={() => setClipToDelete(null)}
+          onDeleted={() => {
+            setClipToDelete(null);
+            setSelectedClip((current) => (current?.id === clipToDelete.id ? null : current));
+            queryClient.invalidateQueries({ queryKey: ["library", "clips"] });
+          }}
         />
       )}
     </OverlayScrollbarsComponent>
@@ -600,7 +684,7 @@ function AzureClipThumb({clip}) {
 }
 
 
-export function ClipCard({clip, userMap, onSelect}) {
+export function ClipCard({clip, userMap, onSelect, onContextMenu}) {
   const clipDate = new Date(clip.created_at).toLocaleString( undefined, { dateStyle: 'long', timeStyle: 'short' });
   const isAzure = Boolean(clip.blob_name);
   const game = clip.game_id != null ? GAME_BY_ID.get(clip.game_id) : null;
@@ -610,7 +694,15 @@ export function ClipCard({clip, userMap, onSelect}) {
     .filter(Boolean);
 
   return (
-    <div className="clip-card" onClick={() => onSelect(clip)}>
+    <div
+      className="clip-card"
+      onClick={() => onSelect(clip)}
+      onContextMenu={(e) => {
+        if (!onContextMenu) return;
+        e.preventDefault();
+        onContextMenu({ x: e.clientX, y: e.clientY });
+      }}
+    >
       <div className="clip-thumb-wrap">
         {isAzure ? (
           <AzureClipThumb clip={clip} />
@@ -677,6 +769,137 @@ function UserAvatar({user, className}) {
   );
 }
 
+function EditClipDialog({clip, userMap, friendsOptions, onClose, onSaved}) {
+  const { session } = useAuthSession();
+  const [title, setTitle] = useState(clip.title || "");
+  const [game, setGame] = useState(
+    clip.game_id != null ? { id: clip.game_id, label: GAME_BY_ID.get(clip.game_id)?.name ?? "" } : null
+  );
+  const [tags, setTags] = useState(
+    clip.tags.map((tag) => (tag.user_id ? { id: tag.user_id, label: userMap[tag.user_id]?.username ?? "" } : tag.label))
+  );
+  const [visibility, setVisibility] = useState(clip.visibility || "public");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (clip.game_id == null || GAME_BY_ID.has(clip.game_id)) return;
+
+    async function getGameLabel() {
+      try {
+        const response = await window?.clipx?.getGameData(clip.game_id);
+        if (response?.label) {
+          setGame((current) => (current?.id === clip.game_id ? { ...current, label: response.label } : current));
+        }
+      } catch (error) {
+        console.error("Error fetching game data:", error);
+      }
+    }
+    getGameLabel();
+  }, [clip.game_id]);
+
+  async function handleSave() {
+    const tagsError = getClipTagsError(tags);
+    if (tagsError) {
+      setError(tagsError);
+      return;
+    }
+
+    setSaving(true);
+    setError("");
+    try {
+      const { data, error } = await updateClip(session, clip.id, {
+        title,
+        visibility,
+        gameId: game?.id ?? null,
+        userIds: tags.filter((tag) => tag?.id).map((tag) => tag.id),
+        labels: tags.filter((tag) => typeof tag === "string"),
+      });
+      if (error) {
+        throw new Error(error);
+      }
+      onSaved(data);
+    } catch (err) {
+      console.error("Failed to update clip:", err);
+      setError(err.message || "Failed to save clip.");
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="delete-modal library-clip-modal">
+      <div className="delete-modal-content library-edit-modal">
+        <div className="delete-modal-message library-edit-title">Edit clip</div>
+        <ClipDetailsFields
+          title={title}
+          onTitleChange={setTitle}
+          game={game}
+          onGameChange={setGame}
+          tags={tags}
+          onTagsChange={setTags}
+          visibility={visibility}
+          onVisibilityChange={setVisibility}
+          friendsOptions={friendsOptions}
+        />
+        {error && (
+          <p className="auth-error" style={{ margin: "8px 0 0", textAlign: "center" }}>{error}</p>
+        )}
+        <div style={{ display: "flex", marginLeft: "auto", marginRight: "auto", marginTop: "20px", width: "fit-content", gap: "12px" }}>
+          <button className="cancel-button" onClick={onClose} disabled={saving}>Cancel</button>
+          <button className="rename-button" onClick={handleSave} disabled={saving || !title.trim()}>
+            {saving ? "Saving..." : "Save"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DeleteClipDialog({clip, onClose, onDeleted}) {
+  const { session } = useAuthSession();
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState("");
+
+  async function handleDelete() {
+    setDeleting(true);
+    setError("");
+    try {
+      const { error } = await deleteClip(session, clip.id);
+      if (error) {
+        throw new Error(error);
+      }
+      onDeleted();
+    } catch (err) {
+      console.error("Failed to delete clip:", err);
+      setError(err.message || "Failed to delete clip.");
+      setDeleting(false);
+    }
+  }
+
+  return (
+    <div className="delete-modal library-clip-modal">
+      <div className="delete-modal-content">
+        {deleting ? (
+          <p>Deleting clip...</p>
+        ) : (
+          <>
+            <div className="delete-modal-message">
+              Are you sure you want to delete "{clip.title}"? This can't be undone.
+            </div>
+            {error && (
+              <p className="auth-error" style={{ margin: "8px 0 0", textAlign: "center" }}>{error}</p>
+            )}
+            <div style={{ display: "flex", marginLeft: "auto", marginRight: "auto", marginTop: "20px", width: "fit-content", gap: "12px" }}>
+              <button className="cancel-button" onClick={onClose}>Cancel</button>
+              <button className="delete-button" onClick={handleDelete}>Delete</button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function getInitials(name) {
   return String(name || "?")
     .split(/[\s@._-]+/)
@@ -689,7 +912,7 @@ function getInitials(name) {
 
 // Legacy Component.
 
-export function VideoPreview({clip, onClose, onPrevClip, onNextClip}){
+export function VideoPreview({clip, onClose, onPrevClip, onNextClip, onEdit, onDelete}){
   const isAzure = Boolean(clip.blob_name);
   const [streamUrl, setStreamUrl] = useState(null);
   const [originalUrl, setOriginalUrl] = useState(null);
@@ -730,9 +953,7 @@ export function VideoPreview({clip, onClose, onPrevClip, onNextClip}){
     async function getGameImage(){
       try {
         const response = await window?.clipx?.getGameData(clip.game_id);
-        if (response) {
-          setGamesSrc(response);
-        }
+        setGamesSrc(response || null);
       } catch (error) {
         console.error("Error fetching game data:", error);
       }
@@ -773,9 +994,25 @@ export function VideoPreview({clip, onClose, onPrevClip, onNextClip}){
           <div className="video-metadata">
             <div className="video-title-row">
               <h2 className="video-title">{clip?.title || "No Video Selected"}</h2>
-              {clip.visibility === "public" && (
-                <CopyLinkButton url={getClipShareUrl(clip.id)} className="video-copy-link" />
-              )}
+              <div className="video-title-actions">
+                {onEdit && (
+                  <Tooltip title="Edit details">
+                    <button type="button" className="video-action-button" aria-label="Edit details" onClick={onEdit}>
+                      <EditIcon />
+                    </button>
+                  </Tooltip>
+                )}
+                {onDelete && (
+                  <Tooltip title="Delete clip">
+                    <button type="button" className="video-action-button danger" aria-label="Delete clip" onClick={onDelete}>
+                      <DeleteIcon />
+                    </button>
+                  </Tooltip>
+                )}
+                {clip.visibility === "public" && (
+                  <CopyLinkButton url={getClipShareUrl(clip.id)} className="video-copy-link" />
+                )}
+              </div>
             </div>
             {gamesSrc && (<div className="video-game-row">
               <img className="video-game-image" src={gamesSrc.image} alt="game"/>
