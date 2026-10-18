@@ -56,9 +56,7 @@ export default function ClipEditor({
   triggerClipIndexRefresh,
   authSession,
   uploading,
-  setUploading,
-  saving,
-  setSaving
+  saving
 }) {
   const playerRef = useRef(null);
   const editorRef = useRef(null);
@@ -276,9 +274,7 @@ export default function ClipEditor({
             onDelete={onDelete}
             onRefreshIndex={triggerClipIndexRefresh}
             uploading={uploading}
-            setUploading={setUploading}
             saving={saving}
-            setSaving={setSaving}
           />
         </div>
       )}
@@ -320,7 +316,7 @@ async function searchGames(gameName) {
 }
 
 
-export function UploadMenu({clip, start, end, onRefreshIndex, onSaveQueueEvent, onUploadQueueEvent, onDelete, uploading, setUploading, saving, setSaving, session}) {
+export function UploadMenu({clip, start, end, onRefreshIndex, onSaveQueueEvent, onUploadQueueEvent, onDelete, uploading, saving, session}) {
   const [tags, setTags] = useState([]);
   const [friendsInClip, setFriendsInClip] = useState([]);
   const [peopleInput, setPeopleInput] = useState('');
@@ -401,19 +397,18 @@ export function UploadMenu({clip, start, end, onRefreshIndex, onSaveQueueEvent, 
       return;
     }
 
-    setSaving(true);
     const saveId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
     const displayName = title?.trim() || getEditableClipName(clip?.name) || "Untitled Clip";
-    onSaveQueueEvent?.({ type: "started", id: saveId, name: displayName });
+    onSaveQueueEvent?.({ type: "started", id: saveId, name: displayName, path: clip?.path });
 
     try {
       const response = await window.clipx.saveClip({clip, start, end, title, game, tags});
       if (response === 200){
-        onSaveQueueEvent?.({ type: "success", id: saveId });
         const renameResponse = await window.clipx.renameClip(clip?.path, "[UNCUT] " + displayName);
         if (!renameResponse?.path) {
           console.error("Failed to rename clip after saving:", renameResponse);
         }
+        onSaveQueueEvent?.({ type: "success", id: saveId });
         return;
       }
       onSaveQueueEvent?.({ type: "failed", id: saveId, error: response?.error || "Something went wrong saving this clip. Please try again." });
@@ -423,8 +418,6 @@ export function UploadMenu({clip, start, end, onRefreshIndex, onSaveQueueEvent, 
         .replace(/^Error invoking remote method '[^']+':\s*(?:Error:\s*)?/, "")
         .trim();
       onSaveQueueEvent?.({ type: "failed", id: saveId, error: message || "Something went wrong saving this clip. Please try again." });
-    } finally {
-      setSaving(false);
     }
   }
 
@@ -450,11 +443,10 @@ export function UploadMenu({clip, start, end, onRefreshIndex, onSaveQueueEvent, 
       console.error("window.clipx.uploadClip is not available (preload not wired?)");
       return;
     }
-    setUploading(true);
 
     const uploadId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
     const displayName = title?.trim() || getEditableClipName(clip?.name) || "Untitled Clip";
-    onUploadQueueEvent?.({ type: "started", id: uploadId, name: displayName });
+    onUploadQueueEvent?.({ type: "started", id: uploadId, name: displayName, path: clip?.path });
 
     try {
       const tagsError = getClipTagsError(tags);
@@ -508,8 +500,6 @@ export function UploadMenu({clip, start, end, onRefreshIndex, onSaveQueueEvent, 
         .replace(/^Error invoking remote method '[^']+':\s*(?:Error:\s*)?/, "")
         .trim();
       onUploadQueueEvent?.({ type: "failed", id: uploadId, error: message || "Upload failed." });
-    } finally {
-      setUploading(false);
     }
   }
 

@@ -60,7 +60,7 @@ function upsertClipInList(currentClips, clip) {
   return mergeClipLists(currentClips.filter((item) => item.path !== clip.path), [clip]);
 }
 
-export default function LocalFiles({ onSaveQueueEvent, onUploadQueueEvent, uploading, setUploading, saving, setSaving }) {
+export default function LocalFiles({ onSaveQueueEvent, onUploadQueueEvent, uploadingPaths, savingPaths }) {
   const navigate = useNavigate();
   const [rootPath, setRootPath] = useState("");
   const [folderPath, setFolderPath] = useState("");
@@ -624,10 +624,8 @@ export default function LocalFiles({ onSaveQueueEvent, onUploadQueueEvent, uploa
           onNextClip={() => moveSelectedClip(1)}
           onPrevClip={() => moveSelectedClip(-1)}
           triggerClipIndexRefresh={() => refreshFiles()}
-          uploading={uploading}
-          setUploading={setUploading}
-          saving={saving}
-          setSaving={setSaving}
+          uploading={uploadingPaths.includes(clip.path)}
+          saving={savingPaths.includes(clip.path)}
         />
       )}
 
@@ -741,7 +739,7 @@ export default function LocalFiles({ onSaveQueueEvent, onUploadQueueEvent, uploa
           ref={contextMenuRef}
           clip={contextMenu}
           position={mousePosition}
-          disabled={uploading || saving}
+          disabled={uploadingPaths.includes(contextMenu.path) || savingPaths.includes(contextMenu.path)}
           onOpen={() => {
             setClip(contextMenu);
             setContextMenu(null);

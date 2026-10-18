@@ -46,8 +46,8 @@ export default function App() {
   const [uploadingClips, setUploadingClips] = useState([]);
   const [showSavingList, setShowSavingList] = useState(true);
   const [showUploadingList, setShowUploadingList] = useState(true);
-  const [uploading, setUploading] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const savingPaths = savingClips.filter((item) => item.status === "saving").map((item) => item.path);
+  const uploadingPaths = uploadingClips.filter((item) => item.status === "uploading").map((item) => item.path);
   const queryClient = useQueryClient();
 
   function upsertSavingClip(id, nextValues) {
@@ -66,7 +66,7 @@ export default function App() {
     if (!event?.id) return;
 
     if (event.type === "started") {
-      setSavingClips((prev) => [...prev, { id: event.id, name: event.name || "Untitled Clip", status: "saving" }]);
+      setSavingClips((prev) => [...prev, { id: event.id, name: event.name || "Untitled Clip", path: event.path, status: "saving" }]);
       return;
     }
 
@@ -86,7 +86,7 @@ export default function App() {
     if (event.type === "started") {
       setUploadingClips((prev) => [
         ...prev,
-        { id: event.id, name: event.name || "Untitled Clip", status: "uploading" },
+        { id: event.id, name: event.name || "Untitled Clip", path: event.path, status: "uploading" },
       ]);
       return;
     }
@@ -175,10 +175,8 @@ export default function App() {
             <LocalFiles
               onSaveQueueEvent={handleSaveQueueEvent}
               onUploadQueueEvent={handleUploadQueueEvent}
-              uploading={uploading}
-              setUploading={setUploading}
-              saving={saving}
-              setSaving={setSaving}
+              uploadingPaths={uploadingPaths}
+              savingPaths={savingPaths}
             />
           </ErrorBoundary>
         }/>
