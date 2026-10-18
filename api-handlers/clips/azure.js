@@ -134,6 +134,28 @@ export async function getStreamUrl(blobNameOrUrl, permissions = 'r', containerNa
   return `${getPublicBlobUrl(blobName, resolvedContainer)}?${getSasToken(blobName, perms.toString(), resolvedContainer)}`
 }
 
+export function getStreamBlobName(blobName) {
+  return `${String(blobName).replace(/\.mp4$/, '')}.stream.mp4`
+}
+
+export async function streamCopyExists(blobName) {
+  try {
+    return await getContainerClient().getBlobClient(getStreamBlobName(blobName)).exists()
+  } catch (err) {
+    console.error('Error checking for stream copy:', err)
+    return false
+  }
+}
+
+export async function getClipStreamUrls(blobName) {
+  const originalUrl = await getStreamUrl(blobName)
+  if (!(await streamCopyExists(blobName))) {
+    return { url: originalUrl, originalUrl: null }
+  }
+  const streamBlobName = getStreamBlobName(blobName)
+  return { url: `${getPublicBlobUrl(streamBlobName)}?${getSasToken(streamBlobName)}`, originalUrl }
+}
+
 export async function deleteBlob(blobName, containerName = CONTAINER_NAME) {
   assertSupportedContainer(containerName)
   const container = getBlobServiceClient().getContainerClient(containerName)

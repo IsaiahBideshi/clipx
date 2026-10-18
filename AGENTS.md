@@ -33,6 +33,7 @@ PowerShell here has execution-policy disabled, so **`npm` fails; always use `npm
 - Clip metadata lives in SQLite at `%APPDATA%/clipx/clip-index.sqlite` (WAL mode, chokidar-watched folders), plus a legacy `clipsData.json` in `%APPDATA%/`. In dev, userData is redirected to `%APPDATA%/clipx-dev`.
 - FFmpeg: `ffmpeg-static` + fluent-ffmpeg; ffmpeg binary must stay unpacked (`asarUnpack`), handled by `electron/utils/ffmpeg.js` (`app.asar.unpacked` path rewrite).
 - Google OAuth uses a PKCE loopback flow on an OS-assigned `127.0.0.1` port (a fixed port can land in a Windows excluded port range and fail with `EACCES`). The app sends its `redirect_uri` to `/api/google/token`, which falls back to port **51723** for builds up to v1.2.5 that don't send one. YouTube refresh tokens are stored in the OS keychain via keytar.
+- Uploads above ~10 Mbps also get a 1080p, ~8 Mbps stream copy stored next to the original as `<blob_name without .mp4>.stream.mp4` in the `clips` container. There is no DB column for it: the name is derived in both `electron/utils/streamCopy.js` and `api-handlers/clips/azure.js`, so change them together. `/api/clips/stream` and `/clip/<id>/video` serve the copy when it exists and fall back to the original; `scripts/backfill-stream-copies.js` creates copies for clips uploaded before this existed.
 - `api/` functions use `process.env.SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` (service role — never expose to the renderer) and authenticate callers with the user's Supabase access token as a Bearer token.
 
 ## CI & releases

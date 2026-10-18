@@ -692,6 +692,7 @@ function getInitials(name) {
 export function VideoPreview({clip, onClose, onPrevClip, onNextClip}){
   const isAzure = Boolean(clip.blob_name);
   const [streamUrl, setStreamUrl] = useState(null);
+  const [originalUrl, setOriginalUrl] = useState(null);
   const [gamesSrc, setGamesSrc] = useState(null);
   const { session } = useAuthSession();
 
@@ -712,6 +713,7 @@ export function VideoPreview({clip, onClose, onPrevClip, onNextClip}){
         const json = await res.json();
         if (json.data?.url) {
           setStreamUrl(json.data.url);
+          setOriginalUrl(json.data.originalUrl || null);
         }
       } catch (err) {
         if (err?.name === "AbortError") return;
@@ -756,6 +758,7 @@ export function VideoPreview({clip, onClose, onPrevClip, onNextClip}){
             <VideoPlayer
               className="video-player-shell-fill"
               src={streamUrl || undefined}
+              originalSrc={originalUrl || undefined}
               volume={volume}
               muted={muted}
               showSkipButtons
