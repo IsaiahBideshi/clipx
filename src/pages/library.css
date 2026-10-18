@@ -144,7 +144,14 @@
   gap: 12px;
 }
 
-.video-copy-link {
+.video-title-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.video-copy-link,
+.video-action-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -160,14 +167,35 @@
   transition: background 180ms ease, border-color 180ms ease, transform 180ms ease;
 }
 
-.video-copy-link:hover {
+.video-copy-link:hover,
+.video-action-button:hover {
   border-color: rgba(144, 202, 249, 0.6);
   background: rgba(144, 202, 249, 0.16);
   transform: translateY(-1px);
 }
 
-.video-copy-link svg {
+.video-action-button.danger:hover {
+  border-color: rgba(255, 125, 125, 0.65);
+  background: rgba(255, 76, 76, 0.22);
+}
+
+.video-copy-link svg,
+.video-action-button svg {
   font-size: 18px;
+}
+
+.library-clip-modal {
+  z-index: 13;
+}
+
+.library-edit-modal {
+  width: min(520px, 90vw);
+}
+
+.library-edit-title {
+  margin-bottom: 16px;
+  font-size: 1.1rem;
+  font-weight: 600;
 }
 
 .video-date{
@@ -360,10 +388,15 @@
   font-size: 13px;
 }
 
-.library .clip-copy-link {
+.library .clip-card-actions {
   position: absolute;
   top: 6px;
   right: 6px;
+  display: flex;
+  gap: 6px;
+}
+
+.library .clip-card-action {
   display: grid;
   place-items: center;
   width: 28px;
@@ -379,16 +412,20 @@
   transition: opacity 0.15s, border-color 0.15s;
 }
 
-.library .clip-card:hover .clip-copy-link,
-.library .clip-copy-link:focus-visible {
+.library .clip-card:hover .clip-card-action,
+.library .clip-card-action:focus-visible {
   opacity: 1;
 }
 
-.library .clip-copy-link:hover {
+.library .clip-card-action:hover {
   border-color: rgba(144, 202, 249, 0.6);
 }
 
-.library .clip-copy-link svg {
+.library .clip-card-action.danger:hover {
+  border-color: rgba(255, 125, 125, 0.65);
+}
+
+.library .clip-card-action svg {
   font-size: 16px;
 }
 

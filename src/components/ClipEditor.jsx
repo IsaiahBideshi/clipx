@@ -1,16 +1,12 @@
 import { useRef, useState, useEffect } from "react";
-import Fuse from "fuse.js";
-import STOREDGAMES from "../data/games.json"
 
 import EditorTimeline from "./EditorTimeline.jsx";
 import VideoPlayer from "./VideoPlayer";
-import TagsAutoComplete from "./TagsAutoComplete.jsx";
-import TextField from '@mui/material/TextField';
+import ClipDetailsFields from "./ClipDetailsFields.jsx";
 import Button from '@mui/material/Button';
-import AutoComplete from '@mui/material/Autocomplete';
 import { supabase } from "../lib/supabase.js";
 import { getClipTagsError, getClipShareUrl } from "../lib/clipsApi.js";
-import { InputLabel, MenuItem, Select, FormControl, Typography } from '@mui/material';
+import { Typography } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import fallBackThumb from "../assets/thumbnail.svg";
 import { usePlayerPrefs } from "../lib/playerPrefs.js";
@@ -282,56 +278,16 @@ export default function ClipEditor({
   );
 }
 
-async function checkStoredGames(query) {
-  const fuseOptions ={
-    threshold: 0.3,
-    keys: ["name"]
-  }
-
-  const fuse = new Fuse(STOREDGAMES, fuseOptions);
-  const results = fuse.search(query);
-  const resultItems = results.map(result => result.item);
-  return resultItems;
-}
-
-async function searchGames(gameName) {
-  if (!gameName) return [];
-  if (gameName.length < 3) return [];
-
-
-  const localGames = await checkStoredGames(gameName);
-  if (localGames.length > 5) return localGames;
-
-  const api = window?.clipx?.searchGames;
-  if (typeof api !== "function") return [];
-
-  try {
-    const fetchedGames = await api(gameName);
-    const allGames = [...localGames, ...fetchedGames];
-    return allGames;
-  } catch (e) {
-    console.error("searchGames failed:", e);
-    return [];
-  }
-}
-
-
 export function UploadMenu({clip, start, end, onRefreshIndex, onSaveQueueEvent, onUploadQueueEvent, onDelete, uploading, saving, session}) {
   const [tags, setTags] = useState([]);
   const [friendsInClip, setFriendsInClip] = useState([]);
   const [peopleInput, setPeopleInput] = useState('');
   const [game, setGame] = useState(null);
   const [clipTitle, setClipTitle] = useState("");
-  const [gameInput, setGameInput] = useState("");
-  const [gameOptions, setGameOptions] = useState([{ id: "testgame", label: "Test Game"},]);
   const [storedGamesLabels, setStoredGamesLabels] = useState([]);
   const [visibility, setVisibility] = useState("public");
   const [friendsOptions, setFriendsOptions] = useState([]);
   const userId = session?.user?.id;
-
-  const handleChange = (event) => {
-    setVisibility(event.target.value);
-  };
 
   useEffect(() => {
     async function loadFriends() {
@@ -386,10 +342,6 @@ export function UploadMenu({clip, start, end, onRefreshIndex, onSaveQueueEvent, 
 
     loadFriends();
   }, [userId]);
-
-  useEffect(() => {
-    handleSearchGame();
-  }, [gameInput]);
 
   async function saveClip(clip, start, end, title, game, tags) {
     if (!window?.clipx?.saveClip) {
@@ -503,93 +455,23 @@ export function UploadMenu({clip, start, end, onRefreshIndex, onSaveQueueEvent, 
     }
   }
 
-  const handleSearchGame = async () => {
-    const games = await searchGames(gameInput);
-    const options = games.map(game => ({
-      id: game.id,
-      label: game.name + (game.first_release_date ? ` (${new Date(game.first_release_date * 1000).getFullYear()})` : ''),
-      image: game?.cover?.url,
-    }));
-
-    setGameOptions(options);
-  }
-
   return (
     <div className="upload-menu">
       <div className="upload-menu-header">
         <p className="eyebrow">Publish</p>
         <h4>Upload Details</h4>
       </div>
-      <form className="upload-menu-form">
-        <TextField fullWidth label={"Title"} value={clipTitle} onChange={(e) => setClipTitle(e.target.value)} />
-        <div className="upload-menu-game-row" >
-          <AutoComplete
-            fullWidth
-            disablePortal
-            options={gameOptions}
-            filterOptions={(options) => options}
-            freeSolo
-            value={game}
-            inputValue={gameInput}
-            onInputChange={(_e, newInputValue) => setGameInput(newInputValue)}
-            onChange={(_e, newValue) => {
-              setGame(newValue);
-              setGameInput(newValue?.label ?? "");
-            }}
-            renderOption={(props, opt) => (
-              <li {...props} style={{display: "flex", alignItems: "center", gap: 10}}>
-                {opt.image && (
-                  <img
-                    src={opt.image}
-                    alt={opt.label}
-                    style={{width: 32, height: 45, objectFit: "cover", borderRadius: 2}}
-                  />
-                )}
-                <span>{opt.label}</span>
-              </li>
-            )}
-            renderInput={(params) => (
-              <TextField
-                {...params}
-                label="Game"
-              />
-            )}
-          />
-        </div>
-        <TagsAutoComplete
-          disablePortal
-          id="tags-outlined"
-          options={friendsOptions}
-          value={tags}
-          onChange={(_e, newValue) => setTags(newValue)}
-          freeSolo
-          saveNewTags
-          renderInput={(params) => (
-            <TextField
-              {...params}
-              label="Tags"
-              placeholder="Friends"
-            />
-          )}
-        />
-        <div style={{ display: "flex", justifyContent: "flex-start", width: "50%" }}>
-          <FormControl sx={{ alignSelf: "flex-start" }} className="upload-menu-visibility-control">
-            <InputLabel id="demo-simple-select-label">Visibility</InputLabel>
-            <Select
-              labelId="demo-simple-select-label"
-              id="demo-simple-select"
-              value={visibility}
-              label="Visibility"
-              onChange={handleChange}
-              sx={{width: "100%"}}
-            >
-              <MenuItem value={"public"}>Public</MenuItem>
-              <MenuItem value={"private"}>Private</MenuItem>
-              <MenuItem value={"friends"}>Friends</MenuItem>
-            </Select>
-          </FormControl>
-        </div>
-      </form>
+      <ClipDetailsFields
+        title={clipTitle}
+        onTitleChange={setClipTitle}
+        game={game}
+        onGameChange={setGame}
+        tags={tags}
+        onTagsChange={setTags}
+        visibility={visibility}
+        onVisibilityChange={setVisibility}
+        friendsOptions={friendsOptions}
+      />
       <div className="upload-menu-actions">
           {session && (
             <Button
