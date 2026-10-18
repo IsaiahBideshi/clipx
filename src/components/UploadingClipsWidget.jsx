@@ -56,35 +56,34 @@ export default function UploadingClipsWidget({ clips, expanded, onToggleExpanded
                 {clip.status === "failed" && <ErrorOutlineIcon />}
               </span>
               <div className="clip-widget-item-body">
-                <span className="clip-widget-item-name">{clip.name}</span>
-                {clip.status === "uploading" && (
-                  <>
-                    <span className="clip-widget-item-detail">Uploading…</span>
-                    <span className="clip-widget-progress" />
-                  </>
-                )}
+                <span className={`clip-widget-item-name${clip.status === "uploading" ? " is-progress" : ""}`}>
+                  {clip.name}
+                </span>
+                {clip.status === "uploading" && <span className="clip-widget-progress" />}
                 {clip.status === "failed" && (
-                  <span className="clip-widget-item-detail failed">{clip.error || "Upload failed."}</span>
+                  <span className="clip-widget-item-detail failed" title={clip.error || "Upload failed."}>
+                    {clip.error || "Upload failed."}
+                  </span>
                 )}
                 {clip.status === "uploaded" && !clip.shareUrl && (
-                  <span className="clip-widget-item-detail">Uploaded. Only public clips get a share link.</span>
+                  <span className="clip-widget-item-detail" title="Uploaded. Only public clips get a share link.">
+                    Uploaded. Only public clips get a share link.
+                  </span>
                 )}
                 {clip.status === "uploaded" && clip.shareUrl && (
-                  <div className="clip-widget-link">
-                    <span className="clip-widget-link-url" title={clip.shareUrl}>
-                      {clip.shareUrl.replace(/^https?:\/\//, "")}
-                    </span>
-                    <button
-                      type="button"
-                      className={`clip-widget-copy ${copiedId === clip.id ? "copied" : ""}`}
-                      onClick={() => handleCopyLink(clip)}
-                    >
-                      {copiedId === clip.id ? <CheckIcon /> : <ContentCopyIcon />}
-                      {copiedId === clip.id ? "Copied" : "Copy link"}
-                    </button>
-                  </div>
+                  <span className="clip-widget-item-detail">Uploaded!</span>
                 )}
               </div>
+              {clip.status === "uploaded" && clip.shareUrl && (
+                <button
+                  type="button"
+                  className={`clip-widget-copy ${copiedId === clip.id ? "copied" : ""}`}
+                  onClick={() => handleCopyLink(clip)}
+                >
+                  {copiedId === clip.id ? <CheckIcon /> : <ContentCopyIcon />}
+                  {copiedId === clip.id ? "Copied" : "Copy link"}
+                </button>
+              )}
             </li>
           ))}
         </ul>

@@ -42,18 +42,17 @@ export default function SavingClipsWidget({ clips, expanded, onToggleExpanded, o
                 {clip.status === "failed" && <ErrorOutlineIcon />}
               </span>
               <div className="clip-widget-item-body">
-                <span className="clip-widget-item-name">{clip.name}</span>
-                {clip.status === "saving" && (
-                  <>
-                    <span className="clip-widget-item-detail">Saving…</span>
-                    <span className="clip-widget-progress" />
-                  </>
-                )}
+                <span className={`clip-widget-item-name${clip.status === "saving" ? " is-progress" : ""}`}>
+                  {clip.name}
+                </span>
+                {clip.status === "saving" && <span className="clip-widget-progress" />}
                 {clip.status === "saved" && (
                   <span className="clip-widget-item-detail">Saved to your Saved Clips</span>
                 )}
                 {clip.status === "failed" && (
-                  <span className="clip-widget-item-detail failed">{clip.error || "Save failed."}</span>
+                  <span className="clip-widget-item-detail failed" title={clip.error || "Save failed."}>
+                    {clip.error || "Save failed."}
+                  </span>
                 )}
               </div>
             </li>
