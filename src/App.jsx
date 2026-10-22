@@ -102,24 +102,26 @@ export default function App() {
     }
   }
 
-  function maybeShowPostUpdateChangelog(version) {
+  async function maybeShowPostUpdateChangelog(version) {
     if (!version) {
       return;
     }
 
-    const lastSeen = globalThis.localStorage?.getItem(LAST_SEEN_CHANGELOG_KEY);
+    const lastSeen = await window.clipx?.authStorageGet?.(LAST_SEEN_CHANGELOG_KEY);
 
     if (lastSeen && lastSeen !== version) {
       setUpdateChangelog({ version, fromVersion: lastSeen });
       return;
     }
 
-    globalThis.localStorage?.setItem(LAST_SEEN_CHANGELOG_KEY, version);
+    await window.clipx?.authStorageSet?.(LAST_SEEN_CHANGELOG_KEY, version);
   }
 
   function handleCloseUpdateChangelog() {
     if (updateChangelog?.version) {
-      globalThis.localStorage?.setItem(LAST_SEEN_CHANGELOG_KEY, updateChangelog.version);
+      window.clipx?.authStorageSet?.(LAST_SEEN_CHANGELOG_KEY, updateChangelog.version)?.catch((error) => {
+        console.error("Failed to save the last seen changelog version:", error);
+      });
     }
     setUpdateChangelog(null);
   }
@@ -144,7 +146,7 @@ export default function App() {
     window.clipx.getUpdateState?.().then((state) => {
       if (mounted) {
         setUpdateState(state);
-        maybeShowPostUpdateChangelog(state?.currentVersion);
+        return maybeShowPostUpdateChangelog(state?.currentVersion);
       }
     }).catch((err) => {
       console.error("Failed to load update state:", err);
