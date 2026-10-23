@@ -39,6 +39,11 @@ test("shows announcements newer than the last seen version up to the current one
   assert.deepEqual(titles("1.3.0", "1.3.1"), []);
 });
 
+test("skips announcements whose version isn't valid", () => {
+  const text = "# v1.3.0-beta.01 Typo\nBody\n\n# v1.3.0 Valid\nBody";
+  assert.deepEqual(getNewAnnouncements(text, "1.2.5", "1.3.0").map((item) => item.title), ["Valid"]);
+});
+
 test("shows nothing without valid versions", () => {
   assert.deepEqual(getNewAnnouncements(announcements, null, "1.3.0"), []);
   assert.deepEqual(getNewAnnouncements(announcements, "junk", "1.3.0"), []);
