@@ -98,6 +98,7 @@ jobs:
           tag_name: ${{ steps.release_tag.outputs.tag }}
           target_commitish: ${{ github.sha }}
           body_path: ${{ steps.release_notes.outputs.path }}
+          prerelease: ${{ contains(steps.release_tag.outputs.tag, '-') }}
           files: |
             dist/ClipX-Setup.exe
             dist/ClipX-Setup.exe.blockmap
