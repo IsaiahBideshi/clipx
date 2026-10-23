@@ -18,6 +18,8 @@ import ChangelogModal from "./components/ChangelogModal.jsx";
 import SavingClipsWidget from "./components/SavingClipsWidget.jsx";
 import UploadingClipsWidget from "./components/UploadingClipsWidget.jsx";
 import changelog from "../CHANGELOG.md?raw";
+import announcements from "../ANNOUNCEMENTS.md?raw";
+import { getNewAnnouncements } from "./lib/announcements.js";
 
 const LAST_SEEN_CHANGELOG_KEY = "clipx:lastSeenChangelogVersion";
 
@@ -227,6 +229,7 @@ export default function App() {
           changelog={changelog}
           currentVersion={updateChangelog.version}
           fromVersion={updateChangelog.fromVersion}
+          announcements={getNewAnnouncements(announcements, updateChangelog.fromVersion, updateChangelog.version)}
           onClose={handleCloseUpdateChangelog}
         />
       )}
