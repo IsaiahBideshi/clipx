@@ -180,16 +180,25 @@ export function parseChangelogSections(changelog, highlightedVersion, { fromVers
   }));
 }
 
-export default function ChangelogPanel({ changelog, highlightedVersion, highlightedLabel = "Current version", fromVersion }) {
+export default function ChangelogPanel({ changelog, highlightedVersion, highlightedLabel = "Current version", fromVersion, announcements = [] }) {
   const sections = parseChangelogSections(changelog, highlightedVersion, { fromVersion });
 
-  if (!sections.length) {
+  if (!sections.length && !announcements.length) {
     return null;
   }
 
   return (
     <div className="update-changelog">
       <div className="update-changelog-list" aria-label="Release changelog">
+        {announcements.map((announcement, index) => (
+          <article className="update-changelog-entry is-target" key={`announcement-${index}`}>
+            <div className="update-changelog-entry-header">
+              <span>{announcement.title || announcement.version}</span>
+              <strong>New</strong>
+            </div>
+            {announcement.content && <div className="update-changelog-entry-body">{announcement.content}</div>}
+          </article>
+        ))}
         {sections.map((section) => (
           <article
             className={`update-changelog-entry${section.isHighlighted ? " is-target" : ""}`}

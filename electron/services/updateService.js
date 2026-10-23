@@ -191,6 +191,9 @@ export function initializeUpdates() {
   autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = true;
   autoUpdater.fullChangelog = true;
+  if (process.env.CLIPX_ALLOW_PRERELEASE === "true") {
+    autoUpdater.allowPrerelease = true;
+  }
 
   autoUpdater.on("checking-for-update", () => {
     emitUpdateState({ status: "checking" });

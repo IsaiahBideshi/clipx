@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.3.1-beta.1
+
+- New: Edit the title, game, tags and visibility of your uploaded clips, or delete them, from the library.
+- New: Edit and delete buttons show when you hover over your own clips in the library.
+- New: Large clips load faster in the library and on share links, with an SD/HD button to watch the original quality.
+- New: The upload and save popups take up less space.
+- Fix: The changelog now shows once after ClipX updates.
+- Fix: Clicking outside the library edit and delete dialogs closes them.
+- Fix: Uploading or saving one clip no longer blocks uploading or saving other clips.
+- Fix: Google sign-in no longer fails on some PCs.
+- Fix: The new-clip badge on the tab you're viewing clears when you come back to ClipX.
+
 ## v1.2.5
 
 - New: Navigation bar redesign with labelled tabs and your profile picture.
