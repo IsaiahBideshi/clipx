@@ -28,6 +28,6 @@ export function getNewAnnouncements(text, fromVersion, currentVersion) {
   }
 
   return parseAnnouncements(text).filter(
-    (announcement) => semver.gt(announcement.version, fromVersion) && semver.lte(announcement.version, currentVersion)
+    (announcement) => semver.valid(announcement.version) && semver.gt(announcement.version, fromVersion) && semver.lte(announcement.version, currentVersion)
   );
 }
