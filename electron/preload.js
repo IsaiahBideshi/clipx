@@ -101,4 +101,20 @@ contextBridge.exposeInMainWorld("clipx", {
     ipcRenderer.on("updates:state", listener);
     return () => ipcRenderer.removeListener("updates:state", listener);
   },
+  getClippingState: () => ipcRenderer.invoke("clipping:get-state"),
+  onClippingState: (callback) => {
+    if (typeof callback !== "function") {
+      return () => {};
+    }
+
+    const listener = (_event, state) => {
+      try {
+        callback(state);
+      } catch (error) {
+        console.error("ClipX: Clipping state callback failed:", error);
+      }
+    };
+    ipcRenderer.on("clipping:state", listener);
+    return () => ipcRenderer.removeListener("clipping:state", listener);
+  },
 });

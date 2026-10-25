@@ -94,6 +94,22 @@
   grid-column: 1 / -1;
 }
 
+.clipping-card {
+  grid-column: 1 / -1;
+}
+
+.clipping-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 8px 0;
+}
+
+.clipping-credit {
+  opacity: 0.6;
+}
+
 .options-form{
   display: flex;
   flex-direction: column;
@@ -166,7 +182,8 @@
     grid-template-columns: 1fr;
   }
 
-  .yt-card {
+  .yt-card,
+  .clipping-card {
     grid-column: auto;
   }
 }

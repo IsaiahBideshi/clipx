@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain } from "electron";
 import fs from "fs";
 import path from "path";
 import { getSupabaseAccessToken } from "./authStorage.js";
+import { applyClippingOptions } from "../services/obsService.js";
 
 const STARTUP_MINIMIZED_ARG = "--clipx-startup-minimized";
 const API_BASE = (process.env.VITE_DATABASE_URL || "https://clipx.bideshi.tech").replace(/\/+$/, "");
@@ -158,6 +159,7 @@ export function registerSettingsIpcHandlers() {
       const appDataDir = path.dirname(optionsPath);
       await fs.promises.mkdir(appDataDir, { recursive: true });
       await fs.promises.writeFile(optionsPath, JSON.stringify(options, null, 2), "utf-8");
+      void applyClippingOptions(options);
 
       if ((previousClipsFolder || "") !== (options?.clipsFolder || "")) {
         for (const window of BrowserWindow.getAllWindows()) {

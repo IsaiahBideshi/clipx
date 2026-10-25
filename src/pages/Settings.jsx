@@ -5,12 +5,32 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import CircularProgress from '@mui/material/CircularProgress';
 import FormGroup from "@mui/material/FormGroup";
 import FormControlLabel from "@mui/material/FormControlLabel";
-import {Checkbox, Switch} from "@mui/material";
+import {Checkbox, FormControl, InputLabel, MenuItem, Select, Switch} from "@mui/material";
 import Button from "@mui/material/Button";
 import ArticleOutlinedIcon from "@mui/icons-material/ArticleOutlined";
 import changelog from "../../CHANGELOG.md?raw";
 import ChangelogModal from "../components/ChangelogModal.jsx";
 import { getCurrentUserId, useAuthSession } from "../lib/authSession.js";
+import { toAccelerator } from "../lib/hotkeys.js";
+
+const DEFAULT_CLIP_HOTKEY = "Alt+F8";
+const DEFAULT_CLIP_SECONDS = 30;
+const CLIP_LENGTHS = [15, 30, 60, 120];
+
+function getClippingStatusMessage(clippingState) {
+  switch (clippingState?.status) {
+    case "installing":
+      return clippingState.progress >= 100 ? "Installing OBS..." : `Downloading OBS... ${clippingState.progress || 0}%`;
+    case "starting":
+      return "Starting OBS...";
+    case "ready":
+      return "Ready. Press your hotkey to save a clip.";
+    case "error":
+      return clippingState.message || "Clipping failed to start.";
+    default:
+      return null;
+  }
+}
 
 
 export async function getOptions() {
@@ -143,6 +163,9 @@ export default function Settings() {
   const [linking, setLinking] = useState(false);
   const [youtubeError, setYoutubeError] = useState(null);
   const [showChangelog, setShowChangelog] = useState(false);
+  const [clippingState, setClippingState] = useState(null);
+  const [capturingHotkey, setCapturingHotkey] = useState(false);
+  const clippingStatusMessage = getClippingStatusMessage(clippingState);
   const { session } = useAuthSession();
   const userId = session?.user?.id || null;
   const queryClient = useQueryClient();
@@ -178,6 +201,24 @@ export default function Settings() {
     }).catch((err) => {
       console.error("Failed to pick folder:", err);
     });
+  }
+
+  function handleHotkeyKeyDown(event) {
+    if (!capturingHotkey) {
+      return;
+    }
+
+    event.preventDefault();
+    if (event.key === "Escape") {
+      setCapturingHotkey(false);
+      return;
+    }
+
+    const accelerator = toAccelerator(event);
+    if (accelerator) {
+      updateOption("clipHotkey", accelerator);
+      setCapturingHotkey(false);
+    }
   }
 
   async function handleLaunchAtStartupChange(event) {
@@ -303,6 +344,17 @@ export default function Settings() {
   }, []);
 
   useEffect(() => {
+    if (typeof window.clipx?.onClippingState !== "function") {
+      return undefined;
+    }
+
+    window.clipx.getClippingState().then(setClippingState).catch((err) => {
+      console.error("Failed to load clipping state:", err);
+    });
+    return window.clipx.onClippingState(setClippingState);
+  }, []);
+
+  useEffect(() => {
     async function saveOptions() {
       if (!options) return;
       if (typeof options !== "object") return;
@@ -421,6 +473,75 @@ export default function Settings() {
                 <span className="folder-path">{options.clipsFolder || "Not Set"}</span>
                 <Button id={"pick-folder"} variant={"contained"} onClick={pickFolder}>Choose Folder</Button>
               </div>
+            </section>
+
+            <section className="settings-card clipping-card">
+              <h4>Clipping</h4>
+              <p className="card-copy">
+                Press a hotkey to save the last few seconds of your screen to your clips folder.
+                Turning this on downloads OBS Studio (about 220 MB) the first time.
+              </p>
+              <FormGroup className={"options-form"}>
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={Boolean(options.clippingEnabled)}
+                      disabled={!options.clipsFolder}
+                      onChange={(e) => {
+                        updateOption("clippingEnabled", e.target.checked);
+                      }}
+                    />
+                  }
+                  label="Enable clipping"
+                />
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={Boolean(options.clipRecordMic)}
+                      onChange={(e) => {
+                        updateOption("clipRecordMic", e.target.checked);
+                      }}
+                    />
+                  }
+                  label="Record microphone"
+                />
+              </FormGroup>
+              <div className="clipping-row">
+                <Button
+                  variant={"outlined"}
+                  data-disable-global-hotkeys
+                  onClick={() => setCapturingHotkey(true)}
+                  onKeyDown={handleHotkeyKeyDown}
+                  onBlur={() => setCapturingHotkey(false)}
+                >
+                  {capturingHotkey ? "Press a hotkey..." : `Hotkey: ${options.clipHotkey || DEFAULT_CLIP_HOTKEY}`}
+                </Button>
+                <FormControl size="small">
+                  <InputLabel id="clip-length-label">Clip length</InputLabel>
+                  <Select
+                    labelId="clip-length-label"
+                    label="Clip length"
+                    value={options.clipSeconds || DEFAULT_CLIP_SECONDS}
+                    onChange={(e) => updateOption("clipSeconds", e.target.value)}
+                  >
+                    {CLIP_LENGTHS.map((seconds) => (
+                      <MenuItem key={seconds} value={seconds}>{seconds} seconds</MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </div>
+              {!options.clipsFolder && (
+                <p className="card-copy">Choose a clips folder in Storage to turn on clipping.</p>
+              )}
+              {clippingStatusMessage && (
+                <p className="card-copy" style={clippingState?.status === "error" ? { color: "#ff9b9b" } : undefined}>
+                  {clippingStatusMessage}
+                </p>
+              )}
+              {clippingState?.hotkeyError && (
+                <p className="card-copy" style={{ color: "#ff9b9b" }}>{clippingState.hotkeyError}</p>
+              )}
+              <p className="card-copy clipping-credit">Recording powered by OBS Studio (GPLv2).</p>
             </section>
 
             <section className="settings-card yt-card">
