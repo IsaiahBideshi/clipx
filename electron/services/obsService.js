@@ -38,6 +38,8 @@ let latestState = { status: "off" };
 let hotkeyError = null;
 let registeredHotkey = null;
 let appliedOptions = null;
+let requestedOptions = null;
+let startupController = null;
 let obsProcess = null;
 let socket = null;
 let applyQueue = Promise.resolve();
@@ -71,7 +73,7 @@ function getObsExePath() {
   return path.join(getObsRoot(), "bin", "64bit", "obs64.exe");
 }
 
-async function ensureObsInstalled() {
+async function ensureObsInstalled(signal) {
   if (fs.existsSync(getObsExePath())) {
     return;
   }
@@ -82,7 +84,7 @@ async function ensureObsInstalled() {
   await fs.promises.mkdir(obsDir, { recursive: true });
   emitClippingState({ status: "installing", progress: 0 });
 
-  const response = await fetch(OBS_ZIP_URL);
+  const response = await fetch(OBS_ZIP_URL, { signal });
   if (!response.ok || !response.body) {
     throw new Error(`Failed to download OBS (${response.status}).`);
   }
@@ -107,7 +109,9 @@ async function ensureObsInstalled() {
       }
     },
     fs.createWriteStream(zipPath),
+    { signal },
   );
+  signal.throwIfAborted();
 
   if (hash.digest("hex") !== OBS_ZIP_SHA256) {
     await fs.promises.rm(zipPath, { force: true });
@@ -118,7 +122,7 @@ async function ensureObsInstalled() {
   await fs.promises.rm(extractDir, { recursive: true, force: true });
   await fs.promises.mkdir(extractDir, { recursive: true });
   const tarPath = path.join(process.env.SystemRoot || "C:\\Windows", "System32", "tar.exe");
-  await execFileAsync(tarPath, ["-xf", zipPath, "-C", extractDir]);
+  await execFileAsync(tarPath, ["-xf", zipPath, "-C", extractDir], { signal });
   await fs.promises.rm(getObsRoot(), { recursive: true, force: true });
   await fs.promises.rename(extractDir, getObsRoot());
   await fs.promises.rm(zipPath, { force: true });
@@ -202,7 +206,7 @@ function openSocket({ port, password }) {
     ws.onclose = () => {
       reject(new Error("OBS closed the connection."));
       if (socket === ws) {
-        closeSocket();
+        handleObsLost("Lost the connection to OBS.");
       }
     };
     ws.onmessage = (event) => {
@@ -246,7 +250,10 @@ async function connectObs(connection) {
 
   while (true) {
     try {
-      return await openSocket(connection);
+      if (!socket) {
+        await openSocket(connection);
+      }
+      return await obsRequest("GetVersion");
     } catch (error) {
       if (!obsProcess || Date.now() > deadline) {
         throw error;
@@ -297,7 +304,8 @@ async function applyMicSetting(recordMic) {
   }
 }
 
-async function launchObs(options) {
+async function launchObs(options, signal) {
+  signal.throwIfAborted();
   emitClippingState({ status: "starting" });
 
   const connection = {
@@ -305,6 +313,7 @@ async function launchObs(options) {
     password: crypto.randomBytes(24).toString("base64url"),
   };
   await writeObsConfig(options, connection);
+  signal.throwIfAborted();
 
   const child = spawn(getObsExePath(), [
     "--portable",
@@ -318,13 +327,9 @@ async function launchObs(options) {
   obsProcess = child;
 
   const onChildStopped = () => {
-    if (obsProcess !== child) {
-      return;
+    if (obsProcess === child) {
+      handleObsLost("OBS stopped unexpectedly.");
     }
-
-    obsProcess = null;
-    closeSocket();
-    emitClippingState({ status: "error", message: "OBS stopped unexpectedly." });
   };
   child.on("exit", onChildStopped);
   child.on("error", onChildStopped);
@@ -333,14 +338,28 @@ async function launchObs(options) {
   await setupCapture();
   await applyMicSetting(options.clipRecordMic);
   await obsRequest("StartReplayBuffer");
+  signal.throwIfAborted();
   emitClippingState({ status: "ready" });
 }
 
 function stopObs() {
+  startupController?.abort();
+  startupController = null;
+
   const child = obsProcess;
   obsProcess = null;
   closeSocket();
   child?.kill();
+}
+
+function handleObsLost(message) {
+  const wasReady = latestState.status === "ready";
+  stopObs();
+  emitClippingState({ status: "error", message });
+
+  if (wasReady && requestedOptions === appliedOptions) {
+    queueApply(appliedOptions);
+  }
 }
 
 async function onReplaySaved(savedReplayPath) {
@@ -402,24 +421,43 @@ async function applyOptions(next) {
   const previous = appliedOptions;
   appliedOptions = next;
 
-  if (!next.enabled) {
-    if (previous?.enabled) {
-      stopClipping();
-    }
-    return;
-  }
-
   if (!previous?.enabled || next.clipHotkey !== previous.clipHotkey) {
     registerHotkey(next.clipHotkey);
   }
 
   if (!obsProcess || next.clipsFolder !== previous.clipsFolder || next.clipSeconds !== previous.clipSeconds) {
     stopObs();
-    await ensureObsInstalled();
-    await launchObs(next);
+    const controller = new AbortController();
+    startupController = controller;
+
+    try {
+      await ensureObsInstalled(controller.signal);
+      await launchObs(next, controller.signal);
+    } catch (error) {
+      if (controller.signal.aborted) {
+        return;
+      }
+      throw error;
+    }
   } else if (next.clipRecordMic !== previous.clipRecordMic) {
     await applyMicSetting(next.clipRecordMic);
   }
+}
+
+function queueApply(next) {
+  requestedOptions = next;
+  applyQueue = applyQueue
+    .then(() => {
+      if (requestedOptions === next) {
+        return applyOptions(next);
+      }
+    })
+    .catch((error) => {
+      console.error("ClipX: Failed to apply clipping options:", error);
+      stopObs();
+      emitClippingState({ status: "error", message: error?.message || "Clipping failed to start." });
+    });
+  return applyQueue;
 }
 
 export function getClippingState() {
@@ -428,13 +466,15 @@ export function getClippingState() {
 
 export function applyClippingOptions(options) {
   const next = normalizeOptions(options);
-  applyQueue = applyQueue
-    .then(() => applyOptions(next))
-    .catch((error) => {
-      console.error("ClipX: Failed to apply clipping options:", error);
-      stopObs();
-      emitClippingState({ status: "error", message: error?.message || "Clipping failed to start." });
-    });
+  if (next.enabled) {
+    return queueApply(next);
+  }
+
+  requestedOptions = next;
+  if (appliedOptions?.enabled) {
+    stopClipping();
+  }
+  appliedOptions = next;
   return applyQueue;
 }
 
