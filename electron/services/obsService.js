@@ -453,12 +453,12 @@ function queueApply(next) {
       }
     })
     .catch((error) => {
+      stopObs();
       if (requestedOptions !== next) {
         return;
       }
 
       console.error("ClipX: Failed to apply clipping options:", error);
-      stopObs();
       emitClippingState({ status: "error", message: error?.message || "Clipping failed to start." });
     });
   return applyQueue;
