@@ -17,12 +17,6 @@ export function pickSimpleEncoder(vendorId) {
   return ENCODER_BY_GPU_VENDOR[vendorId] || "x264";
 }
 
-export function scaleToHeight(width, height, maxHeight) {
-  const scale = Math.min(1, maxHeight / height);
-  const toEven = (value) => Math.max(2, Math.floor((value * scale) / 2) * 2);
-  return { width: toEven(width), height: toEven(height) };
-}
-
 export function obsAuth(password, salt, challenge) {
   const sha256 = (value) => crypto.createHash("sha256").update(value).digest("base64");
   return sha256(sha256(password + salt) + challenge);
@@ -37,9 +31,9 @@ export function toIni(sections) {
     .join("\n\n") + "\n";
 }
 
-export function buildObsConfigFiles({ port, password, clipsDir, seconds, encoder, baseWidth, baseHeight }) {
-  const output = scaleToHeight(baseWidth, baseHeight, 1080);
+export function buildObsConfigFiles({ port, password, clipsDir, seconds, encoder, canvas, output, fps, recTracks = 1 }) {
   const bufferSeconds = seconds + KEYFRAME_PADDING_SECONDS;
+  const megabytesPerSecond = Math.max(8, Math.ceil((8 * output.width * output.height * fps) / (1920 * 1080 * 60)));
 
   return {
     "global.ini": toIni({
@@ -47,6 +41,7 @@ export function buildObsConfigFiles({ port, password, clipsDir, seconds, encoder
     }),
     "user.ini": toIni({
       General: { FirstRun: true },
+      BasicWindow: { SysTrayEnabled: false },
     }),
     [path.join("basic", "profiles", OBS_PROFILE_NAME, "basic.ini")]: toIni({
       General: { Name: OBS_PROFILE_NAME },
@@ -54,20 +49,21 @@ export function buildObsConfigFiles({ port, password, clipsDir, seconds, encoder
       SimpleOutput: {
         RecRB: true,
         RecRBTime: bufferSeconds,
-        RecRBSize: bufferSeconds * 8,
+        RecRBSize: bufferSeconds * megabytesPerSecond,
         RecRBPrefix: "Clip",
         FilePath: clipsDir.replace(/\\/g, "/"),
         RecFormat2: "mp4",
         RecQuality: "Small",
         RecEncoder: encoder,
+        RecTracks: recTracks,
       },
       Video: {
-        BaseCX: baseWidth,
-        BaseCY: baseHeight,
+        BaseCX: canvas.width,
+        BaseCY: canvas.height,
         OutputCX: output.width,
         OutputCY: output.height,
         FPSType: 0,
-        FPSCommon: 60,
+        FPSCommon: fps,
       },
     }),
     [path.join("plugin_config", "obs-websocket", "config.json")]: JSON.stringify({

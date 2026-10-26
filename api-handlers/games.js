@@ -34,6 +34,29 @@ export default async function handler(req, res) {
       return res.status(200).json({ data: games[0] ?? null, error: null })
     }
 
+    if (req.query.steam !== undefined) {
+      const steamAppId = String(req.query.steam)
+      if (!/^\d{1,10}$/.test(steamAppId)) {
+        return res.status(400).json({ data: null, error: 'Invalid "steam" query parameter' })
+      }
+
+      const [externalGame] = await queryIgdb('external_games', `
+        fields game;
+        where external_game_source = 1 & uid = "${steamAppId}";
+        limit 1;
+      `)
+      if (!externalGame?.game) {
+        return res.status(200).json({ data: null, error: null })
+      }
+
+      const games = await queryGames(`
+        fields name, cover.image_id, first_release_date;
+        where id = ${Number(externalGame.game)};
+        limit 1;
+      `)
+      return res.status(200).json({ data: games[0] ?? null, error: null })
+    }
+
     const search = String(req.query.search || '').replace(/["\\]/g, '').trim()
     if (!search || search.length > 100) {
       return res.status(400).json({ data: null, error: 'Missing or invalid "search" query parameter' })
@@ -53,8 +76,12 @@ export default async function handler(req, res) {
   }
 }
 
-async function queryGames(body) {
-  const response = await fetch('https://api.igdb.com/v4/games', {
+function queryGames(body) {
+  return queryIgdb('games', body)
+}
+
+async function queryIgdb(endpoint, body) {
+  const response = await fetch(`https://api.igdb.com/v4/${endpoint}`, {
     method: 'POST',
     headers: {
       'Client-ID': process.env.IGDB_CLIENT_ID,

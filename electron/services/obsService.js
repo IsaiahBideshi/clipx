@@ -1,4 +1,4 @@
-import { app, BrowserWindow, globalShortcut, Notification, screen } from "electron";
+import { app, BrowserWindow, Notification, screen } from "electron";
 import { execFile, spawn } from "child_process";
 import crypto from "crypto";
 import fs from "fs";
@@ -9,6 +9,10 @@ import { pipeline } from "stream/promises";
 import { promisify } from "util";
 
 import { upsertIndexedClip } from "./clipIndexService.js";
+import { getCurrentGame, getGameForClip, setGameForCurrentExe, startGameDetection, stopGameDetection } from "./gameDetectionService.js";
+import { getForegroundWindow } from "../utils/foregroundWindow.js";
+import { isHotkeyDown, parseAccelerator } from "../utils/accelerator.js";
+import { isKeyDown } from "../utils/keyState.js";
 import {
   OBS_PROFILE_NAME,
   OBS_VERSION,
@@ -18,39 +22,83 @@ import {
   obsAuth,
   pickSimpleEncoder,
 } from "../utils/obsConfig.js";
+import {
+  MAX_AUDIO_TRACKS,
+  findMonitorItem,
+  getEnabledScreens,
+  getRecordingOptions,
+  numberScreens,
+  pickFollowScreen,
+  planAudioTracks,
+  planRecorders,
+  toAudioTrackMap,
+} from "../utils/recordingPlan.js";
+import { CLIP_MANIFEST_NAME, buildClipManifest, getAudioTrackNames, getClipName } from "../utils/clipManifest.js";
 
 const execFileAsync = promisify(execFile);
 
-const DEFAULT_CLIP_HOTKEY = "Alt+F8";
-const DEFAULT_CLIP_SECONDS = 30;
 const REPLAYS_DIR_NAME = "ClipX Replays";
+const STAGING_DIR_NAME = ".recording";
+const RECORDERS_DIR_NAME = "recorders";
 const DISPLAY_INPUT_NAME = "ClipX Display";
-const CAPTURE_INPUTS = [
-  { inputName: DISPLAY_INPUT_NAME, inputKind: "monitor_capture" },
-  { inputName: "ClipX Desktop Audio", inputKind: "wasapi_output_capture" },
-  { inputName: "ClipX Microphone", inputKind: "wasapi_input_capture" },
-];
+const DESKTOP_AUDIO_INPUT_NAME = "ClipX Desktop Audio";
+const MIC_INPUT_NAME = "ClipX Microphone";
+const APP_LIST_INPUT_NAME = "ClipX App List";
 const CONNECT_TIMEOUT_MS = 30 * 1000;
 const CONNECT_RETRY_MS = 500;
+const SAVE_TIMEOUT_MS = 20 * 1000;
+const FOLLOW_INTERVAL_MS = 500;
+const HOTKEY_POLL_MS = 25;
+const IDENTIFY_DURATION_MS = 2500;
 const OUTPUTS_EVENT_SUBSCRIPTION = 1 << 6;
 
 let latestState = { status: "off" };
 let hotkeyError = null;
-let registeredHotkey = null;
+let hotkeyTimer = null;
 let appliedOptions = null;
 let requestedOptions = null;
 let startupController = null;
-let obsProcess = null;
-let socket = null;
+let followTimer = null;
+let saving = false;
+let watchingDisplays = false;
 let applyQueue = Promise.resolve();
-const pendingRequests = new Map();
+const recorders = new Map();
+
+function getScreens() {
+  const primaryId = screen.getPrimaryDisplay().id;
+  return numberScreens(screen.getAllDisplays().map((display) => {
+    const bounds = screen.dipToScreenRect(null, display.bounds);
+    return {
+      id: display.id,
+      label: display.label || "",
+      x: bounds.x,
+      y: bounds.y,
+      width: bounds.width,
+      height: bounds.height,
+      primary: display.id === primaryId,
+    };
+  }));
+}
+
+function getSnapshot() {
+  return {
+    ...latestState,
+    hotkeyError,
+    screens: getScreens(),
+    primaryScreenId: recorders.get("main")?.screenId ?? null,
+    recorderCount: recorders.size,
+    recordings: [...recorders.values()].map((recorder) => ({ role: recorder.plan.role, screenId: recorder.plan.screenId })),
+    game: getCurrentGame(),
+  };
+}
 
 function emitClippingState(state) {
-  latestState = { ...state, hotkeyError };
+  latestState = state;
+  const snapshot = getSnapshot();
 
   for (const window of BrowserWindow.getAllWindows()) {
     if (!window.isDestroyed()) {
-      window.webContents.send("clipping:state", latestState);
+      window.webContents.send("clipping:state", snapshot);
     }
   }
 }
@@ -65,12 +113,16 @@ function getObsDir() {
   return path.join(app.getPath("userData"), "obs");
 }
 
-function getObsRoot() {
+function getInstallRoot() {
   return path.join(getObsDir(), OBS_VERSION);
 }
 
 function getObsExePath() {
-  return path.join(getObsRoot(), "bin", "64bit", "obs64.exe");
+  return path.join(getInstallRoot(), "bin", "64bit", "obs64.exe");
+}
+
+function getRecorderRoot(key) {
+  return path.join(getObsDir(), RECORDERS_DIR_NAME, key);
 }
 
 async function ensureObsInstalled(signal) {
@@ -123,18 +175,32 @@ async function ensureObsInstalled(signal) {
   await fs.promises.mkdir(extractDir, { recursive: true });
   const tarPath = path.join(process.env.SystemRoot || "C:\\Windows", "System32", "tar.exe");
   await execFileAsync(tarPath, ["-xf", zipPath, "-C", extractDir], { signal });
-  await fs.promises.rm(getObsRoot(), { recursive: true, force: true });
-  await fs.promises.rename(extractDir, getObsRoot());
+  await fs.promises.rm(getInstallRoot(), { recursive: true, force: true });
+  await fs.promises.rename(extractDir, getInstallRoot());
   await fs.promises.rm(zipPath, { force: true });
 
   for (const entry of await fs.promises.readdir(obsDir, { withFileTypes: true })) {
-    if (entry.isDirectory() && entry.name !== OBS_VERSION) {
+    if (entry.isDirectory() && entry.name !== OBS_VERSION && entry.name !== RECORDERS_DIR_NAME) {
       await fs.promises.rm(path.join(obsDir, entry.name), { recursive: true, force: true });
     }
   }
 
   if (!fs.existsSync(getObsExePath())) {
     throw new Error("OBS was not installed correctly.");
+  }
+}
+
+async function prepareRecorderRoot(key) {
+  const root = getRecorderRoot(key);
+  await fs.promises.mkdir(path.join(root, "bin", "64bit"), { recursive: true });
+
+  for (const entry of await fs.promises.readdir(getInstallRoot())) {
+    if (entry === "bin" || entry === "config") {
+      continue;
+    }
+    const link = path.join(root, entry);
+    await fs.promises.rm(link, { force: true });
+    await fs.promises.symlink(path.join(getInstallRoot(), entry), link, "junction");
   }
 }
 
@@ -149,23 +215,26 @@ function getFreePort() {
   });
 }
 
-async function writeObsConfig(options, connection) {
-  const configDir = path.join(getObsRoot(), "config", "obs-studio");
-  const clipsDir = path.join(options.clipsFolder, REPLAYS_DIR_NAME);
-  const display = screen.getPrimaryDisplay();
+async function getEncoder() {
   const gpuInfo = await app.getGPUInfo("basic").catch(() => null);
   const gpu = gpuInfo?.gpuDevice?.find((device) => device.active) || gpuInfo?.gpuDevice?.[0];
+  return pickSimpleEncoder(gpu?.vendorId);
+}
 
+async function writeRecorderConfig(recorder, options, connection, encoder) {
+  const configDir = path.join(getRecorderRoot(recorder.key), "config", "obs-studio");
   const files = buildObsConfigFiles({
     ...connection,
-    clipsDir,
+    clipsDir: recorder.stagingDir,
     seconds: options.clipSeconds,
-    encoder: pickSimpleEncoder(gpu?.vendorId),
-    baseWidth: Math.round(display.size.width * display.scaleFactor),
-    baseHeight: Math.round(display.size.height * display.scaleFactor),
+    encoder,
+    canvas: recorder.plan.canvas,
+    output: recorder.plan.output,
+    fps: recorder.plan.fps,
+    recTracks: recorder.plan.audio ? planAudioTracks(options.clipAudioTracks).recTracks : 1,
   });
 
-  await fs.promises.mkdir(clipsDir, { recursive: true });
+  await fs.promises.mkdir(recorder.stagingDir, { recursive: true });
   await fs.promises.rm(path.join(configDir, ".sentinel"), { recursive: true, force: true });
   for (const [relativePath, contents] of Object.entries(files)) {
     const filePath = path.join(configDir, relativePath);
@@ -174,19 +243,19 @@ async function writeObsConfig(options, connection) {
   }
 }
 
-function closeSocket() {
-  socket?.close();
-  socket = null;
+function closeRecorderSocket(recorder) {
+  recorder.socket?.close();
+  recorder.socket = null;
 
-  for (const { reject } of pendingRequests.values()) {
+  for (const { reject } of recorder.pending.values()) {
     reject(new Error("OBS disconnected."));
   }
-  pendingRequests.clear();
+  recorder.pending.clear();
 }
 
-function handleObsEvent({ eventType, eventData }) {
+function handleRecorderEvent(recorder, { eventType, eventData }) {
   if (eventType === "ReplayBufferSaved") {
-    void onReplaySaved(eventData.savedReplayPath);
+    recorder.saveWaiter?.resolve(eventData.savedReplayPath);
   }
 
   if (
@@ -198,14 +267,14 @@ function handleObsEvent({ eventType, eventData }) {
   }
 }
 
-function openSocket({ port, password }) {
+function openSocket(recorder, { port, password }) {
   return new Promise((resolve, reject) => {
     const ws = new WebSocket(`ws://127.0.0.1:${port}`);
 
     ws.onerror = () => reject(new Error("Could not connect to OBS."));
     ws.onclose = () => {
       reject(new Error("OBS closed the connection."));
-      if (socket === ws) {
+      if (recorder.socket === ws) {
         handleObsLost("Lost the connection to OBS.");
       }
     };
@@ -224,17 +293,17 @@ function openSocket({ port, password }) {
           },
         }));
       } else if (op === 2) {
-        socket = ws;
+        recorder.socket = ws;
         resolve();
       } else if (op === 5) {
-        handleObsEvent(d);
+        handleRecorderEvent(recorder, d);
       } else if (op === 7) {
-        const pending = pendingRequests.get(d.requestId);
+        const pending = recorder.pending.get(d.requestId);
         if (!pending) {
           return;
         }
 
-        pendingRequests.delete(d.requestId);
+        recorder.pending.delete(d.requestId);
         if (d.requestStatus.result) {
           pending.resolve(d.responseData || {});
         } else {
@@ -245,17 +314,29 @@ function openSocket({ port, password }) {
   });
 }
 
-async function connectObs(connection) {
+function recorderRequest(recorder, requestType, requestData = {}) {
+  if (!recorder?.socket) {
+    return Promise.reject(new Error("OBS is not connected."));
+  }
+
+  const requestId = crypto.randomUUID();
+  return new Promise((resolve, reject) => {
+    recorder.pending.set(requestId, { resolve, reject });
+    recorder.socket.send(JSON.stringify({ op: 6, d: { requestType, requestId, requestData } }));
+  });
+}
+
+async function connectRecorder(recorder, connection) {
   const deadline = Date.now() + CONNECT_TIMEOUT_MS;
 
   while (true) {
     try {
-      if (!socket) {
-        await openSocket(connection);
+      if (!recorder.socket) {
+        await openSocket(recorder, connection);
       }
-      return await obsRequest("GetVersion");
+      return await recorderRequest(recorder, "GetVersion");
     } catch (error) {
-      if (!obsProcess || Date.now() > deadline) {
+      if (!recorder.process || Date.now() > deadline) {
         throw error;
       }
       await new Promise((resolve) => setTimeout(resolve, CONNECT_RETRY_MS));
@@ -263,93 +344,240 @@ async function connectObs(connection) {
   }
 }
 
-function obsRequest(requestType, requestData = {}) {
-  if (!socket) {
-    return Promise.reject(new Error("OBS is not connected."));
-  }
-
-  const requestId = crypto.randomUUID();
-  return new Promise((resolve, reject) => {
-    pendingRequests.set(requestId, { resolve, reject });
-    socket.send(JSON.stringify({ op: 6, d: { requestType, requestId, requestData } }));
-  });
-}
-
-async function setupCapture() {
-  const { inputs } = await obsRequest("GetInputList");
-  const { currentProgramSceneName } = await obsRequest("GetCurrentProgramScene");
-  for (const input of CAPTURE_INPUTS) {
-    if (!inputs.some((existing) => existing.inputName === input.inputName)) {
-      await obsRequest("CreateInput", { sceneName: currentProgramSceneName, ...input });
+function getFollowTargetId(options) {
+  if (options.clipFollow === "focus") {
+    try {
+      const foreground = getForegroundWindow();
+      if (foreground?.rect.width > 0) {
+        return screen.getDisplayMatching(screen.screenToDipRect(null, foreground.rect)).id;
+      }
+    } catch (error) {
+      console.error("ClipX: Failed to read the focused window:", error);
     }
   }
+  return screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).id;
+}
 
-  const { propertyItems } = await obsRequest("GetInputPropertiesListPropertyItems", {
+async function pointRecorderAt(recorder, screenId) {
+  const target = getScreens().find((candidate) => candidate.id === screenId);
+  const item = target && findMonitorItem(recorder.monitorItems, target);
+  if (!item) {
+    return;
+  }
+
+  await recorderRequest(recorder, "SetInputSettings", {
+    inputName: DISPLAY_INPUT_NAME,
+    inputSettings: { monitor_id: item.itemValue },
+  });
+  recorder.screenId = screenId;
+}
+
+async function refreshMonitorItems(recorder) {
+  const { propertyItems } = await recorderRequest(recorder, "GetInputPropertiesListPropertyItems", {
     inputName: DISPLAY_INPUT_NAME,
     propertyName: "monitor_id",
   });
-  const primaryMonitor = propertyItems.find((item) => / @ 0,0( |$)/.test(item.itemName)) || propertyItems[0];
-  if (primaryMonitor) {
-    await obsRequest("SetInputSettings", {
-      inputName: DISPLAY_INPUT_NAME,
-      inputSettings: { monitor_id: primaryMonitor.itemValue },
-    });
+  recorder.monitorItems = propertyItems;
+}
+
+function toWindowMatch(exe) {
+  return exe ? `::${exe}` : "";
+}
+
+function getGameTrackExe() {
+  return getCurrentGame()?.exe || "";
+}
+
+async function setupAudio(recorder, options, ensureInput, existingInputs) {
+  const audio = planAudioTracks(options.clipAudioTracks);
+
+  await ensureInput(DESKTOP_AUDIO_INPUT_NAME, "wasapi_output_capture");
+  await recorderRequest(recorder, "SetInputAudioTracks", { inputName: DESKTOP_AUDIO_INPUT_NAME, inputAudioTracks: toAudioTrackMap(1) });
+
+  await ensureInput(MIC_INPUT_NAME, "wasapi_input_capture");
+  await recorderRequest(recorder, "SetInputMute", { inputName: MIC_INPUT_NAME, inputMuted: !audio.micTrack });
+  await recorderRequest(recorder, "SetInputAudioTracks", { inputName: MIC_INPUT_NAME, inputAudioTracks: toAudioTrackMap(1, audio.micTrack) });
+
+  for (let index = 2; index <= MAX_AUDIO_TRACKS + 1; index++) {
+    const inputName = `ClipX Track ${index}`;
+    const track = audio.tracks.find((candidate) => candidate.index === index && candidate.kind !== "mic");
+    if (!track) {
+      if (existingInputs.has(inputName)) {
+        await recorderRequest(recorder, "RemoveInput", { inputName });
+      }
+      continue;
+    }
+
+    const exe = track.kind === "game" ? getGameTrackExe() : track.exe;
+    await ensureInput(inputName, "wasapi_process_output_capture", { window: toWindowMatch(exe), priority: 2 });
+    await recorderRequest(recorder, "SetInputAudioTracks", { inputName, inputAudioTracks: toAudioTrackMap(index) });
+  }
+
+  await applyVolumes(recorder, audio);
+}
+
+async function applyVolumes(recorder, audio) {
+  for (const track of audio.tracks) {
+    const inputName = track.kind === "mic" ? MIC_INPUT_NAME : `ClipX Track ${track.index}`;
+    const volume = Math.min(Math.max(Number(track.volume ?? 100), 0), 100);
+    await recorderRequest(recorder, "SetInputVolume", { inputName, inputVolumeMul: volume / 100 });
   }
 }
 
-async function applyMicSetting(recordMic) {
-  const { inputs } = await obsRequest("GetInputList", { inputKind: "wasapi_input_capture" });
-  for (const input of inputs) {
-    await obsRequest("SetInputMute", { inputName: input.inputName, inputMuted: !recordMic });
+async function setupRecorder(recorder, options) {
+  const { inputs } = await recorderRequest(recorder, "GetInputList");
+  const { currentProgramSceneName: sceneName } = await recorderRequest(recorder, "GetCurrentProgramScene");
+  const existingInputs = new Set(inputs.map((input) => input.inputName));
+  const ensureInput = async (inputName, inputKind, inputSettings = {}) => {
+    if (!existingInputs.has(inputName)) {
+      await recorderRequest(recorder, "CreateInput", { sceneName, inputName, inputKind, inputSettings });
+      existingInputs.add(inputName);
+    } else if (Object.keys(inputSettings).length) {
+      await recorderRequest(recorder, "SetInputSettings", { inputName, inputSettings });
+    }
+  };
+
+  await ensureInput(DISPLAY_INPUT_NAME, "monitor_capture");
+  const { sceneItemId } = await recorderRequest(recorder, "GetSceneItemId", { sceneName, sourceName: DISPLAY_INPUT_NAME });
+  await recorderRequest(recorder, "SetSceneItemTransform", {
+    sceneName,
+    sceneItemId,
+    sceneItemTransform: {
+      positionX: 0,
+      positionY: 0,
+      alignment: 5,
+      boundsType: "OBS_BOUNDS_SCALE_INNER",
+      boundsAlignment: 0,
+      boundsWidth: recorder.plan.canvas.width,
+      boundsHeight: recorder.plan.canvas.height,
+    },
+  });
+
+  await refreshMonitorItems(recorder);
+  await pointRecorderAt(recorder, recorder.plan.screenId ?? pickFollowScreen(
+    getEnabledScreens(getScreens(), options.clipDisabledScreens),
+    getFollowTargetId(options),
+    null,
+  ));
+
+  if (recorder.plan.audio) {
+    await setupAudio(recorder, options, ensureInput, existingInputs);
   }
 }
 
-async function launchObs(options, signal) {
-  signal.throwIfAborted();
-  emitClippingState({ status: "starting" });
-
+async function launchRecorder(recorder, options, encoder, signal) {
+  await prepareRecorderRoot(recorder.key);
   const connection = {
     port: await getFreePort(),
     password: crypto.randomBytes(24).toString("base64url"),
   };
-  await writeObsConfig(options, connection);
+  await writeRecorderConfig(recorder, options, connection, encoder);
   signal.throwIfAborted();
 
   const child = spawn(getObsExePath(), [
     "--portable",
     "--multi",
-    "--minimize-to-tray",
     "--disable-updater",
     "--disable-missing-files-check",
     "--profile",
     OBS_PROFILE_NAME,
-  ], { cwd: path.dirname(getObsExePath()), stdio: "ignore" });
-  obsProcess = child;
+  ], { cwd: path.join(getRecorderRoot(recorder.key), "bin", "64bit"), stdio: "ignore", windowsHide: true });
+  recorder.process = child;
 
   const onChildStopped = () => {
-    if (obsProcess === child) {
+    if (recorder.process === child) {
       handleObsLost("OBS stopped unexpectedly.");
     }
   };
   child.on("exit", onChildStopped);
   child.on("error", onChildStopped);
 
-  await connectObs(connection);
-  await setupCapture();
-  await applyMicSetting(options.clipRecordMic);
-  await obsRequest("StartReplayBuffer");
+  await connectRecorder(recorder, connection);
+  await setupRecorder(recorder, options);
+  await recorderRequest(recorder, "StartReplayBuffer");
+}
+
+async function launchRecorders(options, signal) {
   signal.throwIfAborted();
+  emitClippingState({ status: "starting" });
+
+  const plan = planRecorders(getScreens(), options);
+  if (!plan.length) {
+    throw new Error("Turn on at least one screen to record.");
+  }
+
+  const stagingRoot = path.join(options.clipsFolder, REPLAYS_DIR_NAME, STAGING_DIR_NAME);
+  await fs.promises.rm(stagingRoot, { recursive: true, force: true });
+  const encoder = await getEncoder();
+
+  for (const recorderPlan of plan) {
+    recorders.set(recorderPlan.key, {
+      key: recorderPlan.key,
+      plan: recorderPlan,
+      stagingDir: path.join(stagingRoot, recorderPlan.key),
+      process: null,
+      socket: null,
+      pending: new Map(),
+      screenId: recorderPlan.screenId,
+      monitorItems: [],
+      saveWaiter: null,
+      switching: false,
+    });
+  }
+
+  await Promise.all([...recorders.values()].map((recorder) => launchRecorder(recorder, options, encoder, signal)));
+  signal.throwIfAborted();
+
+  if (recorders.get("main")?.plan.screenId === null) {
+    startFollowing();
+  }
   emitClippingState({ status: "ready" });
+}
+
+function startFollowing() {
+  stopFollowing();
+  followTimer = setInterval(async () => {
+    const main = recorders.get("main");
+    if (!main || main.switching || latestState.status !== "ready") {
+      return;
+    }
+
+    const enabled = getEnabledScreens(getScreens(), appliedOptions.clipDisabledScreens);
+    const next = pickFollowScreen(enabled, getFollowTargetId(appliedOptions), main.screenId);
+    if (next === main.screenId) {
+      return;
+    }
+
+    main.switching = true;
+    try {
+      await pointRecorderAt(main, next);
+      emitClippingState(latestState);
+    } catch (error) {
+      console.error("ClipX: Failed to switch the primary screen:", error);
+    } finally {
+      main.switching = false;
+    }
+  }, FOLLOW_INTERVAL_MS);
+}
+
+function stopFollowing() {
+  clearInterval(followTimer);
+  followTimer = null;
 }
 
 function stopObs() {
   startupController?.abort();
   startupController = null;
+  stopFollowing();
 
-  const child = obsProcess;
-  obsProcess = null;
-  closeSocket();
-  child?.kill();
+  for (const recorder of recorders.values()) {
+    const child = recorder.process;
+    recorder.process = null;
+    recorder.saveWaiter?.reject(new Error("Recording stopped."));
+    closeRecorderSocket(recorder);
+    child?.kill();
+  }
+  recorders.clear();
 }
 
 function handleObsLost(message) {
@@ -362,14 +590,80 @@ function handleObsLost(message) {
   }
 }
 
-async function onReplaySaved(savedReplayPath) {
-  try {
-    await upsertIndexedClip(appliedOptions.clipsFolder, savedReplayPath, { emitChange: true });
-  } catch (error) {
-    console.error("ClipX: Failed to index saved clip:", error);
+function waitForSave(recorder) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      recorder.saveWaiter = null;
+      reject(new Error("OBS took too long to save the clip."));
+    }, SAVE_TIMEOUT_MS);
+
+    recorder.saveWaiter = {
+      resolve: (savedPath) => {
+        clearTimeout(timer);
+        recorder.saveWaiter = null;
+        resolve(savedPath);
+      },
+      reject: (error) => {
+        clearTimeout(timer);
+        recorder.saveWaiter = null;
+        reject(error);
+      },
+    };
+    recorderRequest(recorder, "SaveReplayBuffer").catch((error) => recorder.saveWaiter?.reject(error));
+  });
+}
+
+async function getUniqueDir(parentDir, name) {
+  for (let attempt = 1; ; attempt++) {
+    const dirName = attempt === 1 ? name : `${name} (${attempt})`;
+    if (!fs.existsSync(path.join(parentDir, dirName))) {
+      return dirName;
+    }
+  }
+}
+
+async function finalizeClip(createdAt, savedFiles, options) {
+  const replaysDir = path.join(options.clipsFolder, REPLAYS_DIR_NAME);
+  const game = options.clipDetectGame ? getGameForClip(options.clipSeconds) : null;
+  const folderName = await getUniqueDir(replaysDir, getClipName(createdAt, game?.name));
+  const clipDir = path.join(replaysDir, folderName);
+  const screens = getScreens();
+  const describeScreen = (screenId) => {
+    const match = screens.find((candidate) => candidate.id === screenId);
+    return match ? { number: match.number, label: match.label, width: match.width, height: match.height } : null;
+  };
+
+  const primary = savedFiles.find(({ recorder }) => recorder.key === "main");
+  const secondaries = savedFiles
+    .filter(({ recorder }) => recorder.key !== "main")
+    .map((saved) => ({ ...saved, screen: describeScreen(saved.recorder.screenId) }))
+    .filter((saved) => saved.screen);
+  const follows = primary.recorder.plan.screenId === null;
+  const manifest = buildClipManifest({
+    folderName,
+    createdAt: createdAt.toISOString(),
+    seconds: options.clipSeconds,
+    game,
+    primary: {
+      follows,
+      screen: follows ? null : describeScreen(primary.recorder.screenId),
+      audioTracks: getAudioTrackNames(planAudioTracks(options.clipAudioTracks).tracks),
+    },
+    secondaries,
+  });
+
+  await fs.promises.mkdir(clipDir, { recursive: true });
+  await fs.promises.writeFile(path.join(clipDir, CLIP_MANIFEST_NAME), JSON.stringify(manifest, null, 2), "utf-8");
+
+  const sources = [primary, ...secondaries];
+  for (const [index, entry] of manifest.files.entries()) {
+    const destination = path.join(clipDir, entry.file);
+    await fs.promises.rename(sources[index].savedPath, destination);
+    await upsertIndexedClip(options.clipsFolder, destination, { emitChange: entry.role === "primary" })
+      .catch((error) => console.error("ClipX: Failed to index saved clip:", error));
   }
 
-  showNotification("Clip saved", path.basename(savedReplayPath));
+  return manifest;
 }
 
 async function saveClip() {
@@ -377,44 +671,128 @@ async function saveClip() {
     showNotification("Clipping isn't ready", latestState.message || "OBS is still starting.");
     return;
   }
+  if (saving) {
+    return;
+  }
 
+  saving = true;
+  const options = appliedOptions;
+  const createdAt = new Date();
   try {
-    await obsRequest("SaveReplayBuffer");
+    const active = [...recorders.values()];
+    const results = await Promise.allSettled(active.map((recorder) => waitForSave(recorder)));
+    const savedFiles = results
+      .map((result, index) => (result.status === "fulfilled" ? { recorder: active[index], savedPath: result.value } : null))
+      .filter(Boolean);
+
+    if (!savedFiles.some(({ recorder }) => recorder.key === "main")) {
+      throw results[active.findIndex((recorder) => recorder.key === "main")].reason;
+    }
+
+    const manifest = await finalizeClip(createdAt, savedFiles, options);
+    const screenCount = manifest.files.length;
+    showNotification("Clip saved", [manifest.game?.name, screenCount > 1 ? `${screenCount} recordings` : null].filter(Boolean).join(" · ") || manifest.files[0].file);
   } catch (error) {
-    showNotification("Clip failed", error.message);
+    console.error("ClipX: Failed to save clip:", error);
+    showNotification("Clip failed", error?.message || "The clip could not be saved.");
+  } finally {
+    saving = false;
   }
 }
 
-function registerHotkey(accelerator) {
-  if (registeredHotkey) {
-    globalShortcut.unregister(registeredHotkey);
-    registeredHotkey = null;
-  }
-  hotkeyError = null;
+function stopHotkey() {
+  clearInterval(hotkeyTimer);
+  hotkeyTimer = null;
+}
 
-  if (accelerator) {
-    try {
-      if (globalShortcut.register(accelerator, () => void saveClip())) {
-        registeredHotkey = accelerator;
-      } else {
-        hotkeyError = `${accelerator} is already used by another app.`;
+function registerHotkey(accelerator) {
+  stopHotkey();
+  const hotkey = parseAccelerator(accelerator);
+  hotkeyError = hotkey ? null : `${accelerator} isn't a valid hotkey.`;
+
+  if (hotkey) {
+    let wasDown = false;
+    hotkeyTimer = setInterval(() => {
+      const down = isHotkeyDown(hotkey, isKeyDown);
+      if (down && !wasDown) {
+        void saveClip();
       }
-    } catch {
-      hotkeyError = `${accelerator} isn't a valid hotkey.`;
-    }
+      wasDown = down;
+    }, HOTKEY_POLL_MS);
   }
 
   emitClippingState(latestState);
 }
 
+async function onGameChange() {
+  emitClippingState(latestState);
+
+  const main = recorders.get("main");
+  const gameTrack = planAudioTracks(appliedOptions?.clipAudioTracks).tracks.find((track) => track.kind === "game");
+  if (!main?.socket || !gameTrack) {
+    return;
+  }
+
+  await recorderRequest(main, "SetInputSettings", {
+    inputName: `ClipX Track ${gameTrack.index}`,
+    inputSettings: { window: toWindowMatch(getGameTrackExe()), priority: 2 },
+  }).catch((error) => console.error("ClipX: Failed to point the game track at the new game:", error));
+}
+
+function syncGameDetection(options) {
+  if (options.enabled && options.clipDetectGame) {
+    startGameDetection({ onChange: () => void onGameChange() });
+  } else {
+    stopGameDetection();
+  }
+}
+
+function watchDisplays() {
+  if (watchingDisplays) {
+    return;
+  }
+  watchingDisplays = true;
+
+  const restartForNewScreens = () => {
+    emitClippingState(latestState);
+    if (recorders.size && appliedOptions?.enabled && requestedOptions === appliedOptions) {
+      stopObs();
+      queueApply(appliedOptions);
+    }
+  };
+  screen.on("display-added", restartForNewScreens);
+  screen.on("display-removed", restartForNewScreens);
+  screen.on("display-metrics-changed", async () => {
+    emitClippingState(latestState);
+    for (const recorder of recorders.values()) {
+      await refreshMonitorItems(recorder)
+        .then(() => pointRecorderAt(recorder, recorder.screenId))
+        .catch((error) => console.error("ClipX: Failed to refresh screens:", error));
+    }
+  });
+}
+
 function normalizeOptions(options) {
   return {
+    ...getRecordingOptions(options),
     enabled: options?.clippingEnabled === true && Boolean(options?.clipsFolder),
     clipsFolder: options?.clipsFolder || "",
-    clipHotkey: options?.clipHotkey || DEFAULT_CLIP_HOTKEY,
-    clipSeconds: Number(options?.clipSeconds) || DEFAULT_CLIP_SECONDS,
-    clipRecordMic: options?.clipRecordMic === true,
   };
+}
+
+function getLaunchKey(options) {
+  return JSON.stringify([
+    options.clipsFolder,
+    options.clipSeconds,
+    options.clipAutoSwitch,
+    options.clipAutoSwitch ? null : String(options.clipPrimaryScreen),
+    options.clipDisabledScreens.map(String).sort(),
+    options.clipPrimaryHeight,
+    options.clipPrimaryFps,
+    options.clipSecondaryHeight,
+    options.clipSecondaryFps,
+    options.clipAudioTracks.map((track) => [track.kind, track.exe || null]),
+  ]);
 }
 
 async function applyOptions(next) {
@@ -424,23 +802,24 @@ async function applyOptions(next) {
   if (!previous?.enabled || next.clipHotkey !== previous.clipHotkey) {
     registerHotkey(next.clipHotkey);
   }
+  syncGameDetection(next);
 
-  if (!obsProcess || next.clipsFolder !== previous.clipsFolder || next.clipSeconds !== previous.clipSeconds) {
+  if (!recorders.size || getLaunchKey(next) !== getLaunchKey(previous)) {
     stopObs();
     const controller = new AbortController();
     startupController = controller;
 
     try {
       await ensureObsInstalled(controller.signal);
-      await launchObs(next, controller.signal);
+      await launchRecorders(next, controller.signal);
     } catch (error) {
       if (controller.signal.aborted) {
         return;
       }
       throw error;
     }
-  } else if (next.clipRecordMic !== previous.clipRecordMic) {
-    await applyMicSetting(next.clipRecordMic);
+  } else {
+    await applyVolumes(recorders.get("main"), planAudioTracks(next.clipAudioTracks));
   }
 }
 
@@ -465,10 +844,11 @@ function queueApply(next) {
 }
 
 export function getClippingState() {
-  return latestState;
+  return getSnapshot();
 }
 
 export function applyClippingOptions(options) {
+  watchDisplays();
   const next = normalizeOptions(options);
   if (next.enabled) {
     return queueApply(next);
@@ -483,11 +863,73 @@ export function applyClippingOptions(options) {
 }
 
 export function stopClipping() {
-  if (registeredHotkey) {
-    globalShortcut.unregister(registeredHotkey);
-    registeredHotkey = null;
-  }
+  stopHotkey();
   hotkeyError = null;
+  stopGameDetection();
   stopObs();
   emitClippingState({ status: "off" });
+}
+
+export async function listAudioApps() {
+  const main = recorders.get("main");
+  if (!main?.socket || latestState.status !== "ready") {
+    return null;
+  }
+
+  const { currentProgramSceneName: sceneName } = await recorderRequest(main, "GetCurrentProgramScene");
+  await recorderRequest(main, "CreateInput", {
+    sceneName,
+    inputName: APP_LIST_INPUT_NAME,
+    inputKind: "wasapi_process_output_capture",
+    sceneItemEnabled: false,
+  });
+
+  try {
+    const { propertyItems } = await recorderRequest(main, "GetInputPropertiesListPropertyItems", {
+      inputName: APP_LIST_INPUT_NAME,
+      propertyName: "window",
+    });
+    const apps = new Map();
+    for (const item of propertyItems) {
+      const exe = item.itemValue.split(":").pop();
+      if (exe && !apps.has(exe.toLowerCase())) {
+        apps.set(exe.toLowerCase(), { exe, title: item.itemName.replace(/^\[[^\]]*\]:\s*/, "") });
+      }
+    }
+    return [...apps.values()].sort((a, b) => a.exe.localeCompare(b.exe));
+  } finally {
+    await recorderRequest(main, "RemoveInput", { inputName: APP_LIST_INPUT_NAME }).catch(() => {});
+  }
+}
+
+export async function setDetectedGame(game) {
+  await setGameForCurrentExe(game);
+  return getSnapshot();
+}
+
+export function identifyScreens() {
+  const screens = getScreens();
+  for (const display of screen.getAllDisplays()) {
+    const number = screens.find((candidate) => candidate.id === display.id)?.number;
+    const win = new BrowserWindow({
+      ...display.bounds,
+      frame: false,
+      transparent: true,
+      alwaysOnTop: true,
+      focusable: false,
+      skipTaskbar: true,
+      resizable: false,
+      show: false,
+    });
+    win.setIgnoreMouseEvents(true);
+    win.once("ready-to-show", () => win.showInactive());
+    void win.loadURL(`data:text/html,${encodeURIComponent(
+      `<body style="margin:0;height:100vh;display:flex;align-items:center;justify-content:center;background:transparent;font:600 240px 'Segoe UI',sans-serif;color:#fff;text-shadow:0 0 32px rgba(0,0,0,.85)">${number}</body>`,
+    )}`);
+    setTimeout(() => {
+      if (!win.isDestroyed()) {
+        win.destroy();
+      }
+    }, IDENTIFY_DURATION_MS);
+  }
 }

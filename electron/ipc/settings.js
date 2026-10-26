@@ -1,28 +1,10 @@
 import { app, BrowserWindow, ipcMain } from "electron";
 import fs from "fs";
 import path from "path";
-import { getSupabaseAccessToken } from "./authStorage.js";
 import { applyClippingOptions } from "../services/obsService.js";
+import { fetchGames } from "../services/gamesApi.js";
 
 const STARTUP_MINIMIZED_ARG = "--clipx-startup-minimized";
-const API_BASE = (process.env.VITE_DATABASE_URL || "https://clipx.bideshi.tech").replace(/\/+$/, "");
-
-async function fetchGames(params) {
-  const accessToken = await getSupabaseAccessToken();
-  if (!accessToken) {
-    return null;
-  }
-
-  const response = await fetch(`${API_BASE}/api/games?${new URLSearchParams(params)}`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
-  const { data, error } = await response.json().catch(() => ({ data: null, error: "Invalid server response." }));
-  if (!response.ok || error) {
-    console.error("ClipX: Failed to fetch games:", error || response.status);
-    return null;
-  }
-  return data;
-}
 
 function getLoginItemOptions(openAtLogin, { includeStartupArg = true } = {}) {
   const options = {};

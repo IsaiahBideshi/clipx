@@ -102,6 +102,14 @@ contextBridge.exposeInMainWorld("clipx", {
     return () => ipcRenderer.removeListener("updates:state", listener);
   },
   getClippingState: () => ipcRenderer.invoke("clipping:get-state"),
+  identifyScreens: () => ipcRenderer.invoke("clipping:identify-screens"),
+  listAudioApps: () => ipcRenderer.invoke("clipping:list-audio-apps"),
+  setDetectedGame: (game) => ipcRenderer.invoke("clipping:set-game", game),
+  listRunningApps: () => ipcRenderer.invoke("clipping:list-running-apps"),
+  listGameAssignments: () => ipcRenderer.invoke("clipping:list-game-assignments"),
+  assignGame: (exe, game) => ipcRenderer.invoke("clipping:assign-game", exe, game),
+  removeGameAssignment: (exe) => ipcRenderer.invoke("clipping:remove-game-assignment", exe),
+  getClipGroup: (clipPath) => ipcRenderer.invoke("local-clips:get-group", clipPath),
   onClippingState: (callback) => {
     if (typeof callback !== "function") {
       return () => {};
