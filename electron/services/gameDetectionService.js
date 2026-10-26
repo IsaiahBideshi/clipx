@@ -20,6 +20,14 @@ import {
 
 const execFileAsync = promisify(execFile);
 
+function runPowerShell(command, env = {}) {
+  return execFileAsync(
+    "powershell.exe",
+    ["-NoProfile", "-NonInteractive", "-Command", `[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; ${command}`],
+    { windowsHide: true, maxBuffer: 4 * 1024 * 1024, env: { ...process.env, ...env } },
+  );
+}
+
 const POLL_INTERVAL_MS = 2000;
 const KNOWN_GAMES_REFRESH_MS = 10 * 60 * 1000;
 const LOOKUP_RETRY_MS = 60 * 1000;
@@ -94,11 +102,7 @@ async function refreshKnownGames() {
 
 async function readFileDescription(exePath) {
   try {
-    const { stdout } = await execFileAsync(
-      "powershell.exe",
-      ["-NoProfile", "-NonInteractive", "-Command", "(Get-Item -LiteralPath $env:CLIPX_EXE).VersionInfo.FileDescription"],
-      { windowsHide: true, env: { ...process.env, CLIPX_EXE: exePath } },
-    );
+    const { stdout } = await runPowerShell("(Get-Item -LiteralPath $env:CLIPX_EXE).VersionInfo.FileDescription", { CLIPX_EXE: exePath });
     return stdout.trim() || null;
   } catch {
     return null;
@@ -277,11 +281,7 @@ export async function setGameForCurrentExe(game) {
 }
 
 export async function listRunningApps() {
-  const { stdout } = await execFileAsync(
-    "powershell.exe",
-    ["-NoProfile", "-NonInteractive", "-Command", "Get-Process | Where-Object { $_.MainWindowTitle } | Select-Object ProcessName, MainWindowTitle | ConvertTo-Json -Compress"],
-    { windowsHide: true, maxBuffer: 4 * 1024 * 1024 },
-  );
+  const { stdout } = await runPowerShell("Get-Process | Where-Object { $_.MainWindowTitle } | Select-Object ProcessName, MainWindowTitle | ConvertTo-Json -Compress");
   const parsed = JSON.parse(stdout.trim() || "[]");
   const apps = new Map();
   for (const item of Array.isArray(parsed) ? parsed : [parsed]) {
