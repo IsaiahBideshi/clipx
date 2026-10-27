@@ -1,7 +1,7 @@
 import { BrowserWindow, dialog, ipcMain } from "electron";
 
 import { generateThumbnail, scanFolder, openInExplorer } from "../services/fileService.js";
-import { clipIndexEvents, listLocalClips, refreshLocalClipIndex } from "../services/clipIndexService.js";
+import { clipIndexEvents, getClipGroup, listLocalClips, refreshLocalClipIndex } from "../services/clipIndexService.js";
 
 let clipIndexForwarderRegistered = false;
 
@@ -65,6 +65,10 @@ export function registerFileIpcHandlers() {
 
   ipcMain.handle("local-clips:refresh-index", async (_event, options) => {
     return await refreshLocalClipIndex(options);
+  });
+
+  ipcMain.handle("local-clips:get-group", async (_event, clipPath) => {
+    return typeof clipPath === "string" ? getClipGroup(clipPath) : null;
   });
 
 

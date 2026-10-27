@@ -7,6 +7,7 @@ import chokidar from "chokidar";
 
 import { getFastFileId } from "../utils/hashing.js";
 import { isSkippableMediaDirectory, isSupportedVideoFile } from "../utils/videoFiles.js";
+import { CLIP_MANIFEST_NAME, getManifestFile } from "../utils/clipManifest.js";
 
 const DB_FILE_NAME = "clip-index.sqlite";
 const LEGACY_CLIPS_DATA_FILE = "clipsData.json";
@@ -83,6 +84,14 @@ function getDb() {
       ON clips(id);
   `);
 
+  const columns = new Set(db.prepare("PRAGMA table_info(clips)").all().map((column) => column.name));
+  if (!columns.has("group_path")) {
+    db.exec("ALTER TABLE clips ADD COLUMN group_path TEXT");
+  }
+  if (!columns.has("group_role")) {
+    db.exec("ALTER TABLE clips ADD COLUMN group_role TEXT");
+  }
+
   return db;
 }
 
@@ -123,7 +132,26 @@ function rowToClip(row) {
     collection: row.collection,
     thumbnailPath,
     savedMetadata: parseJson(row.saved_metadata_json),
+    groupPath: row.group_path || null,
+    groupRole: row.group_role || null,
   };
+}
+
+function readClipManifest(dirPath) {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(dirPath, CLIP_MANIFEST_NAME), "utf-8"));
+  } catch (error) {
+    if (error?.code !== "ENOENT") {
+      console.error("ClipX: Failed to read clip manifest:", error);
+    }
+    return null;
+  }
+}
+
+function getClipGroupInfo(filePath) {
+  const dirPath = path.dirname(filePath);
+  const entry = getManifestFile(readClipManifest(dirPath), path.basename(filePath));
+  return entry ? { groupPath: dirPath, groupRole: entry.role } : { groupPath: null, groupRole: null };
 }
 
 function emitIndexEvent(event) {
@@ -154,7 +182,7 @@ function pathSegments(filePath) {
 function isIgnoredPath(filePath) {
   return pathSegments(filePath).some((segment) => {
     const normalized = segment.toLowerCase();
-    return normalized === "thumbs" || normalized === "saved clips thumbs";
+    return normalized === "thumbs" || normalized === "saved clips thumbs" || normalized === ".recording";
   });
 }
 
@@ -253,6 +281,7 @@ export function listLocalClips(options = {}) {
       WHERE root_path = ?
         ${collectionClause}
         AND missing = 0
+        AND (group_role IS NULL OR group_role != 'secondary')
         ${cursorClause}
       ORDER BY created_at_ms DESC, id DESC
       LIMIT ?
@@ -340,6 +369,7 @@ export async function upsertIndexedClip(rootPath, filePath, options = {}) {
   const collection = getCollectionForPath(normalizedRootPath, normalizedFilePath);
   const existingRow = getRowByPath(normalizedFilePath);
   const savedMetadata = collection === "saved" ? findLegacyClipMetadata(normalizedFilePath) : null;
+  const { groupPath, groupRole } = getClipGroupInfo(normalizedFilePath);
 
   getDb()
     .prepare(`
@@ -354,10 +384,14 @@ export async function upsertIndexedClip(rootPath, filePath, options = {}) {
         modified_at_ms,
         indexed_at_ms,
         missing,
-        saved_metadata_json
+        saved_metadata_json,
+        group_path,
+        group_role
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)
       ON CONFLICT(path) DO UPDATE SET
+        group_path = excluded.group_path,
+        group_role = excluded.group_role,
         id = excluded.id,
         root_path = excluded.root_path,
         collection = excluded.collection,
@@ -379,7 +413,9 @@ export async function upsertIndexedClip(rootPath, filePath, options = {}) {
       stats.birthtimeMs,
       stats.mtimeMs,
       Date.now(),
-      savedMetadata ? JSON.stringify(savedMetadata) : null
+      savedMetadata ? JSON.stringify(savedMetadata) : null,
+      groupPath,
+      groupRole
     );
 
   const clip = rowToClip(getRowByPath(normalizedFilePath));
@@ -393,6 +429,20 @@ export async function upsertIndexedClip(rootPath, filePath, options = {}) {
   }
 
   return clip;
+}
+
+export function getClipGroup(clipPath) {
+  const dirPath = path.dirname(normalizeStoredPath(clipPath));
+  const manifest = readClipManifest(dirPath);
+  if (!getManifestFile(manifest, path.basename(clipPath))) {
+    return null;
+  }
+
+  return {
+    path: dirPath,
+    manifest,
+    files: manifest.files.map((entry) => ({ ...entry, path: path.join(dirPath, entry.file) })),
+  };
 }
 
 export function markIndexedClipMissing(filePath, options = {}) {

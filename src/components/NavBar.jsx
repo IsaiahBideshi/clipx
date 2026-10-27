@@ -9,8 +9,10 @@ import { useAuthSession } from "../lib/authSession.js";
 import { getAccountInitials, loadAccountData } from "../lib/accountApi.js";
 import { fetchLocalOptions } from "../lib/localOptions.js";
 import { useNewLibraryClips } from "../lib/newLibraryClips.js";
+import { getClippingStatusLabel, useClippingState } from "../lib/clippingState.js";
 
 import SettingsIcon from '@mui/icons-material/Settings';
+import VideocamIcon from '@mui/icons-material/Videocam';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import VideoLibraryIcon from '@mui/icons-material/VideoLibrary';
 import FolderIcon from '@mui/icons-material/Folder';
@@ -39,6 +41,13 @@ export default function NavBar({ showUpdateButton = true, updateStatus = null, u
   const [newLocalClips, setNewLocalClips] = useState(0);
   const newLibraryClips = useNewLibraryClips(session);
   const newClips = { "/": newLocalClips, "/library": newLibraryClips.count };
+  const clippingState = useClippingState();
+  const recordDotClass = {
+    ready: "nav-record-dot--on",
+    installing: "nav-record-dot--starting",
+    starting: "nav-record-dot--starting",
+  }[clippingState?.status] || "";
+  const recordingTitle = `Recording: ${getClippingStatusLabel(clippingState)}`;
 
   function clearNewClips(path) {
     if (path === "/") {
@@ -155,6 +164,13 @@ export default function NavBar({ showUpdateButton = true, updateStatus = null, u
           ) : (
             <AccountCircleIcon fontSize="small" />
           )}
+        </NavLink>
+
+        <NavLink to="/recording" className="nav-link nav-link--icon" aria-label={recordingTitle} title={recordingTitle}>
+          <span className="nav-record-icon">
+            <VideocamIcon fontSize="small" />
+            <span className={`nav-record-dot ${recordDotClass}`} />
+          </span>
         </NavLink>
 
         <NavLink to="/settings" className="nav-link nav-link--icon" aria-label="Settings" title="Settings">
