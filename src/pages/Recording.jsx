@@ -616,6 +616,49 @@ export default function Recording() {
             </>
           )}
         </section>
+
+        <section className="settings-card recording-card--wide">
+          <div className="recording-card-header">
+            <h4>Notifications</h4>
+            <Button size="small" disabled={!recording.clipToastEnabled && !recording.clipSoundEnabled} onClick={() => window.clipx?.previewToast?.()}>Preview</Button>
+          </div>
+          <div className="recording-row">
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={recording.clipToastEnabled}
+                  onChange={(event) => updateOption("clipToastEnabled", event.target.checked)}
+                />
+              }
+              label="Show a notification when a clip is saved"
+            />
+            <FormControl size="small" disabled={!recording.clipToastEnabled}>
+              <Select value={recording.clipToastCorner} onChange={(event) => updateOption("clipToastCorner", event.target.value)}>
+                <MenuItem value="right">Top right</MenuItem>
+                <MenuItem value="left">Top left</MenuItem>
+              </Select>
+            </FormControl>
+          </div>
+          <div className="recording-row">
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={recording.clipSoundEnabled}
+                  onChange={(event) => updateOption("clipSoundEnabled", event.target.checked)}
+                />
+              }
+              label="Play a sound"
+            />
+            <Slider
+              size="small"
+              aria-label="Notification sound volume"
+              disabled={!recording.clipSoundEnabled}
+              defaultValue={recording.clipSoundVolume}
+              onChangeCommitted={(_event, value) => updateOption("clipSoundVolume", value)}
+              sx={{ width: 180 }}
+            />
+          </div>
+        </section>
       </div>
 
       <p className="card-copy recording-credit">Recording powered by OBS Studio (GPLv2).</p>

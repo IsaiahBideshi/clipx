@@ -1,6 +1,16 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildClipManifest, getAudioTrackNames, getClipName, getManifestFile } from "../electron/utils/clipManifest.js";
+import { buildClipManifest, describeClip, getAudioTrackNames, getClipName, getManifestFile } from "../electron/utils/clipManifest.js";
+
+test("describes a saved clip for its notification", () => {
+  const files = (follows, secondaries) => [
+    { role: "primary", follows },
+    ...Array.from({ length: secondaries }, () => ({ role: "secondary" })),
+  ];
+  assert.equal(describeClip({ seconds: 30, game: { name: "VALORANT" }, files: files(true, 2) }), "VALORANT · last 30 s · 2 screens");
+  assert.equal(describeClip({ seconds: 30, game: null, files: files(false, 1) }), "last 30 s · 2 screens");
+  assert.equal(describeClip({ seconds: 15, game: null, files: files(false, 0) }), "last 15 s");
+});
 
 test("names clips by date, game and 12-hour time", () => {
   assert.equal(getClipName(new Date(2026, 9, 25, 15, 52, 30), "VALORANT"), "Clip 2026-Oct-25 [VALORANT] 03꞉52꞉30PM");

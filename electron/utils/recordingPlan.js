@@ -16,6 +16,10 @@ export const DEFAULT_RECORDING_OPTIONS = {
   clipSecondaryFps: 30,
   clipAudioTracks: [],
   clipDetectGame: true,
+  clipToastEnabled: true,
+  clipToastCorner: "right",
+  clipSoundEnabled: true,
+  clipSoundVolume: 60,
 };
 const MAX_ENCODE_WIDTH = 4096;
 const LOAD_UNIT = 1920 * 1080 * 60;

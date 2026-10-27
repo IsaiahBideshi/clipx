@@ -59,6 +59,16 @@ export function buildClipManifest({ folderName, createdAt, seconds, game, primar
   };
 }
 
+export function describeClip(manifest) {
+  const secondaryCount = manifest.files.filter((file) => file.role === "secondary").length;
+  const screenCount = manifest.files[0]?.follows ? secondaryCount : secondaryCount + 1;
+  return [
+    manifest.game?.name,
+    `last ${manifest.seconds} s`,
+    screenCount > 1 ? `${screenCount} screens` : null,
+  ].filter(Boolean).join(" · ");
+}
+
 export function getManifestFile(manifest, fileName) {
   const name = String(fileName || "").toLowerCase();
   return manifest?.files?.find((entry) => String(entry.file).toLowerCase() === name) || null;

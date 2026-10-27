@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Notification, screen } from "electron";
+import { app, BrowserWindow, screen } from "electron";
 import { execFile, spawn } from "child_process";
 import crypto from "crypto";
 import fs from "fs";
@@ -33,7 +33,8 @@ import {
   planRecorders,
   toAudioTrackMap,
 } from "../utils/recordingPlan.js";
-import { CLIP_MANIFEST_NAME, buildClipManifest, getAudioTrackNames, getClipName } from "../utils/clipManifest.js";
+import { CLIP_MANIFEST_NAME, buildClipManifest, describeClip, getAudioTrackNames, getClipName } from "../utils/clipManifest.js";
+import { showToast } from "./toastService.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -103,10 +104,22 @@ function emitClippingState(state) {
   }
 }
 
-function showNotification(title, body) {
-  if (Notification.isSupported()) {
-    new Notification({ title, body }).show();
-  }
+function notify(kind, title, detail) {
+  const options = requestedOptions || getRecordingOptions({});
+  const screenId = recorders.get("main")?.screenId;
+  const display = screen.getAllDisplays().find((candidate) => candidate.id === screenId)
+    || screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
+
+  showToast({
+    display,
+    corner: options.clipToastCorner,
+    visible: kind === "failed" || options.clipToastEnabled,
+    sound: kind === "saved" && options.clipSoundEnabled,
+    volume: options.clipSoundVolume,
+    kind,
+    title,
+    detail,
+  }).catch((error) => console.error("ClipX: Failed to show the clip notification:", error));
 }
 
 function getObsDir() {
@@ -668,7 +681,7 @@ async function finalizeClip(createdAt, savedFiles, options) {
 
 async function saveClip() {
   if (latestState.status !== "ready") {
-    showNotification("Clipping isn't ready", latestState.message || "OBS is still starting.");
+    notify("failed", "Clipping isn't ready", latestState.message || "OBS is still starting.");
     return;
   }
   if (saving) {
@@ -690,11 +703,10 @@ async function saveClip() {
     }
 
     const manifest = await finalizeClip(createdAt, savedFiles, options);
-    const screenCount = manifest.files.length;
-    showNotification("Clip saved", [manifest.game?.name, screenCount > 1 ? `${screenCount} recordings` : null].filter(Boolean).join(" · ") || manifest.files[0].file);
+    notify("saved", "Clip saved", describeClip(manifest));
   } catch (error) {
     console.error("ClipX: Failed to save clip:", error);
-    showNotification("Clip failed", error?.message || "The clip could not be saved.");
+    notify("failed", "Clip failed", error?.message || "The clip could not be saved.");
   } finally {
     saving = false;
   }
@@ -905,6 +917,11 @@ export async function listAudioApps() {
 export async function setDetectedGame(game) {
   await setGameForCurrentExe(game);
   return getSnapshot();
+}
+
+export function previewToast() {
+  const seconds = (requestedOptions || getRecordingOptions({})).clipSeconds;
+  notify("saved", "Clip saved", [getCurrentGame()?.name || "Preview", `last ${seconds} s`].join(" · "));
 }
 
 export function identifyScreens() {

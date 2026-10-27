@@ -125,4 +125,20 @@ contextBridge.exposeInMainWorld("clipx", {
     ipcRenderer.on("clipping:state", listener);
     return () => ipcRenderer.removeListener("clipping:state", listener);
   },
+  previewToast: () => ipcRenderer.invoke("clipping:preview-toast"),
+  onToast: (callback) => {
+    if (typeof callback !== "function") {
+      return () => {};
+    }
+
+    const listener = (_event, payload) => {
+      try {
+        callback(payload);
+      } catch (error) {
+        console.error("ClipX: Toast callback failed:", error);
+      }
+    };
+    ipcRenderer.on("toast:show", listener);
+    return () => ipcRenderer.removeListener("toast:show", listener);
+  },
 });
