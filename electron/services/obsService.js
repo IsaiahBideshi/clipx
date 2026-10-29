@@ -411,6 +411,10 @@ async function setupAudio(recorder, options, ensureInput, existingInputs) {
   await recorderRequest(recorder, "SetInputMute", { inputName: MIC_INPUT_NAME, inputMuted: !audio.micTrack });
   await recorderRequest(recorder, "SetInputAudioTracks", { inputName: MIC_INPUT_NAME, inputAudioTracks: toAudioTrackMap(1, audio.micTrack) });
 
+  await ensureInput(APP_LIST_INPUT_NAME, "wasapi_process_output_capture");
+  await recorderRequest(recorder, "SetInputMute", { inputName: APP_LIST_INPUT_NAME, inputMuted: true });
+  await recorderRequest(recorder, "SetInputAudioTracks", { inputName: APP_LIST_INPUT_NAME, inputAudioTracks: toAudioTrackMap() });
+
   for (let index = 2; index <= MAX_AUDIO_TRACKS + 1; index++) {
     const inputName = `ClipX Track ${index}`;
     const track = audio.tracks.find((candidate) => candidate.index === index && candidate.kind !== "mic");
@@ -888,30 +892,18 @@ export async function listAudioApps() {
     return null;
   }
 
-  const { currentProgramSceneName: sceneName } = await recorderRequest(main, "GetCurrentProgramScene");
-  await recorderRequest(main, "CreateInput", {
-    sceneName,
+  const { propertyItems } = await recorderRequest(main, "GetInputPropertiesListPropertyItems", {
     inputName: APP_LIST_INPUT_NAME,
-    inputKind: "wasapi_process_output_capture",
-    sceneItemEnabled: false,
+    propertyName: "window",
   });
-
-  try {
-    const { propertyItems } = await recorderRequest(main, "GetInputPropertiesListPropertyItems", {
-      inputName: APP_LIST_INPUT_NAME,
-      propertyName: "window",
-    });
-    const apps = new Map();
-    for (const item of propertyItems) {
-      const exe = item.itemValue.split(":").pop();
-      if (exe && !apps.has(exe.toLowerCase())) {
-        apps.set(exe.toLowerCase(), { exe, title: item.itemName.replace(/^\[[^\]]*\]:\s*/, "") });
-      }
+  const apps = new Map();
+  for (const item of propertyItems) {
+    const exe = item.itemValue.split(":").pop();
+    if (exe && !apps.has(exe.toLowerCase())) {
+      apps.set(exe.toLowerCase(), { exe, title: item.itemName.replace(/^\[[^\]]*\]:\s*/, "") });
     }
-    return [...apps.values()].sort((a, b) => a.exe.localeCompare(b.exe));
-  } finally {
-    await recorderRequest(main, "RemoveInput", { inputName: APP_LIST_INPUT_NAME }).catch(() => {});
   }
+  return [...apps.values()].sort((a, b) => a.exe.localeCompare(b.exe));
 }
 
 export async function setDetectedGame(game) {
