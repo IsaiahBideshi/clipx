@@ -1,4 +1,5 @@
 import { getAuthenticatedUser } from './auth.js'
+import { queryIgdb } from './igdb.js'
 
 export default async function handler(req, res) {
   const allowedOrigin = process.env.CORS_ORIGIN || '*'
@@ -78,21 +79,4 @@ export default async function handler(req, res) {
 
 function queryGames(body) {
   return queryIgdb('games', body)
-}
-
-async function queryIgdb(endpoint, body) {
-  const response = await fetch(`https://api.igdb.com/v4/${endpoint}`, {
-    method: 'POST',
-    headers: {
-      'Client-ID': process.env.IGDB_CLIENT_ID,
-      Authorization: `Bearer ${process.env.IGDB_ACCESS_TOKEN}`,
-      'Content-Type': 'text/plain',
-      Accept: 'application/json',
-    },
-    body,
-  })
-  if (!response.ok) {
-    throw new Error(`IGDB request failed (${response.status}): ${await response.text()}`)
-  }
-  return response.json()
 }
