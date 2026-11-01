@@ -38,9 +38,12 @@ function sendQuery(endpoint, body, token) {
 }
 
 export async function queryIgdb(endpoint, body) {
-  let response = await sendQuery(endpoint, body, await getToken())
+  const usedRequest = getToken()
+  let response = await sendQuery(endpoint, body, await usedRequest)
   if (response.status === 401) {
-    tokenRequest = null
+    if (tokenRequest === usedRequest) {
+      tokenRequest = null
+    }
     response = await sendQuery(endpoint, body, await getToken())
   }
   if (!response.ok) {

@@ -53,6 +53,16 @@ test("renews the token and retries when IGDB rejects it", async () => {
   assert.deepEqual(calls.queries, ["token-1", "token-2"]);
 });
 
+test("shares one renewal when overlapping queries are rejected", async () => {
+  const calls = stubTwitch({ expiredTokens: ["token-1"] });
+  const { queryIgdb } = await loadIgdb();
+
+  await Promise.all([queryIgdb("games", "fields name;"), queryIgdb("games", "fields name;")]);
+
+  assert.equal(calls.tokens, 2);
+  assert.deepEqual(calls.queries, ["token-1", "token-1", "token-2", "token-2"]);
+});
+
 test("fails instead of retrying forever when a new token is rejected too", async () => {
   const calls = stubTwitch({ expiredTokens: ["token-1", "token-2"] });
   const { queryIgdb } = await loadIgdb();
