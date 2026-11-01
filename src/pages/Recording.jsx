@@ -19,6 +19,7 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 
 import { getOptions } from "./Settings.jsx";
+import { useAuthSession } from "../lib/authSession.js";
 import { toAccelerator } from "../lib/hotkeys.js";
 import { getClippingStatusLabel, useClippingState } from "../lib/clippingState.js";
 import {
@@ -173,6 +174,7 @@ export default function Recording() {
   const [clipSecondsDraft, setClipSecondsDraft] = useState(null);
   const loadedRef = useRef(false);
   const clippingState = useClippingState();
+  const { session, loading: authLoading } = useAuthSession();
 
   const recording = getRecordingOptions(options);
   const screens = clippingState?.screens || [];
@@ -561,7 +563,11 @@ export default function Recording() {
                 <div>
                   <p className="audio-track-name">{detected.game?.name || detected.name}</p>
                   <p className="audio-track-detail">
-                    {detected.exe} · {detected.game?.id ? "matched on IGDB" : "not matched yet. Sign in to match it, or pick it below."}
+                    {detected.exe} · {detected.game?.id
+                      ? "matched on IGDB"
+                      : session || authLoading
+                        ? "not matched yet. Use Change to pick it."
+                        : "not matched yet. Sign in to match it, or use Change to pick it."}
                   </p>
                 </div>
                 {!changingGame && (

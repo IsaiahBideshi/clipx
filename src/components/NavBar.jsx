@@ -156,6 +156,13 @@ export default function NavBar({ showUpdateButton = true, updateStatus = null, u
           )
         )}
 
+        <NavLink to="/recording" className="nav-link nav-link--icon" aria-label={recordingTitle} title={recordingTitle}>
+          <span className="nav-record-icon">
+            <VideocamIcon fontSize="small" />
+            <span className={`nav-record-dot ${recordDotClass}`} />
+          </span>
+        </NavLink>
+
         <NavLink to="/profile" className="nav-link nav-link--icon" aria-label="Account" title="Account">
           {account ? (
             <span className="account-avatar">
@@ -164,13 +171,6 @@ export default function NavBar({ showUpdateButton = true, updateStatus = null, u
           ) : (
             <AccountCircleIcon fontSize="small" />
           )}
-        </NavLink>
-
-        <NavLink to="/recording" className="nav-link nav-link--icon" aria-label={recordingTitle} title={recordingTitle}>
-          <span className="nav-record-icon">
-            <VideocamIcon fontSize="small" />
-            <span className={`nav-record-dot ${recordDotClass}`} />
-          </span>
         </NavLink>
 
         <NavLink to="/settings" className="nav-link nav-link--icon" aria-label="Settings" title="Settings">
