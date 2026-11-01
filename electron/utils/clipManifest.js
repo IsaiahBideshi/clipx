@@ -24,13 +24,16 @@ export function getClipName(date, gameName) {
   return `Clip ${day} ${game ? `[${game}] ` : ""}${time}${hours < 12 ? "AM" : "PM"}`;
 }
 
-export function getAudioTrackNames(tracks = []) {
+export function getAudioTrackNames({ tracks = [], desktopTrack = null, otherAppsTrack = null } = {}) {
   return [
-    { index: 1, name: "Full mix" },
+    { index: 1, name: "Full mix", kind: "mix" },
     ...tracks.map((track) => ({
       index: track.index,
       name: track.kind === "mic" ? "Microphone" : track.kind === "game" ? "Game" : track.name || track.exe,
+      kind: track.kind,
     })),
+    ...(desktopTrack ? [{ index: desktopTrack, name: "Desktop audio", kind: "desktop" }] : []),
+    ...(otherAppsTrack ? [{ index: otherAppsTrack, name: "Other apps", kind: "other" }] : []),
   ];
 }
 

@@ -10,7 +10,7 @@ import { promisify } from "util";
 
 import { upsertIndexedClip } from "./clipIndexService.js";
 import { getCurrentGame, getGameForClip, setGameForCurrentExe, startGameDetection, stopGameDetection } from "./gameDetectionService.js";
-import { getForegroundWindow } from "../utils/foregroundWindow.js";
+import { getForegroundWindow, listProcesses } from "../utils/foregroundWindow.js";
 import { isHotkeyDown, parseAccelerator } from "../utils/accelerator.js";
 import { isKeyDown } from "../utils/keyState.js";
 import {
@@ -23,12 +23,13 @@ import {
   pickSimpleEncoder,
 } from "../utils/obsConfig.js";
 import {
-  MAX_AUDIO_TRACKS,
+  OBS_AUDIO_TRACKS,
   findMonitorItem,
   getEnabledScreens,
   getRecordingOptions,
   numberScreens,
   pickFollowScreen,
+  pickOtherAudioApps,
   planAudioTracks,
   planRecorders,
   toAudioTrackMap,
@@ -45,6 +46,8 @@ const DISPLAY_INPUT_NAME = "ClipX Display";
 const DESKTOP_AUDIO_INPUT_NAME = "ClipX Desktop Audio";
 const MIC_INPUT_NAME = "ClipX Microphone";
 const APP_LIST_INPUT_NAME = "ClipX App List";
+const OTHER_APP_INPUT_PREFIX = "ClipX Other App ";
+const OTHER_APPS_SYNC_INTERVAL_MS = 5000;
 const CONNECT_TIMEOUT_MS = 30 * 1000;
 const CONNECT_RETRY_MS = 500;
 const SAVE_TIMEOUT_MS = 20 * 1000;
@@ -60,6 +63,7 @@ let appliedOptions = null;
 let requestedOptions = null;
 let startupController = null;
 let followTimer = null;
+let otherAppsTimer = null;
 let saving = false;
 let watchingDisplays = false;
 let applyQueue = Promise.resolve();
@@ -405,7 +409,7 @@ async function setupAudio(recorder, options, ensureInput, existingInputs) {
   const audio = planAudioTracks(options.clipAudioTracks);
 
   await ensureInput(DESKTOP_AUDIO_INPUT_NAME, "wasapi_output_capture");
-  await recorderRequest(recorder, "SetInputAudioTracks", { inputName: DESKTOP_AUDIO_INPUT_NAME, inputAudioTracks: toAudioTrackMap(1) });
+  await recorderRequest(recorder, "SetInputAudioTracks", { inputName: DESKTOP_AUDIO_INPUT_NAME, inputAudioTracks: toAudioTrackMap(1, audio.desktopTrack) });
 
   await ensureInput(MIC_INPUT_NAME, "wasapi_input_capture");
   await recorderRequest(recorder, "SetInputMute", { inputName: MIC_INPUT_NAME, inputMuted: !audio.micTrack });
@@ -415,7 +419,7 @@ async function setupAudio(recorder, options, ensureInput, existingInputs) {
   await recorderRequest(recorder, "SetInputMute", { inputName: APP_LIST_INPUT_NAME, inputMuted: true });
   await recorderRequest(recorder, "SetInputAudioTracks", { inputName: APP_LIST_INPUT_NAME, inputAudioTracks: toAudioTrackMap() });
 
-  for (let index = 2; index <= MAX_AUDIO_TRACKS + 1; index++) {
+  for (let index = 2; index <= OBS_AUDIO_TRACKS; index++) {
     const inputName = `ClipX Track ${index}`;
     const track = audio.tracks.find((candidate) => candidate.index === index && candidate.kind !== "mic");
     if (!track) {
@@ -431,6 +435,62 @@ async function setupAudio(recorder, options, ensureInput, existingInputs) {
   }
 
   await applyVolumes(recorder, audio);
+
+  for (const inputName of existingInputs) {
+    if (inputName.startsWith(OTHER_APP_INPUT_PREFIX)) {
+      await recorderRequest(recorder, "RemoveInput", { inputName });
+      existingInputs.delete(inputName);
+    }
+  }
+}
+
+async function syncOtherApps(recorder, options) {
+  const audio = planAudioTracks(options.clipAudioTracks);
+  if (!audio.otherAppsTrack) {
+    return;
+  }
+
+  const windowExes = [...(await listWindowApps(recorder)).values()].map((windowApp) => windowApp.exe);
+  const trackedExes = audio.tracks.filter((track) => track.kind !== "mic").map((track) => (track.kind === "game" ? getGameTrackExe() : track.exe));
+  const wanted = new Set(pickOtherAudioApps(windowExes, trackedExes, listProcesses()).map((exe) => `${OTHER_APP_INPUT_PREFIX}${exe}`));
+
+  const { inputs } = await recorderRequest(recorder, "GetInputList");
+  const existing = new Set(inputs.map((input) => input.inputName).filter((inputName) => inputName.startsWith(OTHER_APP_INPUT_PREFIX)));
+  for (const inputName of existing) {
+    if (!wanted.has(inputName)) {
+      await recorderRequest(recorder, "RemoveInput", { inputName });
+    }
+  }
+
+  const { currentProgramSceneName: sceneName } = await recorderRequest(recorder, "GetCurrentProgramScene");
+  for (const inputName of wanted) {
+    if (existing.has(inputName)) {
+      continue;
+    }
+
+    const exe = inputName.slice(OTHER_APP_INPUT_PREFIX.length);
+    await recorderRequest(recorder, "CreateInput", {
+      sceneName,
+      inputName,
+      inputKind: "wasapi_process_output_capture",
+      inputSettings: { window: toWindowMatch(exe), priority: 2 },
+    });
+    await recorderRequest(recorder, "SetInputAudioTracks", { inputName, inputAudioTracks: toAudioTrackMap(audio.otherAppsTrack) });
+  }
+}
+
+function runOtherAppsSync() {
+  const main = recorders.get("main");
+  if (!main?.socket || main.syncingOtherApps || latestState.status !== "ready") {
+    return;
+  }
+
+  main.syncingOtherApps = true;
+  syncOtherApps(main, appliedOptions)
+    .catch((error) => console.error("ClipX: Failed to update the other apps track:", error))
+    .finally(() => {
+      main.syncingOtherApps = false;
+    });
 }
 
 async function applyVolumes(recorder, audio) {
@@ -549,6 +609,10 @@ async function launchRecorders(options, signal) {
     startFollowing();
   }
   emitClippingState({ status: "ready" });
+  if (planAudioTracks(options.clipAudioTracks).otherAppsTrack) {
+    runOtherAppsSync();
+    otherAppsTimer = setInterval(runOtherAppsSync, OTHER_APPS_SYNC_INTERVAL_MS);
+  }
 }
 
 function startFollowing() {
@@ -586,6 +650,8 @@ function stopObs() {
   startupController?.abort();
   startupController = null;
   stopFollowing();
+  clearInterval(otherAppsTimer);
+  otherAppsTimer = null;
 
   for (const recorder of recorders.values()) {
     const child = recorder.process;
@@ -664,7 +730,7 @@ async function finalizeClip(createdAt, savedFiles, options) {
     primary: {
       follows,
       screen: follows ? null : describeScreen(primary.recorder.screenId),
-      audioTracks: getAudioTrackNames(planAudioTracks(options.clipAudioTracks).tracks),
+      audioTracks: getAudioTrackNames(planAudioTracks(options.clipAudioTracks)),
     },
     secondaries,
   });
@@ -753,6 +819,7 @@ async function onGameChange() {
     inputName: `ClipX Track ${gameTrack.index}`,
     inputSettings: { window: toWindowMatch(getGameTrackExe()), priority: 2 },
   }).catch((error) => console.error("ClipX: Failed to point the game track at the new game:", error));
+  runOtherAppsSync();
 }
 
 function syncGameDetection(options) {
@@ -892,7 +959,12 @@ export async function listAudioApps() {
     return null;
   }
 
-  const { propertyItems } = await recorderRequest(main, "GetInputPropertiesListPropertyItems", {
+  const apps = await listWindowApps(main);
+  return [...apps.values()].sort((a, b) => a.exe.localeCompare(b.exe));
+}
+
+async function listWindowApps(recorder) {
+  const { propertyItems } = await recorderRequest(recorder, "GetInputPropertiesListPropertyItems", {
     inputName: APP_LIST_INPUT_NAME,
     propertyName: "window",
   });
@@ -903,7 +975,7 @@ export async function listAudioApps() {
       apps.set(exe.toLowerCase(), { exe, title: item.itemName.replace(/^\[[^\]]*\]:\s*/, "") });
     }
   }
-  return [...apps.values()].sort((a, b) => a.exe.localeCompare(b.exe));
+  return apps;
 }
 
 export async function setDetectedGame(game) {

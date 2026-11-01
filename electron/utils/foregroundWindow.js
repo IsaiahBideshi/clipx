@@ -55,7 +55,7 @@ export function listProcesses() {
     const processes = [];
     const entry = { dwSize: processEntrySize };
     for (let found = Process32FirstW(snapshot, entry); found; found = Process32NextW(snapshot, entry)) {
-      processes.push({ pid: entry.th32ProcessID, exeName: entry.szExeFile });
+      processes.push({ pid: entry.th32ProcessID, parentPid: entry.th32ParentProcessID, exeName: entry.szExeFile });
     }
     return processes;
   } finally {

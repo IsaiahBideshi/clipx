@@ -1,6 +1,7 @@
 export const QUALITY_HEIGHTS = [2160, 1440, 1080, 720, 480];
 export const QUALITY_FPS = [60, 30];
-export const MAX_AUDIO_TRACKS = 5;
+export const MAX_AUDIO_TRACKS = 4;
+export const OBS_AUDIO_TRACKS = 6;
 export const MIN_CLIP_SECONDS = 5;
 export const MAX_CLIP_SECONDS = 600;
 export const DEFAULT_RECORDING_OPTIONS = {
@@ -21,6 +22,7 @@ export const DEFAULT_RECORDING_OPTIONS = {
   clipSoundEnabled: true,
   clipSoundVolume: 60,
 };
+const PROCESS_TREE_ROOTS = ["explorer.exe"];
 const MAX_ENCODE_WIDTH = 4096;
 const LOAD_UNIT = 1920 * 1080 * 60;
 
@@ -137,16 +139,58 @@ export function estimateLoad(recorders) {
 
 export function planAudioTracks(tracks = []) {
   const used = tracks.slice(0, MAX_AUDIO_TRACKS).map((track, index) => ({ ...track, index: index + 2 }));
+  const restTrack = used.length ? used.length + 2 : null;
+  const hasAppTracks = used.some((track) => track.kind !== "mic");
   return {
     tracks: used,
-    recTracks: used.reduce((mask, track) => mask | (1 << (track.index - 1)), 1),
+    recTracks: [...used.map((track) => track.index), restTrack ?? 1].reduce((mask, index) => mask | (1 << (index - 1)), 1),
     micTrack: used.find((track) => track.kind === "mic")?.index ?? null,
+    desktopTrack: hasAppTracks ? null : restTrack,
+    otherAppsTrack: hasAppTracks ? restTrack : null,
   };
+}
+
+export function pickOtherAudioApps(windowExes, trackedExes, processes) {
+  const toKey = (exe) => String(exe || "").toLowerCase();
+  const tracked = new Set(trackedExes.map(toKey));
+  const windowed = new Set(windowExes.map(toKey));
+  const processByPid = new Map(processes.map((process) => [process.pid, process]));
+  const blocked = new Set(PROCESS_TREE_ROOTS);
+
+  for (const process of processes) {
+    const exe = toKey(process.exeName);
+    if (!windowed.has(exe) && !tracked.has(exe)) {
+      continue;
+    }
+
+    const visited = new Set([process.pid]);
+    let parent = processByPid.get(process.parentPid);
+    while (parent && !visited.has(parent.pid)) {
+      visited.add(parent.pid);
+      const parentExe = toKey(parent.exeName);
+      if (parentExe !== exe) {
+        blocked.add(parentExe);
+        if (tracked.has(parentExe)) {
+          blocked.add(exe);
+        }
+      }
+      parent = processByPid.get(parent.parentPid);
+    }
+  }
+
+  const picked = new Map();
+  for (const exe of windowExes) {
+    const key = toKey(exe);
+    if (!tracked.has(key) && !blocked.has(key)) {
+      picked.set(key, exe);
+    }
+  }
+  return [...picked.values()];
 }
 
 export function toAudioTrackMap(...indexes) {
   const map = {};
-  for (let index = 1; index <= MAX_AUDIO_TRACKS + 1; index++) {
+  for (let index = 1; index <= OBS_AUDIO_TRACKS; index++) {
     map[index] = indexes.includes(index);
   }
   return map;

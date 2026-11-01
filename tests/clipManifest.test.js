@@ -31,12 +31,14 @@ test("describes the primary and secondary files of a clip", () => {
     createdAt: "2026-10-05T13:03:07.000Z",
     seconds: 30,
     game: { id: 242408, name: "Counter-Strike 2" },
-    primary: { follows: true, audioTracks: getAudioTrackNames([{ kind: "mic", index: 2 }, { kind: "app", exe: "Discord.exe", index: 3 }]) },
+    primary: { follows: true, audioTracks: getAudioTrackNames({ tracks: [{ kind: "mic", index: 2 }, { kind: "app", exe: "Discord.exe", index: 3 }], otherAppsTrack: 4 }) },
     secondaries: [{ screen: { number: 2, label: "DELL", width: 1920, height: 1080 } }],
   });
 
   assert.equal(manifest.files[0].file, "Clip 2026-10-05 09-03-07.mp4");
-  assert.deepEqual(manifest.files[0].audioTracks.map((track) => track.name), ["Full mix", "Microphone", "Discord.exe"]);
+  assert.deepEqual(manifest.files[0].audioTracks.map((track) => track.name), ["Full mix", "Microphone", "Discord.exe", "Other apps"]);
+  assert.deepEqual(manifest.files[0].audioTracks.map((track) => track.kind), ["mix", "mic", "app", "other"]);
+  assert.deepEqual(getAudioTrackNames({ tracks: [{ kind: "mic", index: 2 }], desktopTrack: 3 }).map((track) => track.kind), ["mix", "mic", "desktop"]);
   assert.equal(getManifestFile(manifest, "screen 2.MP4").role, "secondary");
   assert.equal(getManifestFile(manifest, "other.mp4"), null);
   assert.equal(manifest.game.id, 242408);

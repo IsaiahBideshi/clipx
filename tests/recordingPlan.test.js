@@ -8,6 +8,7 @@ import {
   findMonitorItem,
   numberScreens,
   pickFollowScreen,
+  pickOtherAudioApps,
   planAudioTracks,
   planRecorders,
   toAudioTrackMap,
@@ -93,11 +94,54 @@ test("estimates load from resolution and fps", () => {
 test("lays out audio tracks after the full mix", () => {
   const plan = planAudioTracks([{ kind: "game" }, { kind: "mic" }, { kind: "app", exe: "Discord.exe" }]);
   assert.deepEqual(plan.tracks.map((track) => track.index), [2, 3, 4]);
-  assert.equal(plan.recTracks, 0b1111);
+  assert.equal(plan.recTracks, 0b11111);
   assert.equal(plan.micTrack, 3);
-  assert.equal(planAudioTracks([]).recTracks, 1);
-  assert.equal(planAudioTracks(Array.from({ length: 8 }, () => ({ kind: "app" }))).tracks.length, 5);
+  assert.equal(plan.otherAppsTrack, 5);
+  assert.equal(plan.desktopTrack, null);
+  assert.equal(planAudioTracks(Array.from({ length: 8 }, () => ({ kind: "app" }))).tracks.length, 4);
+  assert.equal(planAudioTracks(Array.from({ length: 8 }, () => ({ kind: "app" }))).otherAppsTrack, 6);
   assert.deepEqual(toAudioTrackMap(1, 3), { 1: true, 2: false, 3: true, 4: false, 5: false, 6: false });
+});
+
+test("records only the full mix when no tracks are added", () => {
+  const plan = planAudioTracks([]);
+  assert.equal(plan.recTracks, 1);
+  assert.equal(plan.desktopTrack, null);
+  assert.equal(plan.otherAppsTrack, null);
+});
+
+test("gives desktop audio its own track when only the mic is separated", () => {
+  const plan = planAudioTracks([{ kind: "mic" }]);
+  assert.equal(plan.recTracks, 0b111);
+  assert.equal(plan.desktopTrack, 3);
+  assert.equal(plan.otherAppsTrack, null);
+});
+
+test("picks other apps whose audio no other track already captures", () => {
+  const processes = [
+    { pid: 1, parentPid: 0, exeName: "explorer.exe" },
+    { pid: 2, parentPid: 1, exeName: "Discord.exe" },
+    { pid: 3, parentPid: 2, exeName: "Discord.exe" },
+    { pid: 4, parentPid: 1, exeName: "chrome.exe" },
+    { pid: 5, parentPid: 1, exeName: "steam.exe" },
+    { pid: 6, parentPid: 5, exeName: "game.exe" },
+    { pid: 7, parentPid: 2, exeName: "opened-from-discord.exe" },
+  ];
+
+  assert.deepEqual(
+    pickOtherAudioApps(["explorer.exe", "Discord.exe", "chrome.exe", "CHROME.exe", "steam.exe", "game.exe", "opened-from-discord.exe"], ["discord.exe"], processes),
+    ["CHROME.exe", "game.exe"],
+  );
+  assert.deepEqual(pickOtherAudioApps(["steam.exe"], ["game.exe"], processes), []);
+  assert.deepEqual(pickOtherAudioApps(["chrome.exe"], [""], processes), ["chrome.exe"]);
+});
+
+test("survives a loop in the process parents", () => {
+  const processes = [
+    { pid: 1, parentPid: 2, exeName: "a.exe" },
+    { pid: 2, parentPid: 1, exeName: "b.exe" },
+  ];
+  assert.deepEqual(pickOtherAudioApps(["c.exe"], [], processes), ["c.exe"]);
 });
 
 test("matches an OBS monitor by its desktop position", () => {
