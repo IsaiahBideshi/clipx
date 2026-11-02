@@ -52,6 +52,7 @@ contextBridge.exposeInMainWorld("clipx", {
   deleteClipBlob: (options) => ipcRenderer.invoke("delete-clip-blob", options),
   renameClip: (clipPath, newName) => ipcRenderer.invoke("rename-clip", clipPath, newName),
   deleteClip: (clipPath) => ipcRenderer.invoke("delete-clip", clipPath),
+  deleteClipGroup: (clipPath) => ipcRenderer.invoke("delete-clip-group", clipPath),
   linkYoutube: (userId) => ipcRenderer.invoke("link-youtube", userId),
   unlinkYoutube: (userId) => ipcRenderer.invoke("unlink-youtube", userId),
   getGoogleInfo: (userId) => ipcRenderer.invoke("get-google-info", userId),
@@ -110,6 +111,8 @@ contextBridge.exposeInMainWorld("clipx", {
   assignGame: (exe, game) => ipcRenderer.invoke("clipping:assign-game", exe, game),
   removeGameAssignment: (exe) => ipcRenderer.invoke("clipping:remove-game-assignment", exe),
   getClipGroup: (clipPath) => ipcRenderer.invoke("local-clips:get-group", clipPath),
+  extractClipTracks: (clipPath) => ipcRenderer.invoke("clip-tracks:extract", clipPath),
+  releaseClipTracks: () => ipcRenderer.invoke("clip-tracks:release"),
   onClippingState: (callback) => {
     if (typeof callback !== "function") {
       return () => {};

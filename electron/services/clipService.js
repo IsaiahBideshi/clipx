@@ -1,6 +1,6 @@
 import fs from "fs";
 import path from "path";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import ffmpeg from "fluent-ffmpeg";
 import ffmpegPath from "ffmpeg-static";
 import { app } from "electron";
@@ -9,7 +9,9 @@ import { rename } from "fs/promises";
 import { uploadClipToYoutube } from "./youtubeService.js";
 import { resolveFfmpegPath } from "../utils/ffmpeg.js";
 import { STREAM_COPY_BITRATE, buildStreamBlobName, renderStreamCopy } from "../utils/streamCopy.js";
-import { getIndexedClipData, setIndexedClipMetadata, markIndexedClipMissing, getWatchedRootForPath, upsertIndexedClip, getCachedThumbnailPath } from "./clipIndexService.js";
+import { getIndexedClipData, setIndexedClipMetadata, markIndexedClipMissing, getWatchedRootForPath, upsertIndexedClip, getCachedThumbnailPath, getClipGroup } from "./clipIndexService.js";
+import { CLIP_MANIFEST_NAME, getManifestFile, removeManifestFile, renameManifestFile } from "../utils/clipManifest.js";
+import { buildAudioOutputOptions } from "../utils/audioMix.js";
 import { getSupabaseAccessToken } from "../ipc/authStorage.js";
 
 ffmpeg.setFfmpegPath(resolveFfmpegPath(ffmpegPath));
@@ -42,13 +44,36 @@ function buildThumbnailOutputName(baseName) {
   return buildClipOutputName(baseName).replace(/\.mp4$/, ".jpg");
 }
 
-async function renderClipSegment(videoPath, startTime, endTime, outputPath) {
+function getScreenSource(clipPath, screen) {
+  if (!screen) {
+    return null;
+  }
+
+  const file = getClipGroup(clipPath)?.files.find((entry) => entry.path === screen.path && entry.role === "secondary");
+  if (!file) {
+    throw new ClipServiceError("That screen is no longer part of this clip.", 404);
+  }
+
+  const shift = Number(screen.shift);
+  return { videoPath: file.path, audioPath: clipPath, shift: Number.isFinite(shift) ? shift : 0 };
+}
+
+async function renderClipSegment(videoPath, startTime, endTime, outputPath, mix = null, screen = null) {
   await new Promise((resolve, reject) => {
-    ffmpeg(videoPath)
-      .setStartTime(startTime)
+    const command = ffmpeg(videoPath).setStartTime(startTime);
+    if (screen) {
+      const audioStart = startTime + screen.shift;
+      command.input(screen.audioPath);
+      if (audioStart >= 0) {
+        command.seekInput(audioStart);
+      } else {
+        command.inputOptions(["-itsoffset", String(-audioStart)]);
+      }
+    }
+    command
       .setDuration(endTime - startTime)
       .output(outputPath)
-      .outputOptions(["-c copy", "-movflags +faststart"])
+      .outputOptions([...buildAudioOutputOptions(mix, screen ? 1 : 0), "-movflags +faststart"])
       .on("end", resolve)
       .on("error", reject)
       .run();
@@ -165,7 +190,7 @@ export async function saveClip(options) {
   const tags = options.tags || [];
   let game = options.game || null;
   if (options.game && typeof options.game === "object") {
-    game.image = game.image.replace("t_thumb", "t_cover_big") || null;
+    game.image = game.image?.replace("t_thumb", "t_cover_big") || null;
   }
 
   if (!videoPath || typeof videoPath !== "string") {
@@ -175,6 +200,7 @@ export async function saveClip(options) {
     throw new TypeError("save-clip: Invalid startTime or endTime");
   }
 
+  const screen = getScreenSource(videoPath, options.screen);
   const sourceDir = path.dirname(videoPath);
   const outputDir = path.join(sourceDir, "ClipX Videos");
   await fs.promises.mkdir(outputDir, { recursive: true });
@@ -188,7 +214,7 @@ export async function saveClip(options) {
     throw new Error(`A clip named "${clipTitle}" already exists`);
   }
 
-  await renderClipSegment(videoPath, startTime, endTime, outputPath);
+  await renderClipSegment(screen?.videoPath || videoPath, startTime, endTime, outputPath, options.mix, screen);
 
   const stat = await fs.promises.stat(outputPath);
   if (!stat.size) {
@@ -198,7 +224,7 @@ export async function saveClip(options) {
   await saveClipData(outputDir, {
     path: outputPath,
     name: path.basename(outputPath),
-    sourcePath: videoPath,
+    sourcePath: screen?.videoPath || videoPath,
     size: stat.size,
     modifiedAt: stat.mtimeMs,
     startTime,
@@ -239,7 +265,8 @@ export async function uploadClip(app, options) {
   const tempStreamPath = path.join(tempDir, `${tempStamp}-stream-${buildClipOutputName(clipTitle)}`);
 
   try {
-    await renderClipSegment(videoPath, startTime, endTime, tempPath);
+    const screen = getScreenSource(videoPath, options.screen);
+    await renderClipSegment(screen?.videoPath || videoPath, startTime, endTime, tempPath, options.mix, screen);
 
     let streamPath = null;
     try {
@@ -255,7 +282,7 @@ export async function uploadClip(app, options) {
 
     let thumbnailPath = null;
     try {
-      await renderClipThumbnail(videoPath, startTime, endTime, tempThumbPath);
+      await renderClipThumbnail(screen?.videoPath || videoPath, startTime, endTime, tempThumbPath);
       thumbnailPath = tempThumbPath;
     } catch (thumbnailError) {
       console.error("ClipX: Failed to render thumbnail:", thumbnailError);
@@ -403,6 +430,57 @@ export async function deleteClipBlob({ blobName, thumbnailBlobName }) {
   }
 }
 
+function getTracksDir() {
+  return path.join(app.getPath("temp"), "clipx", "tracks");
+}
+
+export async function extractClipTracks(clipPath) {
+  if (typeof clipPath !== "string" || clipPath.length === 0) {
+    throw new TypeError("extract-clip-tracks: clipPath must be a non-empty string");
+  }
+
+  const group = getClipGroup(clipPath);
+  const tracks = getManifestFile(group?.manifest, path.basename(clipPath))?.audioTracks || [];
+  if (!tracks.length) {
+    return [];
+  }
+
+  const stat = await fs.promises.stat(clipPath);
+  const key = createHash("sha1").update(`${clipPath}|${stat.size}|${stat.mtimeMs}`).digest("hex").slice(0, 16);
+  const tracksDir = getTracksDir();
+  const outputDir = path.join(tracksDir, key);
+  for (const name of await fs.promises.readdir(tracksDir).catch(() => [])) {
+    if (name !== key) {
+      await fs.promises.rm(path.join(tracksDir, name), { recursive: true, force: true });
+    }
+  }
+
+  const outputs = tracks.map((track) => ({ index: track.index, path: path.join(outputDir, `${track.index}.m4a`) }));
+  if (outputs.every((output) => fs.existsSync(output.path))) {
+    return outputs;
+  }
+
+  await fs.promises.mkdir(outputDir, { recursive: true });
+  try {
+    await new Promise((resolve, reject) => {
+      const command = ffmpeg(clipPath);
+      for (const output of outputs) {
+        command.output(output.path).outputOptions(["-map", `0:a:${output.index - 1}`, "-c", "copy"]);
+      }
+      command.on("end", resolve).on("error", reject).run();
+    });
+  } catch (error) {
+    await fs.promises.rm(outputDir, { recursive: true, force: true });
+    throw error;
+  }
+
+  return outputs;
+}
+
+export async function releaseClipTracks() {
+  await fs.promises.rm(getTracksDir(), { recursive: true, force: true });
+}
+
 export async function getClipData(clipPath) {
   if (typeof clipPath !== "string" || clipPath.length === 0) {
     throw new TypeError("get-clip-data: clipPath must be a non-empty string");
@@ -417,6 +495,24 @@ export async function getClipData(clipPath) {
   const clipsData = await getClipDataFromDir(clipDir);
   const clipEntry = clipsData.clips.find((item) => item.path === clipPath);
   return clipEntry || null;
+}
+
+async function updateClipManifest(clipDir, update) {
+  const manifestPath = path.join(clipDir, CLIP_MANIFEST_NAME);
+  let manifest;
+  try {
+    manifest = JSON.parse(await fs.promises.readFile(manifestPath, "utf-8"));
+  } catch (error) {
+    if (error?.code !== "ENOENT") {
+      console.error("ClipX: Failed to read clip manifest:", error);
+    }
+    return;
+  }
+
+  const updated = update(manifest);
+  if (updated) {
+    await fs.promises.writeFile(manifestPath, JSON.stringify(updated, null, 2), "utf-8");
+  }
 }
 
 export async function renameClip(clipPath, newName) {
@@ -455,9 +551,18 @@ export async function renameClip(clipPath, newName) {
     throw new ClipServiceError(`A clip named "${baseName + ext}" already exists`, 409);
   }
 
+  const thumbPath = getCachedThumbnailPath(clipPath) || getThumbnailPath(clipPath);
+
   try {
     await rename(clipPath, newClipPath);
-    
+    await rename(thumbPath, getThumbnailPath(newClipPath)).catch((error) => {
+      if (error.code !== "ENOENT") {
+        console.error(`Failed to rename thumbnail at ${thumbPath}:`, error);
+      }
+    });
+    await updateClipManifest(clipDir, (manifest) => renameManifestFile(manifest, path.basename(clipPath), path.basename(newClipPath)))
+      .catch((error) => console.error("ClipX: Failed to update clip manifest after rename:", error));
+
     const root = getWatchedRootForPath(newClipPath) || clipDir;
     markIndexedClipMissing(clipPath, { emitChange: true });
     await upsertIndexedClip(root, newClipPath, { emitChange: true });
@@ -469,18 +574,56 @@ export async function renameClip(clipPath, newName) {
   }
 }
 
+async function removeClipManifest(dirPath) {
+  await fs.promises.rm(path.join(dirPath, CLIP_MANIFEST_NAME), { force: true });
+  await fs.promises.rmdir(dirPath).catch(() => {});
+}
+
 export async function deleteClip(clipPath) {
   if (typeof clipPath !== "string" || clipPath.length === 0) {
     throw new TypeError("delete-clip: clipPath must be a non-empty string");
   }
 
+  const group = getClipGroup(clipPath);
+  const entry = getManifestFile(group?.manifest, path.basename(clipPath));
+  if (entry?.role === "primary" && group.files.length > 1) {
+    throw new Error("Failed to delete clip: the other screens use this file's audio, so delete all screens instead.");
+  }
+
+  await deleteClipFile(clipPath);
+  if (entry?.role === "secondary") {
+    await updateClipManifest(group.path, (manifest) => removeManifestFile(manifest, entry.file));
+  } else if (entry) {
+    await removeClipManifest(group.path);
+  }
+}
+
+export async function deleteClipGroup(clipPath) {
+  if (typeof clipPath !== "string" || clipPath.length === 0) {
+    throw new TypeError("delete-clip-group: clipPath must be a non-empty string");
+  }
+
+  const group = getClipGroup(clipPath);
+  if (!group) {
+    return deleteClip(clipPath);
+  }
+
+  for (const file of group.files) {
+    await deleteClipFile(file.path);
+  }
+  await removeClipManifest(group.path);
+}
+
+function getThumbnailPath(clipPath) {
+  const thumbsDir = clipPath.toLowerCase().includes("clipx videos") ? "saved clips thumbs" : "thumbs";
+  return path.join(app.getPath("appData"), "clipx", thumbsDir, `${path.basename(clipPath, path.extname(clipPath))}.jpg`);
+}
+
+async function deleteClipFile(clipPath) {
   try {
-    const clipx = path.join(app.getPath("appData"), "clipx");
-    const baseName = path.basename(clipPath, path.extname(clipPath));
-    const thumbsDir = clipPath.toLowerCase().includes("clipx videos") ? "saved clips thumbs" : "thumbs";
     const thumbnailPaths = [
       getCachedThumbnailPath(clipPath),
-      path.join(clipx, thumbsDir, `${baseName}.jpg`),
+      getThumbnailPath(clipPath),
     ];
 
     await fs.promises.unlink(clipPath);

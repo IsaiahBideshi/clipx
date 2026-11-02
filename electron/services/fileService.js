@@ -90,6 +90,7 @@ export function registerClipxProtocol(protocol) {
         "Content-Range": `bytes ${start}-${end}/${fileStat.size}`,
         "Accept-Ranges": "bytes",
         "Content-Length": String(chunkSize),
+        "Access-Control-Allow-Origin": "*",
       },
     });
   }

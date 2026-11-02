@@ -419,7 +419,7 @@ export async function upsertIndexedClip(rootPath, filePath, options = {}) {
     );
 
   const clip = rowToClip(getRowByPath(normalizedFilePath));
-  if (options.emitChange) {
+  if (options.emitChange && groupRole !== "secondary") {
     emitIndexEvent({
       type: existingRow ? "updated" : "added",
       rootPath: normalizedRootPath,
@@ -441,7 +441,9 @@ export function getClipGroup(clipPath) {
   return {
     path: dirPath,
     manifest,
-    files: manifest.files.map((entry) => ({ ...entry, path: path.join(dirPath, entry.file) })),
+    files: manifest.files
+      .map((entry) => ({ ...entry, path: path.join(dirPath, entry.file) }))
+      .filter((entry) => fs.existsSync(entry.path)),
   };
 }
 

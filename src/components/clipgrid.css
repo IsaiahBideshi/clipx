@@ -34,11 +34,45 @@
   box-shadow:
     0 26px 60px rgba(0, 0, 0, 0.52),
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  width: min(1320px, calc(100vw - 430px));
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  width: min(1400px, calc(100vw - 350px));
   max-width: 100%;
   max-height: calc(100vh - 56px);
   overflow-y: auto;
   text-align: center;
+}
+
+.clip-editor > * {
+  flex-shrink: 0;
+}
+
+.clip-editor > .screen-stage {
+  flex-shrink: 1;
+  min-height: 180px;
+  display: flex;
+  flex-direction: column;
+}
+
+.screen-stage-front {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.screen-stage .video-player-shell {
+  flex: 0 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.screen-stage .video-player-element {
+  flex: 0 1 auto;
+  min-height: 0;
+  object-fit: contain;
 }
 
 .clip-grid{
@@ -184,6 +218,28 @@
 }
 .clip-card.clip-menu-open {
   z-index: 3;
+}
+.clip-card--stacked {
+  box-shadow:
+    2px 2px 5px rgb(30, 31, 34),
+    6px -6px 0 -1px #1b1d23,
+    6px -6px 0 0 rgba(255, 255, 255, 0.16),
+    12px -12px 0 -2px #17181d,
+    12px -12px 0 -1px rgba(255, 255, 255, 0.1);
+}
+.clip-screens-badge {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.7);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 600;
 }
 .clip-card.filler {
   visibility: hidden;
@@ -363,12 +419,193 @@
   background: #90caf9;
 }
 
+.screen-stage--multi {
+  width: 92%;
+  aspect-ratio: 16 / 9;
+  margin: 0 auto 8px;
+}
+
+.screen-stage--multi .screen-stage-front {
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 22px 44px rgba(0, 0, 0, 0.46);
+}
+
+.screen-stage-snapshot {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.screen-stage--multi .video-player-shell,
+.screen-stage--multi .video-player-element {
+  flex-grow: 1;
+}
+
+.screen-stage-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin: 0 auto 10px;
+}
+
+.screen-stage-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 180ms ease, border-color 180ms ease, color 180ms ease;
+}
+
+.screen-stage-chip:hover {
+  border-color: rgba(var(--accent-rgb), 0.5);
+}
+
+.screen-stage-chip--active {
+  background: rgba(var(--accent-rgb), 0.16);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.audio-mixer {
+  width: 92%;
+  margin: 14px auto 0;
+  text-align: left;
+}
+
+.audio-mixer-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.audio-mixer-toggle,
+.audio-mixer-reset {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 180ms ease, border-color 180ms ease;
+}
+
+.audio-mixer-toggle:hover,
+.audio-mixer-reset:hover {
+  background: rgba(var(--accent-rgb), 0.12);
+  border-color: rgba(var(--accent-rgb), 0.5);
+}
+
+.audio-mixer-badge {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #0f1015;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.audio-mixer-chevron {
+  transition: transform 180ms ease;
+}
+
+.audio-mixer-chevron--open {
+  transform: rotate(180deg);
+}
+
+.audio-mixer-tracks {
+  display: grid;
+  gap: 2px;
+  margin-top: 8px;
+  padding: 6px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.audio-mixer-track {
+  display: grid;
+  grid-template-columns: auto minmax(90px, 160px) minmax(120px, 1fr) 56px;
+  align-items: center;
+  gap: 12px;
+}
+
+.audio-mixer-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.9rem;
+}
+
+.audio-mixer-value {
+  text-align: right;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.6);
+  font-variant-numeric: tabular-nums;
+}
+
 .upload-menu {
   text-align: left;
 }
 
 .upload-menu-header {
+  position: relative;
   margin-bottom: 10px;
+}
+
+.upload-menu-target {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: rgba(var(--accent-rgb), 0.16);
+  border: 1px solid rgba(var(--accent-rgb), 0.6);
+  color: var(--accent);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.delete-menu-item.MuiMenuItem-root {
+  gap: 10px;
+  color: #ffc4c4;
+}
+
+.delete-menu-item.MuiMenuItem-root:hover,
+.delete-menu-item.MuiMenuItem-root.Mui-focusVisible {
+  background: rgba(255, 76, 76, 0.22);
+  color: #ff9b9b;
+}
+
+.delete-menu-item--all.MuiMenuItem-root {
+  color: #ff9b9b;
+}
+
+.delete-menu-note {
+  margin-left: auto;
+  padding-left: 12px;
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.6);
 }
 
 .upload-menu-header h4 {

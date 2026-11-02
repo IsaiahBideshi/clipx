@@ -27,6 +27,7 @@ export default function VideoPlayer({
   src,
   originalSrc,
   poster,
+  crossOrigin,
   volume = 1,
   muted = false,
   startTime = 0,
@@ -204,6 +205,12 @@ export default function VideoPlayer({
     get paused() {
       return videoRef.current ? videoRef.current.paused : true;
     },
+    get element() {
+      return videoRef.current;
+    },
+    resumeAt(time, paused) {
+      resumeRef.current = { time, paused };
+    },
   }), [duration, currentTime, start, end]);
 
   useEffect(() => {
@@ -347,6 +354,7 @@ export default function VideoPlayer({
       <video
         ref={videoRef}
         src={activeSrc}
+        crossOrigin={crossOrigin}
         onLoadedMetadata={(e) => {
           const d = e.target.duration;
           if (resumeRef.current) {

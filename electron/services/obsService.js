@@ -741,7 +741,7 @@ async function finalizeClip(createdAt, savedFiles, options) {
   await fs.promises.writeFile(path.join(clipDir, CLIP_MANIFEST_NAME), JSON.stringify(manifest, null, 2), "utf-8");
 
   const sources = [primary, ...secondaries];
-  for (const [index, entry] of manifest.files.entries()) {
+  for (const [index, entry] of [...manifest.files.entries()].reverse()) {
     const destination = path.join(clipDir, entry.file);
     await fs.promises.rename(sources[index].savedPath, destination);
     await upsertIndexedClip(options.clipsFolder, destination, { emitChange: entry.role === "primary" })
