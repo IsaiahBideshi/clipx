@@ -263,7 +263,8 @@ export function getGameForClip(clipSeconds) {
     return null;
   }
 
-  return { ...(detected.game || { id: null, name: detected.name, label: detected.name, image: null }), exe: detected.exe };
+  const game = detected.game || getGameMapping(getMappings(), detected.exePath)?.game;
+  return { ...(game || { id: null, name: detected.name, label: detected.name, image: null }), exe: detected.exe };
 }
 
 export async function setGameForCurrentExe(game) {
