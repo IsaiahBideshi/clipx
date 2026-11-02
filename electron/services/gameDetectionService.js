@@ -34,6 +34,7 @@ const LOOKUP_RETRY_MS = 60 * 1000;
 
 let pollTimer = null;
 let polling = false;
+let lookingUp = false;
 let knownGamePaths = new Set();
 let knownGamesLoadedAt = 0;
 let mappings = null;
@@ -167,6 +168,7 @@ async function lookUpGame(exePath) {
 async function resolveCurrentGame() {
   const game = current;
   game.lookedUpAt = Date.now();
+  lookingUp = true;
 
   try {
     const { name, game: match } = await lookUpGame(game.exePath);
@@ -186,6 +188,8 @@ async function resolveCurrentGame() {
     }
   } catch (error) {
     console.error("ClipX: Failed to look up the running game:", error);
+  } finally {
+    lookingUp = false;
   }
 }
 
@@ -223,8 +227,8 @@ async function poll() {
     }
     current.pid = target.pid;
 
-    if (!current.game && Date.now() - current.lookedUpAt > LOOKUP_RETRY_MS) {
-      await resolveCurrentGame();
+    if (!current.game && !lookingUp && Date.now() - current.lookedUpAt > LOOKUP_RETRY_MS) {
+      void resolveCurrentGame();
     }
   } catch (error) {
     console.error("ClipX: Game detection failed:", error);

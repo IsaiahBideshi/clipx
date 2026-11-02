@@ -906,6 +906,10 @@ async function applyOptions(next) {
 
   if (!recorders.size || getLaunchKey(next) !== getLaunchKey(previous)) {
     await savingClip;
+    if (appliedOptions !== next) {
+      return;
+    }
+
     stopObs();
     const controller = new AbortController();
     startupController = controller;
