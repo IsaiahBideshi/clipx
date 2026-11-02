@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'" />
+  <title>ClipX</title>
+  <style>
+    html,
+    body {
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: transparent;
+      font-family: "Segoe UI", "Trebuchet MS", sans-serif;
+      user-select: none;
+    }
+
+    .toast {
+      position: absolute;
+      top: 16px;
+      box-sizing: border-box;
+      width: 330px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 14px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 12px;
+      background: rgba(18, 20, 26, 0.94);
+      color: #ffffff;
+      opacity: 0;
+    }
+
+    .toast.right {
+      right: 16px;
+      transform: translateX(120%);
+    }
+
+    .toast.left {
+      left: 16px;
+      transform: translateX(-120%);
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateX(0);
+      transition: transform 450ms cubic-bezier(0.2, 1.3, 0.4, 1), opacity 200ms ease;
+    }
+
+    .toast.show.hide {
+      opacity: 0;
+      transition: transform 350ms ease-in, opacity 350ms ease-in;
+    }
+
+    .toast.right.hide {
+      transform: translateX(120%);
+    }
+
+    .toast.left.hide {
+      transform: translateX(-120%);
+    }
+
+    .badge {
+      flex: none;
+      width: 38px;
+      height: 38px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 10px;
+      background: #2e7d32;
+    }
+
+    .toast.failed .badge {
+      background: #c62828;
+    }
+
+    .toast.show .badge {
+      animation: pop 500ms 150ms both;
+    }
+
+    .title {
+      margin: 0;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .detail {
+      margin: 2px 0 0;
+      color: #b9bcc6;
+      font-size: 12px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 250px;
+    }
+
+    .bar {
+      position: absolute;
+      left: 0;
+      bottom: 0;
+      width: 100%;
+      height: 3px;
+      background: #66bb6a;
+    }
+
+    .toast.failed .bar {
+      background: #ef5350;
+    }
+
+    .toast.show .bar {
+      animation: shrink 3000ms linear 450ms forwards;
+    }
+
+    @keyframes pop {
+      0% { transform: scale(0.4); }
+      60% { transform: scale(1.15); }
+      100% { transform: scale(1); }
+    }
+
+    @keyframes shrink {
+      to { width: 0; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .toast.right,
+      .toast.left,
+      .toast.right.hide,
+      .toast.left.hide {
+        transform: none;
+      }
+
+      .toast.show .badge {
+        animation: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="toast right" id="toast">
+    <div class="badge" id="badge"></div>
+    <div>
+      <p class="title" id="title"></p>
+      <p class="detail" id="detail"></p>
+    </div>
+    <div class="bar"></div>
+  </div>
+  <script>
+    const VISIBLE_MS = 3600;
+    const ICONS = {
+      saved: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg>',
+      failed: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+    };
+    const toast = document.getElementById("toast");
+    const bar = toast.querySelector(".bar");
+    let audioContext = null;
+    let hideTimer = null;
+
+    function playChime(volume) {
+      audioContext ??= new AudioContext();
+      const gainLevel = Math.min(Math.max(Number(volume) || 0, 0), 100) / 100 * 0.35;
+      const now = audioContext.currentTime;
+      for (const [frequency, delay] of [[880, 0], [1318.5, 0.09]]) {
+        const oscillator = audioContext.createOscillator();
+        const gain = audioContext.createGain();
+        oscillator.type = "sine";
+        oscillator.frequency.value = frequency;
+        gain.gain.setValueAtTime(0, now + delay);
+        gain.gain.linearRampToValueAtTime(gainLevel, now + delay + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + delay + 0.45);
+        oscillator.connect(gain).connect(audioContext.destination);
+        oscillator.start(now + delay);
+        oscillator.stop(now + delay + 0.5);
+      }
+    }
+
+    function showToast(payload) {
+      const kind = payload.kind === "failed" ? "failed" : "saved";
+      const base = `toast ${payload.corner === "left" ? "left" : "right"} ${kind}`;
+      document.getElementById("badge").innerHTML = ICONS[kind];
+      document.getElementById("title").textContent = payload.title || "";
+      document.getElementById("detail").textContent = payload.detail || "";
+
+      clearTimeout(hideTimer);
+      toast.className = base;
+      bar.style.animation = "none";
+      void toast.offsetWidth;
+      bar.style.animation = "";
+      toast.className = `${base} show`;
+      hideTimer = setTimeout(() => {
+        toast.className = `${base} show hide`;
+      }, VISIBLE_MS);
+    }
+
+    window.clipx.onToast((payload) => {
+      if (payload?.visible) {
+        showToast(payload);
+      }
+      if (payload?.sound) {
+        playChime(payload.volume);
+      }
+    });
+  </script>
+</body>
+</html>

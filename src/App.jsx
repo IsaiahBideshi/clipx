@@ -2,6 +2,7 @@ import './App.css';
 import ErrorFallback from "./components/errorfallback.jsx";
 import LocalFiles from './pages/LocalFiles.jsx';
 import Settings from './pages/Settings.jsx';
+import Recording from './pages/Recording.jsx';
 
 import {useState, useEffect} from 'react';
 import {Routes, Route} from "react-router-dom";
@@ -187,6 +188,11 @@ export default function App() {
         <Route path="/settings" element={
           <ErrorBoundary FallbackComponent={ErrorFallback}>
             <Settings/>
+          </ErrorBoundary>
+        }/>
+        <Route path="/recording" element={
+          <ErrorBoundary FallbackComponent={ErrorFallback}>
+            <Recording/>
           </ErrorBoundary>
         }/>
         <Route path="/library" element={

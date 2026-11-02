@@ -16,6 +16,8 @@ import { registerAuthStorageIpcHandlers } from "./ipc/authStorage.js";
 import { initializeUpdates, scheduleUpdateChecks, startVersionPolling, checkForUpdatesAndInstall } from "./services/updateService.js";
 import { registerUpdateIpcHandlers } from "./ipc/update.js";
 import { registerWindowControlIpcHandlers } from "./services/menuBarService.js";
+import { registerClippingIpcHandlers } from "./ipc/clipping.js";
+import { applyClippingOptions, stopClipping } from "./services/obsService.js";
 
 
 
@@ -361,6 +363,7 @@ function registerIpcHandlers() {
   registerYoutubeIpcHandlers();
   registerGoogleAuthIpcHandlers();
   registerUpdateIpcHandlers();
+  registerClippingIpcHandlers();
 }
 
 app.setAppUserModelId("com.isaiah.clipx");
@@ -388,6 +391,7 @@ if (!hasSingleInstanceLock) {
     }
     await createWindow({ show: !launchMinimized || Boolean(updateWindow) });
     updateWindow?.close();
+    void applyClippingOptions(getStoredOptions());
     scheduleUpdateChecks();
     startVersionPolling();
   });
@@ -408,6 +412,7 @@ app.on("before-quit", () => {
 });
 
 app.on("will-quit", () => {
+  stopClipping();
   closeClipIndexService();
   stopRendererServer();
 });

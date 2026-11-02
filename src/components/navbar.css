@@ -51,6 +51,30 @@
   justify-content: center;
 }
 
+.nav-record-icon {
+  position: relative;
+  display: inline-flex;
+}
+
+.nav-record-dot {
+  position: absolute;
+  right: -3px;
+  bottom: -2px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #f44336;
+  box-shadow: 0 0 0 2px rgb(30, 30, 30);
+}
+
+.nav-record-dot--on {
+  background: #4caf50;
+}
+
+.nav-record-dot--starting {
+  background: #ffc107;
+}
+
 .nav-badge {
   box-sizing: border-box;
   min-width: 18px;
