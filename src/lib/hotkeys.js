@@ -29,15 +29,14 @@ const ACCELERATOR_KEYS = {
   ArrowRight: "Right",
 };
 
-function toAcceleratorKey(code) {
-  if (/^Key[A-Z]$/.test(code)) return code.slice(3);
-  if (/^Digit\d$/.test(code)) return code.slice(5);
+function toAcceleratorKey({ code = "", keyCode = 0 }) {
+  if ((keyCode >= 48 && keyCode <= 57) || (keyCode >= 65 && keyCode <= 90)) return String.fromCharCode(keyCode);
   if (/^F([1-9]|1\d|2[0-4])$/.test(code)) return code;
   return ACCELERATOR_KEYS[code] || null;
 }
 
 export function toAccelerator(event) {
-  const key = toAcceleratorKey(event?.code || "");
+  const key = toAcceleratorKey(event || {});
   const hasModifier = Boolean(event?.ctrlKey || event?.altKey || event?.metaKey);
   if (!key || (!hasModifier && !/^F\d/.test(key))) return null;
 

@@ -64,7 +64,7 @@ let requestedOptions = null;
 let startupController = null;
 let followTimer = null;
 let otherAppsTimer = null;
-let saving = false;
+let savingClip = null;
 let watchingDisplays = false;
 let applyQueue = Promise.resolve();
 const recorders = new Map();
@@ -754,12 +754,16 @@ async function saveClip() {
     notify("failed", "Clipping isn't ready", latestState.message || "OBS is still starting.");
     return;
   }
-  if (saving) {
+  if (savingClip) {
     return;
   }
 
-  saving = true;
-  const options = appliedOptions;
+  savingClip = writeClip(appliedOptions).finally(() => {
+    savingClip = null;
+  });
+}
+
+async function writeClip(options) {
   const createdAt = new Date();
   try {
     const active = [...recorders.values()];
@@ -773,12 +777,21 @@ async function saveClip() {
     }
 
     const manifest = await finalizeClip(createdAt, savedFiles, options);
-    notify("saved", "Clip saved", describeClip(manifest));
+    const failedCount = results.length - savedFiles.length;
+    results.forEach((result, index) => {
+      if (result.status === "rejected") {
+        console.error(`ClipX: ${active[index].key} failed to save its part of the clip:`, result.reason);
+      }
+    });
+
+    if (failedCount) {
+      notify("failed", "Clip saved, screen missing", `${describeClip(manifest)} · ${failedCount === 1 ? "1 screen" : `${failedCount} screens`} didn't save`);
+    } else {
+      notify("saved", "Clip saved", describeClip(manifest));
+    }
   } catch (error) {
     console.error("ClipX: Failed to save clip:", error);
     notify("failed", "Clip failed", error?.message || "The clip could not be saved.");
-  } finally {
-    saving = false;
   }
 }
 
@@ -823,7 +836,8 @@ async function onGameChange() {
 }
 
 function syncGameDetection(options) {
-  if (options.enabled && options.clipDetectGame) {
+  const hasGameTrack = planAudioTracks(options.clipAudioTracks).tracks.some((track) => track.kind === "game");
+  if (options.enabled && (options.clipDetectGame || hasGameTrack)) {
     startGameDetection({ onChange: () => void onGameChange() });
   } else {
     stopGameDetection();
@@ -836,8 +850,9 @@ function watchDisplays() {
   }
   watchingDisplays = true;
 
-  const restartForNewScreens = () => {
+  const restartForNewScreens = async () => {
     emitClippingState(latestState);
+    await savingClip;
     if (recorders.size && appliedOptions?.enabled && requestedOptions === appliedOptions) {
       stopObs();
       queueApply(appliedOptions);
@@ -888,6 +903,7 @@ async function applyOptions(next) {
   syncGameDetection(next);
 
   if (!recorders.size || getLaunchKey(next) !== getLaunchKey(previous)) {
+    await savingClip;
     stopObs();
     const controller = new AbortController();
     startupController = controller;

@@ -174,7 +174,7 @@ async function resolveCurrentGame() {
       game.name = name;
       onGameChange(getCurrentGame());
     }
-    if (!match) {
+    if (!match || getGameMapping(getMappings(), game.exePath)?.source === "user") {
       return;
     }
 
@@ -307,6 +307,11 @@ export async function assignGameToExe(exe, game) {
   }
 
   const match = { id: game.id, name: game.name, label: game.name, image: game.image || null };
+  for (const key of Object.keys(getMappings())) {
+    if (/[\\/]/.test(key) && getExeName(key) === exeName.toLowerCase()) {
+      delete getMappings()[key];
+    }
+  }
   getMappings()[exeName.toLowerCase()] = { exe: exeName, game: match, source: "user" };
   await saveMappings();
 
@@ -318,7 +323,19 @@ export async function assignGameToExe(exe, game) {
 }
 
 export async function removeGameAssignment(exe) {
-  delete getMappings()[getExeName(exe).toLowerCase()];
+  const exeName = getExeName(exe).toLowerCase();
+  delete getMappings()[exeName];
   await saveMappings();
+
+  if (current && getExeName(current.exePath).toLowerCase() === exeName) {
+    const mapped = getGameMapping(getMappings(), current.exePath);
+    if (mapped || isLikelyGame(current.exePath, knownGamePaths)) {
+      current.game = mapped?.game || null;
+      current.lookedUpAt = 0;
+    } else {
+      current = null;
+    }
+    onGameChange(getCurrentGame());
+  }
   return listGameAssignments();
 }
