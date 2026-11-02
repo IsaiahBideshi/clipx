@@ -47,6 +47,12 @@ export default function ClipDetailsFields({ title, onTitleChange, game, onGameCh
     handleSearchGame();
   }, [gameInput]);
 
+  useEffect(() => {
+    if (!game) {
+      setGameInput("");
+    }
+  }, [game]);
+
   const handleSearchGame = async () => {
     const games = await searchGames(gameInput);
     const options = games.map(game => ({
@@ -69,6 +75,7 @@ export default function ClipDetailsFields({ title, onTitleChange, game, onGameCh
           filterOptions={(options) => options}
           freeSolo
           value={game}
+          inputValue={gameInput}
           onInputChange={(_e, newInputValue) => setGameInput(newInputValue)}
           onChange={(_e, newValue) => onGameChange(newValue)}
           renderOption={(props, opt) => (

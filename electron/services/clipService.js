@@ -430,6 +430,14 @@ export async function deleteClipBlob({ blobName, thumbnailBlobName }) {
   }
 }
 
+let tracksJob = Promise.resolve();
+
+function queueTracksJob(job) {
+  const result = tracksJob.then(job);
+  tracksJob = result.catch(() => {});
+  return result;
+}
+
 function getTracksDir() {
   return path.join(app.getPath("temp"), "clipx", "tracks");
 }
@@ -439,6 +447,10 @@ export async function extractClipTracks(clipPath) {
     throw new TypeError("extract-clip-tracks: clipPath must be a non-empty string");
   }
 
+  return queueTracksJob(() => extractTracks(clipPath));
+}
+
+async function extractTracks(clipPath) {
   const group = getClipGroup(clipPath);
   const tracks = getManifestFile(group?.manifest, path.basename(clipPath))?.audioTracks || [];
   if (!tracks.length) {
@@ -478,7 +490,7 @@ export async function extractClipTracks(clipPath) {
 }
 
 export async function releaseClipTracks() {
-  await fs.promises.rm(getTracksDir(), { recursive: true, force: true });
+  await queueTracksJob(() => fs.promises.rm(getTracksDir(), { recursive: true, force: true }));
 }
 
 export async function getClipData(clipPath) {

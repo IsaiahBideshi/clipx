@@ -634,6 +634,12 @@
   gap: 10px;
 }
 
+.upload-menu-note {
+  margin: 8px 0 0;
+  font-size: 0.8rem;
+  color: #ffc4c4;
+}
+
 .upload-menu-form .MuiTextField-root,
 .upload-menu-form .MuiFormControl-root {
   margin-bottom: 10px;

@@ -122,6 +122,7 @@ export default function ClipEditor({
     [group, isSavedClipsView, clip.path]
   );
   const homeView = useMemo(() => getHomeView(views, clip.path), [views, clip.path]);
+  const hasViews = views.length > 0;
   const multiScreen = views.length > 1;
   const durations = useMediaDurations(multiScreen ? group.files.map((file) => file.path) : []);
   const shifts = useMemo(() => {
@@ -146,7 +147,7 @@ export default function ClipEditor({
   useEffect(() => {
     switchingRef.current = false;
     setFrontPath(multiScreen && homeView ? homeView.path : clip.path);
-  }, [multiScreen, homeView, clip.path]);
+  }, [hasViews, clip.path]);
 
   function selectView(nextPath) {
     if (nextPath === activePath) {
@@ -178,10 +179,13 @@ export default function ClipEditor({
 
     return window.clipx.onLocalClipIndexChanged((event) => {
       if (event?.type === "removed" && event.clip?.path !== clip.path && group.files.some((file) => file.path === event.clip?.path)) {
+        if (event.clip.path === activePath) {
+          selectView(clip.path);
+        }
         loadGroup();
       }
     });
-  }, [group]);
+  }, [group, activePath, shifts]);
 
   useEffect(() => {
     if (clip?.name) {
@@ -434,6 +438,7 @@ export function UploadMenu({clip, group, mix, screen, screens, target, start, en
   const [visibility, setVisibility] = useState("public");
   const [friendsOptions, setFriendsOptions] = useState([]);
   const userId = session?.user?.id;
+  const emptyRange = Boolean(screen) && end <= start;
 
   useEffect(() => {
     async function loadFriends() {
@@ -489,12 +494,10 @@ export function UploadMenu({clip, group, mix, screen, screens, target, start, en
     loadFriends();
   }, [userId]);
 
+  const detected = group?.manifest?.game;
   useEffect(() => {
-    const detected = group?.manifest?.game;
-    if (detected?.id) {
-      setGame({ id: detected.id, label: detected.label || detected.name, image: detected.image?.replace(/^https:/, "") || null });
-    }
-  }, [group]);
+    setGame(detected?.id ? { id: detected.id, label: detected.label || detected.name, image: detected.image?.replace(/^https:/, "") || null } : null);
+  }, [clip.path, detected?.id]);
 
   async function saveClip(clip, start, end, title, game, tags) {
     if (!window?.clipx?.saveClip) {
@@ -638,11 +641,11 @@ export function UploadMenu({clip, group, mix, screen, screens, target, start, en
             <Button
               variant={"contained"}
               onClick={() => {uploadClip(clip, start, end, clipTitle, game, tags)}}
-              disabled={uploading || saving}
+              disabled={uploading || saving || emptyRange}
             >
             Upload
           </Button>)}
-        <Button variant={session ? "outlined" : "contained"} onClick={() => {saveClip(clip, start, end, clipTitle, game, tags)}} disabled={uploading || saving} >Save</Button>
+        <Button variant={session ? "outlined" : "contained"} onClick={() => {saveClip(clip, start, end, clipTitle, game, tags)}} disabled={uploading || saving || emptyRange} >Save</Button>
         <Button
           variant={"contained"}
           color={"error"}
@@ -653,6 +656,7 @@ export function UploadMenu({clip, group, mix, screen, screens, target, start, en
           Delete
         </Button>
       </div>
+      {emptyRange && <p className="upload-menu-note">This screen has no video in the trimmed part. Move the trim later or pick another screen.</p>}
       {screens && (
         <Menu anchorEl={deleteAnchor} open={Boolean(deleteAnchor)} onClose={() => setDeleteAnchor(null)}>
           {screens.map((view) => (
