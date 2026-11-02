@@ -713,7 +713,9 @@ async function finalizeClip(createdAt, savedFiles, options) {
   const screens = getScreens();
   const describeScreen = (screenId) => {
     const match = screens.find((candidate) => candidate.id === screenId);
-    return match ? { number: match.number, label: match.label, width: match.width, height: match.height } : null;
+    return match
+      ? { number: match.number, label: match.label, x: match.x, y: match.y, width: match.width, height: match.height, primary: match.primary }
+      : null;
   };
 
   const primary = savedFiles.find(({ recorder }) => recorder.key === "main");
