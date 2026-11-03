@@ -112,6 +112,7 @@ export default function ClipEditor({
 
   const [group, setGroup] = useState(null);
   const [trackLevels, setTrackLevels] = useState({});
+  const [videoRatio, setVideoRatio] = useState(16 / 9);
   const mixTracks = useMemo(() => getMixTracks(getManifestFile(group?.manifest, clip.name)?.audioTracks), [group, clip.name]);
   const mix = useMemo(() => buildMix(mixTracks, trackLevels), [mixTracks, trackLevels]);
 
@@ -227,6 +228,10 @@ export default function ClipEditor({
   // When video loads
   function handleLoadedMetadata(d) {
     setDuration(d);
+    const video = playerRef.current?.element;
+    if (video?.videoWidth && video.videoHeight) {
+      setVideoRatio(video.videoWidth / video.videoHeight);
+    }
     if (switchingRef.current) {
       switchingRef.current = false;
       return;
@@ -335,13 +340,13 @@ export default function ClipEditor({
           views={views}
           frontPath={activePath}
           playerRef={playerRef}
+          ratio={videoRatio}
           onSelect={selectView}
         >
           <VideoPlayer
             ref={playerRef}
             src={toClipxUrl(activePath)}
             crossOrigin="anonymous"
-            className={multiScreen ? "video-player-shell-fill" : undefined}
             poster={activePath === clip.path ? thumbSrc : undefined}
             volume={volume}
             muted={isMuted}
@@ -397,7 +402,7 @@ export default function ClipEditor({
         )}
 
         {!isSavedClipsView && mixTracks.length > 0 && (
-          <AudioMixer tracks={mixTracks} levels={trackLevels} onChange={setTrackLevels} />
+          <AudioMixer tracks={mixTracks} levels={trackLevels} game={group?.manifest?.game} onChange={setTrackLevels} />
         )}
       </div>
 

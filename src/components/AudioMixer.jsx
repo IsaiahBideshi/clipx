@@ -4,14 +4,18 @@ import GraphicEqIcon from "@mui/icons-material/GraphicEq";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import VolumeUpIcon from "@mui/icons-material/VolumeUp";
 import VolumeOffIcon from "@mui/icons-material/VolumeOff";
+import TrackIcon from "./TrackIcon.jsx";
 
 const DEFAULT_LEVEL = { volume: 100, muted: false };
 
-function getTrackLabel(track) {
+function getTrackLabel(track, game) {
+  if (track.kind === "game" && game?.name) {
+    return game.name;
+  }
   return String(track.name || "").replace(/\.exe$/i, "");
 }
 
-export default function AudioMixer({ tracks, levels, onChange }) {
+export default function AudioMixer({ tracks, levels, game, onChange }) {
   const [open, setOpen] = useState(false);
   const changed = tracks.some((track) => levels[track.index]?.muted || (levels[track.index]?.volume ?? 100) !== 100);
 
@@ -39,9 +43,11 @@ export default function AudioMixer({ tracks, levels, onChange }) {
         <div className="audio-mixer-tracks">
           {tracks.map((track) => {
             const level = { ...DEFAULT_LEVEL, ...levels[track.index] };
-            const label = getTrackLabel(track);
+            const label = getTrackLabel(track, game);
             return (
               <div className="audio-mixer-track" key={track.index}>
+                <TrackIcon kind={track.kind} exe={track.name} gameImage={game?.image} />
+                <span className="audio-mixer-name" title={label}>{label}</span>
                 <IconButton
                   size="small"
                   aria-label={level.muted ? `Unmute ${label}` : `Mute ${label}`}
@@ -49,7 +55,6 @@ export default function AudioMixer({ tracks, levels, onChange }) {
                 >
                   {level.muted ? <VolumeOffIcon fontSize="small" /> : <VolumeUpIcon fontSize="small" />}
                 </IconButton>
-                <span className="audio-mixer-name" title={label}>{label}</span>
                 <Slider
                   size="small"
                   min={0}

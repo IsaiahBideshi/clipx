@@ -105,6 +105,7 @@ contextBridge.exposeInMainWorld("clipx", {
   getClippingState: () => ipcRenderer.invoke("clipping:get-state"),
   identifyScreens: () => ipcRenderer.invoke("clipping:identify-screens"),
   listAudioApps: () => ipcRenderer.invoke("clipping:list-audio-apps"),
+  getAppIcon: (exe) => ipcRenderer.invoke("clipping:get-app-icon", exe),
   setDetectedGame: (game) => ipcRenderer.invoke("clipping:set-game", game),
   listRunningApps: () => ipcRenderer.invoke("clipping:list-running-apps"),
   listGameAssignments: () => ipcRenderer.invoke("clipping:list-game-assignments"),

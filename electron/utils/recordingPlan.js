@@ -4,6 +4,8 @@ export const MAX_AUDIO_TRACKS = 4;
 export const OBS_AUDIO_TRACKS = 6;
 export const MIN_CLIP_SECONDS = 5;
 export const MAX_CLIP_SECONDS = 600;
+export const MIN_BITRATE_MBPS = 1;
+export const MAX_BITRATE_MBPS = 100;
 export const DEFAULT_RECORDING_OPTIONS = {
   clipHotkey: "Alt+F8",
   clipSeconds: 30,
@@ -13,8 +15,10 @@ export const DEFAULT_RECORDING_OPTIONS = {
   clipDisabledScreens: [],
   clipPrimaryHeight: 1080,
   clipPrimaryFps: 60,
+  clipPrimaryBitrate: 20,
   clipSecondaryHeight: 720,
   clipSecondaryFps: 30,
+  clipSecondaryBitrate: 6,
   clipAudioTracks: [],
   clipDetectGame: true,
   clipToastEnabled: true,
@@ -35,15 +39,25 @@ export function getRecordingOptions(options) {
   }
   merged.clipPrimaryScreen = options?.clipPrimaryScreen ?? null;
   merged.clipSeconds = clampClipSeconds(merged.clipSeconds);
+  merged.clipPrimaryBitrate = clampBitrate(merged.clipPrimaryBitrate, DEFAULT_RECORDING_OPTIONS.clipPrimaryBitrate);
+  merged.clipSecondaryBitrate = clampBitrate(merged.clipSecondaryBitrate, DEFAULT_RECORDING_OPTIONS.clipSecondaryBitrate);
   return merged;
 }
 
-export function clampClipSeconds(value) {
-  const seconds = Math.round(Number(value));
-  if (!Number.isFinite(seconds)) {
-    return DEFAULT_RECORDING_OPTIONS.clipSeconds;
+function clampWholeNumber(value, min, max, fallback) {
+  const number = Math.round(Number(value));
+  if (!Number.isFinite(number)) {
+    return fallback;
   }
-  return Math.min(Math.max(seconds, MIN_CLIP_SECONDS), MAX_CLIP_SECONDS);
+  return Math.min(Math.max(number, min), max);
+}
+
+export function clampClipSeconds(value) {
+  return clampWholeNumber(value, MIN_CLIP_SECONDS, MAX_CLIP_SECONDS, DEFAULT_RECORDING_OPTIONS.clipSeconds);
+}
+
+export function clampBitrate(value, fallback) {
+  return clampWholeNumber(value, MIN_BITRATE_MBPS, MAX_BITRATE_MBPS, fallback);
 }
 
 export function toOutputSize(width, height, maxHeight) {
@@ -90,6 +104,7 @@ export function planRecorders(screens, options) {
     canvas: mainCanvas,
     output: toOutputSize(mainCanvas.width, mainCanvas.height, recording.clipPrimaryHeight),
     fps: recording.clipPrimaryFps,
+    bitrate: recording.clipPrimaryBitrate,
     audio: true,
   };
 
@@ -103,6 +118,7 @@ export function planRecorders(screens, options) {
         canvas: { width: screen.width, height: screen.height },
         output: toOutputSize(screen.width, screen.height, recording.clipSecondaryHeight),
         fps: recording.clipSecondaryFps,
+        bitrate: recording.clipSecondaryBitrate,
         audio: false,
       }))
     : [];

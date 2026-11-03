@@ -22,12 +22,16 @@ import { getOptions } from "./Settings.jsx";
 import { useAuthSession } from "../lib/authSession.js";
 import { toAccelerator } from "../lib/hotkeys.js";
 import { getClippingStatusLabel, useClippingState } from "../lib/clippingState.js";
+import TrackIcon from "../components/TrackIcon.jsx";
 import {
   MAX_AUDIO_TRACKS,
+  MAX_BITRATE_MBPS,
   MAX_CLIP_SECONDS,
+  MIN_BITRATE_MBPS,
   MIN_CLIP_SECONDS,
   QUALITY_FPS,
   QUALITY_HEIGHTS,
+  clampBitrate,
   clampClipSeconds,
   describeRecorders,
   estimateLoad,
@@ -36,16 +40,16 @@ import {
   planRecorders,
 } from "../../electron/utils/recordingPlan.js";
 
-const MAP_MAX_HEIGHT = 170;
+const MAP_SCREEN_HEIGHT = 170;
 const STATUS_TONES = { ready: "on", error: "error", installing: "busy", starting: "busy" };
 
 function formatHeight(height) {
   return height === 2160 ? "4K" : `${height}p`;
 }
 
-function getTrackLabel(track) {
+function getTrackLabel(track, gameName) {
   if (track.kind === "mic") return "Microphone";
-  if (track.kind === "game") return "Game";
+  if (track.kind === "game") return gameName || "Game";
   return track.name || String(track.exe).replace(/\.exe$/i, "");
 }
 
@@ -104,16 +108,64 @@ function GameSearch({ value = null, autoFocus = false, onChange, onBlur }) {
   );
 }
 
+function NumberField({ value, clamp, min, max, onCommit, ...props }) {
+  const [draft, setDraft] = useState(null);
+
+  function commit(nextValue) {
+    setDraft(null);
+    if (String(nextValue).trim() === "") {
+      return;
+    }
+
+    const clamped = clamp(nextValue);
+    if (clamped !== value) {
+      onCommit(clamped);
+    }
+  }
+
+  return (
+    <TextField
+      size="small"
+      type="number"
+      value={draft ?? value}
+      onChange={(event) => setDraft(event.target.value)}
+      onBlur={(event) => commit(event.target.value)}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") {
+          event.target.blur();
+        }
+      }}
+      slotProps={{ htmlInput: { min, max, step: 1 } }}
+      {...props}
+    />
+  );
+}
+
+function BitrateField({ value, onCommit }) {
+  return (
+    <NumberField
+      label={`Bitrate (${MIN_BITRATE_MBPS}-${MAX_BITRATE_MBPS} Mbps)`}
+      value={value}
+      clamp={(nextValue) => clampBitrate(nextValue, value)}
+      min={MIN_BITRATE_MBPS}
+      max={MAX_BITRATE_MBPS}
+      onCommit={onCommit}
+      sx={{ width: 190 }}
+    />
+  );
+}
+
 function ScreenMap({ screens, getRole, canPickPrimary, onToggle, onPick }) {
   const minX = Math.min(...screens.map((screen) => screen.x));
   const minY = Math.min(...screens.map((screen) => screen.y));
   const totalWidth = Math.max(...screens.map((screen) => screen.x + screen.width)) - minX;
   const totalHeight = Math.max(...screens.map((screen) => screen.y + screen.height)) - minY;
+  const scale = MAP_SCREEN_HEIGHT / Math.max(...screens.map((screen) => screen.height));
 
   return (
     <div
       className="screen-map"
-      style={{ aspectRatio: `${totalWidth} / ${totalHeight}`, maxWidth: `${(MAP_MAX_HEIGHT * totalWidth) / totalHeight}px` }}
+      style={{ aspectRatio: `${totalWidth} / ${totalHeight}`, maxWidth: `${totalWidth * scale}px` }}
     >
       {screens.map((screen) => {
         const role = getRole(screen);
@@ -171,7 +223,6 @@ export default function Recording() {
   const [runningApps, setRunningApps] = useState(null);
   const [assignExe, setAssignExe] = useState("");
   const [assignGame, setAssignGame] = useState(null);
-  const [clipSecondsDraft, setClipSecondsDraft] = useState(null);
   const loadedRef = useRef(false);
   const clippingState = useClippingState();
   const { session, loading: authLoading } = useAuthSession();
@@ -185,18 +236,7 @@ export default function Recording() {
   const tracks = recording.clipAudioTracks;
   const multipleScreens = screens.length > 1;
   const detected = clippingState?.game || null;
-
-  function commitClipSeconds(value) {
-    setClipSecondsDraft(null);
-    if (String(value).trim() === "") {
-      return;
-    }
-
-    const seconds = clampClipSeconds(value);
-    if (seconds !== recording.clipSeconds) {
-      updateOption("clipSeconds", seconds);
-    }
-  }
+  const gameName = detected?.game?.name || detected?.name;
 
   function updateOption(key, value) {
     setOptions((previous) => ({ ...(previous || {}), [key]: value }));
@@ -382,19 +422,13 @@ export default function Recording() {
           >
             {capturingHotkey ? "Press a hotkey..." : `Hotkey: ${recording.clipHotkey}`}
           </Button>
-          <TextField
-            size="small"
-            type="number"
+          <NumberField
             label={`Clip length (${MIN_CLIP_SECONDS}-${MAX_CLIP_SECONDS}s)`}
-            value={clipSecondsDraft ?? recording.clipSeconds}
-            onChange={(event) => setClipSecondsDraft(event.target.value)}
-            onBlur={(event) => commitClipSeconds(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.target.blur();
-              }
-            }}
-            slotProps={{ htmlInput: { min: MIN_CLIP_SECONDS, max: MAX_CLIP_SECONDS, step: 1 } }}
+            value={recording.clipSeconds}
+            clamp={clampClipSeconds}
+            min={MIN_CLIP_SECONDS}
+            max={MAX_CLIP_SECONDS}
+            onCommit={(seconds) => updateOption("clipSeconds", seconds)}
             sx={{ width: 180 }}
           />
         </div>
@@ -455,6 +489,7 @@ export default function Recording() {
             <Select size="small" value={recording.clipPrimaryFps} onChange={(event) => updateOption("clipPrimaryFps", event.target.value)}>
               {QUALITY_FPS.map((fps) => <MenuItem key={fps} value={fps}>{fps} fps</MenuItem>)}
             </Select>
+            <BitrateField value={recording.clipPrimaryBitrate} onCommit={(mbps) => updateOption("clipPrimaryBitrate", mbps)} />
           </div>
           {multipleScreens && (
             <div className="quality-row">
@@ -465,6 +500,7 @@ export default function Recording() {
               <Select size="small" value={recording.clipSecondaryFps} onChange={(event) => updateOption("clipSecondaryFps", event.target.value)}>
                 {QUALITY_FPS.map((fps) => <MenuItem key={fps} value={fps}>{fps} fps</MenuItem>)}
               </Select>
+              <BitrateField value={recording.clipSecondaryBitrate} onCommit={(mbps) => updateOption("clipSecondaryBitrate", mbps)} />
             </div>
           )}
           <p className="card-copy">
@@ -481,6 +517,7 @@ export default function Recording() {
           </div>
           <div className="audio-track audio-track--fixed">
             <span className="audio-track-index">1</span>
+            <TrackIcon kind="mix" />
             <div>
               <p className="audio-track-name">Full mix</p>
               <p className="audio-track-detail">Everything you hear{hasMic ? " plus your microphone" : ""}. Used for playback and sharing.</p>
@@ -490,17 +527,18 @@ export default function Recording() {
           {tracks.map((track, index) => (
             <div className="audio-track" key={track.id || index}>
               <span className="audio-track-index">{index + 2}</span>
+              <TrackIcon kind={track.kind} exe={track.exe} gameImage={detected?.game?.image} />
               <div>
-                <p className="audio-track-name">{getTrackLabel(track)}</p>
+                <p className="audio-track-name">{getTrackLabel(track, gameName)}</p>
                 <p className="audio-track-detail">{getTrackDetail(track)}</p>
               </div>
               <Slider
                 size="small"
-                aria-label={`${getTrackLabel(track)} volume`}
+                aria-label={`${getTrackLabel(track, gameName)} volume`}
                 defaultValue={track.volume ?? 100}
                 onChangeCommitted={(_event, value) => updateTrack(track.id, { volume: value })}
               />
-              <IconButton size="small" aria-label={`Remove ${getTrackLabel(track)} track`} onClick={() => removeTrack(track.id)}>
+              <IconButton size="small" aria-label={`Remove ${getTrackLabel(track, gameName)} track`} onClick={() => removeTrack(track.id)}>
                 <CloseIcon fontSize="small" />
               </IconButton>
             </div>

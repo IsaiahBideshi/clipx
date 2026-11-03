@@ -171,7 +171,7 @@
 
 .quality-row {
   display: grid;
-  grid-template-columns: 160px auto auto;
+  grid-template-columns: 160px auto auto auto;
   justify-content: start;
   align-items: center;
   gap: 10px;
@@ -180,7 +180,7 @@
 
 .audio-track {
   display: grid;
-  grid-template-columns: 24px minmax(0, 1fr) 140px 32px;
+  grid-template-columns: 24px 24px minmax(0, 1fr) 140px 32px;
   align-items: center;
   gap: 12px;
   padding: 8px 12px;
@@ -190,7 +190,7 @@
 }
 
 .audio-track--fixed {
-  grid-template-columns: 24px minmax(0, 1fr) auto;
+  grid-template-columns: 24px 24px minmax(0, 1fr) auto;
   background: rgba(255, 255, 255, 0.04);
 }
 
@@ -251,6 +251,6 @@
   }
 
   .quality-row {
-    grid-template-columns: 1fr auto auto;
+    grid-template-columns: 1fr auto auto auto;
   }
 }
