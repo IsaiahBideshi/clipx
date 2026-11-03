@@ -14,7 +14,7 @@ export function ScreenIcon({ view }) {
   return view.windowsPrimary ? <DesktopWindowsIcon fontSize="small" /> : <DesktopWindowsOutlinedIcon fontSize="small" />;
 }
 
-export default function ScreenStage({ views, frontPath, playerRef, onSelect, children }) {
+export default function ScreenStage({ views, frontPath, playerRef, ratio, onSelect, children }) {
   const multi = views.length > 1;
   const snapshotRef = useRef(null);
   const cancelSwipeRef = useRef(null);
@@ -78,7 +78,7 @@ export default function ScreenStage({ views, frontPath, playerRef, onSelect, chi
 
   return (
     <>
-      <div className={`screen-stage ${multi ? "screen-stage--multi" : ""}`}>
+      <div className={`screen-stage ${multi ? "screen-stage--multi" : ""}`} style={{ "--video-ratio": ratio }}>
         <div className="screen-stage-front">
           {children}
           {multi && <canvas ref={snapshotRef} className="screen-stage-snapshot" />}

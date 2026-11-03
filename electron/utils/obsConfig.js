@@ -8,13 +8,13 @@ export const OBS_PROFILE_NAME = "ClipX";
 const KEYFRAME_PADDING_SECONDS = 5;
 
 const ENCODER_BY_GPU_VENDOR = {
-  0x10de: "nvenc",
-  0x1002: "amd",
-  0x8086: "qsv",
+  0x10de: "obs_nvenc_h264_tex",
+  0x1002: "h264_texture_amf",
+  0x8086: "obs_qsv11_v2",
 };
 
-export function pickSimpleEncoder(vendorId) {
-  return ENCODER_BY_GPU_VENDOR[vendorId] || "x264";
+export function pickEncoder(vendorId) {
+  return ENCODER_BY_GPU_VENDOR[vendorId] || "obs_x264";
 }
 
 export function obsAuth(password, salt, challenge) {
@@ -31,9 +31,8 @@ export function toIni(sections) {
     .join("\n\n") + "\n";
 }
 
-export function buildObsConfigFiles({ port, password, clipsDir, seconds, encoder, canvas, output, fps, recTracks = 1 }) {
-  const bufferSeconds = seconds + KEYFRAME_PADDING_SECONDS;
-  const megabytesPerSecond = Math.max(8, Math.ceil((8 * output.width * output.height * fps) / (1920 * 1080 * 60)));
+export function buildObsConfigFiles({ port, password, clipsDir, seconds, encoder, canvas, output, fps, bitrate, recTracks = 1 }) {
+  const profileDir = path.join("basic", "profiles", OBS_PROFILE_NAME);
 
   return {
     "global.ini": toIni({
@@ -43,19 +42,18 @@ export function buildObsConfigFiles({ port, password, clipsDir, seconds, encoder
       General: { FirstRun: true },
       BasicWindow: { SysTrayEnabled: false },
     }),
-    [path.join("basic", "profiles", OBS_PROFILE_NAME, "basic.ini")]: toIni({
+    [path.join(profileDir, "basic.ini")]: toIni({
       General: { Name: OBS_PROFILE_NAME },
-      Output: { Mode: "Simple", FilenameFormatting: "%CCYY-%MM-%DD %hh-%mm-%ss" },
-      SimpleOutput: {
-        RecRB: true,
-        RecRBTime: bufferSeconds,
-        RecRBSize: bufferSeconds * megabytesPerSecond,
-        RecRBPrefix: "Clip",
-        FilePath: clipsDir.replace(/\\/g, "/"),
+      Output: { Mode: "Advanced", FilenameFormatting: "%CCYY-%MM-%DD %hh-%mm-%ss" },
+      SimpleOutput: { RecRBPrefix: "Clip" },
+      AdvOut: {
+        RecType: "Standard",
+        RecFilePath: clipsDir.replace(/\\/g, "/"),
         RecFormat2: "mp4",
-        RecQuality: "Small",
         RecEncoder: encoder,
         RecTracks: recTracks,
+        RecRB: true,
+        RecRBTime: seconds + KEYFRAME_PADDING_SECONDS,
       },
       Video: {
         BaseCX: canvas.width,
@@ -66,6 +64,7 @@ export function buildObsConfigFiles({ port, password, clipsDir, seconds, encoder
         FPSCommon: fps,
       },
     }),
+    [path.join(profileDir, "recordEncoder.json")]: JSON.stringify({ rate_control: "CBR", bitrate: bitrate * 1000 }),
     [path.join("plugin_config", "obs-websocket", "config.json")]: JSON.stringify({
       alerts_enabled: false,
       auth_required: true,

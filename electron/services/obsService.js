@@ -10,7 +10,7 @@ import { promisify } from "util";
 
 import { upsertIndexedClip } from "./clipIndexService.js";
 import { getCurrentGame, getGameForClip, setGameForCurrentExe, startGameDetection, stopGameDetection } from "./gameDetectionService.js";
-import { getForegroundWindow, listProcesses } from "../utils/foregroundWindow.js";
+import { findProcessPath, getForegroundWindow, listProcesses } from "../utils/foregroundWindow.js";
 import { isHotkeyDown, parseAccelerator } from "../utils/accelerator.js";
 import { isKeyDown } from "../utils/keyState.js";
 import {
@@ -20,7 +20,7 @@ import {
   OBS_ZIP_URL,
   buildObsConfigFiles,
   obsAuth,
-  pickSimpleEncoder,
+  pickEncoder,
 } from "../utils/obsConfig.js";
 import {
   OBS_AUDIO_TRACKS,
@@ -235,7 +235,7 @@ function getFreePort() {
 async function getEncoder() {
   const gpuInfo = await app.getGPUInfo("basic").catch(() => null);
   const gpu = gpuInfo?.gpuDevice?.find((device) => device.active) || gpuInfo?.gpuDevice?.[0];
-  return pickSimpleEncoder(gpu?.vendorId);
+  return pickEncoder(gpu?.vendorId);
 }
 
 async function writeRecorderConfig(recorder, options, connection, encoder) {
@@ -248,6 +248,7 @@ async function writeRecorderConfig(recorder, options, connection, encoder) {
     canvas: recorder.plan.canvas,
     output: recorder.plan.output,
     fps: recorder.plan.fps,
+    bitrate: recorder.plan.bitrate,
     recTracks: recorder.plan.audio ? planAudioTracks(options.clipAudioTracks).recTracks : 1,
   });
 
@@ -889,8 +890,10 @@ function getLaunchKey(options) {
     options.clipDisabledScreens.map(String).sort(),
     options.clipPrimaryHeight,
     options.clipPrimaryFps,
+    options.clipPrimaryBitrate,
     options.clipSecondaryHeight,
     options.clipSecondaryFps,
+    options.clipSecondaryBitrate,
     options.clipAudioTracks.map((track) => [track.kind, track.exe || null]),
   ]);
 }
@@ -983,6 +986,32 @@ export async function listAudioApps() {
 
   const apps = await listWindowApps(main);
   return [...apps.values()].sort((a, b) => a.exe.localeCompare(b.exe));
+}
+
+export async function getAppIcon(exe) {
+  const exeName = path.basename(exe);
+  if (!exeName) {
+    return null;
+  }
+
+  const iconPath = path.join(app.getPath("userData"), "app-icons", `${exeName.toLowerCase()}.png`);
+  const cached = await fs.promises.readFile(iconPath).catch(() => null);
+  if (cached) {
+    return `data:image/png;base64,${cached.toString("base64")}`;
+  }
+
+  const exePath = findProcessPath(exeName);
+  if (!exePath || !path.isAbsolute(exePath)) {
+    return null;
+  }
+
+  const icon = await app.getFileIcon(exePath, { size: "normal" });
+  if (icon.isEmpty()) {
+    return null;
+  }
+  await fs.promises.mkdir(path.dirname(iconPath), { recursive: true });
+  await fs.promises.writeFile(iconPath, icon.toPNG());
+  return icon.toDataURL();
 }
 
 async function listWindowApps(recorder) {

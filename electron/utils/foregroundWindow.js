@@ -83,6 +83,12 @@ function getProcessPath(pid) {
   }
 }
 
+export function findProcessPath(exeName) {
+  const name = exeName.toLowerCase();
+  const match = listProcesses().find((process) => process.exeName.toLowerCase() === name);
+  return match ? getProcessPath(match.pid) : null;
+}
+
 export function getForegroundWindow() {
   const { GetForegroundWindow, GetWindowThreadProcessId, GetWindowRect, GetWindowTextW } = getApi();
   const hwnd = GetForegroundWindow();

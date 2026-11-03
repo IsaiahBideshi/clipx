@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  clampBitrate,
   clampClipSeconds,
   describeRecorders,
   getRecordingOptions,
@@ -78,6 +79,18 @@ test("keeps the clip length in range", () => {
   assert.equal(clampClipSeconds("abc"), 30);
   assert.equal(getRecordingOptions({ clipSeconds: 900 }).clipSeconds, 600);
   assert.equal(getRecordingOptions({}).clipSeconds, 30);
+});
+
+test("keeps the bitrate in range and gives each recorder its screen's bitrate", () => {
+  assert.equal(clampBitrate(45.4, 20), 45);
+  assert.equal(clampBitrate(0, 20), 1);
+  assert.equal(clampBitrate(500, 20), 100);
+  assert.equal(clampBitrate("abc", 20), 20);
+  assert.equal(getRecordingOptions({ clipPrimaryBitrate: 999 }).clipPrimaryBitrate, 100);
+  assert.equal(getRecordingOptions({}).clipSecondaryBitrate, 6);
+
+  const recorders = planRecorders(screens, { clipPrimaryBitrate: 40, clipSecondaryBitrate: 10 });
+  assert.deepEqual(recorders.map((recorder) => recorder.bitrate), [40, 10, 10, 10]);
 });
 
 test("describes what each recording is", () => {
