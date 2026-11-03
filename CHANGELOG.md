@@ -1,7 +1,15 @@
 # Changelog
 
-## v1.3.1-beta.1
+## v1.3.0
 
+- New: Record clips in ClipX. Turn on clipping on the new Recording page and press your hotkey to save the last few seconds.
+- New: The clip hotkey works while you're in a game, even in fullscreen.
+- New: Record all your screens at once, with the main recording following the screen you're using.
+- New: Clips of several screens show as one card. Switch between screens in the editor and save or upload any of them.
+- New: Record your mic, your game and other apps on their own audio tracks.
+- New: ClipX auto detects the game you're playing, or you can assign a game to a running app yourself.
+- New: A notification with a sound shows when a clip is saved.
+- New: Change the volume of each audio track in the clip editor.
 - New: Edit the title, game, tags and visibility of your uploaded clips, or delete them, from the library.
 - New: Edit and delete buttons show when you hover over your own clips in the library.
 - New: Large clips load faster in the library and on share links, with an SD/HD button to watch the original quality.
