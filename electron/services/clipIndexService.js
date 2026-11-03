@@ -443,7 +443,7 @@ export function getClipGroup(clipPath) {
     manifest,
     files: manifest.files
       .map((entry) => ({ ...entry, path: path.join(dirPath, entry.file) }))
-      .filter((entry) => fs.existsSync(entry.path)),
+      .filter((entry) => path.dirname(entry.path) === dirPath && fs.existsSync(entry.path)),
   };
 }
 

@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 
 const DRIFT_SECONDS = 0.08;
-const VIDEO_EVENTS = ["play", "pause", "playing", "waiting", "ratechange", "timeupdate"];
+const VIDEO_EVENTS = ["play", "pause", "playing", "waiting", "seeking", "ratechange", "timeupdate"];
 
 export function toClipxUrl(filePath) {
   return `clipx://video?path=${encodeURIComponent(filePath)}`;
@@ -53,7 +53,7 @@ function createTrackMixer(video) {
     if (video.readyState === 0) {
       return;
     }
-    const playing = isAudible() && !video.paused;
+    const playing = isAudible() && !video.paused && !video.seeking && video.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA;
     for (const { audio } of stems) {
       syncMedia(audio, video.currentTime + settings.offset, playing, video.playbackRate, force);
     }
