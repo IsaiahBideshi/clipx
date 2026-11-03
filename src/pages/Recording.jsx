@@ -520,7 +520,7 @@ export default function Recording() {
             <TrackIcon kind="mix" />
             <div>
               <p className="audio-track-name">Full mix</p>
-              <p className="audio-track-detail">Everything you hear{hasMic ? " plus your microphone" : ""}. Used for playback and sharing.</p>
+              <p className="audio-track-detail">Everything besides your audio tracks below</p>
             </div>
             <span className="audio-track-detail">Always on</span>
           </div>
