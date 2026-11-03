@@ -1,13 +1,21 @@
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect, useMemo } from "react";
 
 import EditorTimeline from "./EditorTimeline.jsx";
 import VideoPlayer from "./VideoPlayer";
 import ClipDetailsFields from "./ClipDetailsFields.jsx";
+import AudioMixer from "./AudioMixer.jsx";
+import ScreenStage, { ScreenIcon } from "./ScreenStage.jsx";
+import { toClipxUrl, useTrackMix } from "../lib/trackMix.js";
+import { getHomeView, getScreenViews } from "../lib/screenLayout.js";
+import { buildMix, getMixTracks } from "../../electron/utils/audioMix.js";
+import { getManifestFile } from "../../electron/utils/clipManifest.js";
 import Button from '@mui/material/Button';
 import { supabase } from "../lib/supabase.js";
 import { getClipTagsError, getClipShareUrl } from "../lib/clipsApi.js";
-import { Typography } from '@mui/material';
+import { Divider, Menu, MenuItem, Typography } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
+import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
+import DeleteSweepIcon from "@mui/icons-material/DeleteSweep";
 import fallBackThumb from "../assets/thumbnail.svg";
 import { usePlayerPrefs } from "../lib/playerPrefs.js";
 
@@ -15,6 +23,34 @@ import { usePlayerPrefs } from "../lib/playerPrefs.js";
 function getEditableClipName(fileName) {
   const name = String(fileName || "");
   return name.replace(/\.(mp4|webm|mov)$/i, "");
+}
+
+function useMediaDurations(paths) {
+  const [durations, setDurations] = useState({});
+  const key = paths.join("|");
+
+  useEffect(() => {
+    let cancelled = false;
+    setDurations({});
+    const probes = paths.map((filePath) => {
+      const probe = document.createElement("video");
+      probe.preload = "metadata";
+      probe.onloadedmetadata = () => {
+        if (!cancelled) {
+          setDurations((current) => ({ ...current, [filePath]: probe.duration }));
+        }
+      };
+      probe.src = toClipxUrl(filePath);
+      return probe;
+    });
+
+    return () => {
+      cancelled = true;
+      probes.forEach((probe) => probe.removeAttribute("src"));
+    };
+  }, [key]);
+
+  return durations;
 }
 
 function getClipNameValidationError(value) {
@@ -50,6 +86,7 @@ export default function ClipEditor({
   onClose, 
   baseFolder,
   triggerClipIndexRefresh,
+  onClipRenamed,
   authSession,
   uploading,
   saving
@@ -73,6 +110,83 @@ export default function ClipEditor({
   const [clipName, setClipName] = useState(null);
   const [clipNameError, setClipNameError] = useState("");
 
+  const [group, setGroup] = useState(null);
+  const [trackLevels, setTrackLevels] = useState({});
+  const mixTracks = useMemo(() => getMixTracks(getManifestFile(group?.manifest, clip.name)?.audioTracks), [group, clip.name]);
+  const mix = useMemo(() => buildMix(mixTracks, trackLevels), [mixTracks, trackLevels]);
+
+  const [frontPath, setFrontPath] = useState(clip.path);
+  const switchingRef = useRef(false);
+  const views = useMemo(
+    () => (group && !isSavedClipsView && group.files.some((file) => file.path === clip.path) ? getScreenViews(group.files) : []),
+    [group, isSavedClipsView, clip.path]
+  );
+  const homeView = useMemo(() => getHomeView(views, clip.path), [views, clip.path]);
+  const hasViews = views.length > 0;
+  const multiScreen = views.length > 1;
+  const durations = useMediaDurations(multiScreen ? group.files.map((file) => file.path) : []);
+  const shifts = useMemo(() => {
+    const primaryDuration = durations[clip.path];
+    return Object.fromEntries(Object.entries(durations).map(([filePath, fileDuration]) => [filePath, primaryDuration ? primaryDuration - fileDuration : 0]));
+  }, [durations, clip.path]);
+  const activePath = multiScreen && views.some((view) => view.path === frontPath) ? frontPath : clip.path;
+  const frontView = views.find((view) => view.path === activePath) || null;
+  const offset = shifts[activePath] ?? 0;
+  const screen = activePath !== clip.path ? { path: activePath, shift: offset } : null;
+  const timelineDuration = duration + offset;
+  const outEnd = Math.min(outPoint, timelineDuration);
+
+  useTrackMix(
+    playerRef,
+    clip.path,
+    { mix: isSavedClipsView ? null : mix, offset, external: activePath !== clip.path },
+    volume,
+    isMuted
+  );
+
+  useEffect(() => {
+    switchingRef.current = false;
+    setFrontPath(multiScreen && homeView ? homeView.path : clip.path);
+  }, [hasViews, clip.path]);
+
+  function selectView(nextPath) {
+    if (nextPath === activePath) {
+      return;
+    }
+
+    const player = playerRef.current;
+    if (player?.element?.readyState > 0) {
+      switchingRef.current = true;
+      player.resumeAt(Math.max(0, player.element.currentTime + offset - (shifts[nextPath] ?? 0)), player.paused);
+    }
+    setFrontPath(nextPath);
+  }
+
+  function loadGroup(cancelledRef) {
+    window.clipx?.getClipGroup?.(clip.path)
+      .then((clipGroup) => {
+        if (!cancelledRef?.cancelled) {
+          setGroup(clipGroup);
+        }
+      })
+      .catch((error) => console.error("Failed to load the clip's group:", error));
+  }
+
+  useEffect(() => {
+    if (!group || typeof window.clipx?.onLocalClipIndexChanged !== "function") {
+      return undefined;
+    }
+
+    return window.clipx.onLocalClipIndexChanged((event) => {
+      if (event?.type === "removed" && event.clip?.path !== clip.path && group.files.some((file) => file.path === event.clip?.path)) {
+        if (event.clip.path === activePath) {
+          selectView(clip.path);
+        }
+        loadGroup();
+      }
+    });
+  }, [group, activePath, shifts]);
+
   useEffect(() => {
     if (clip?.name) {
       setClipName(getEditableClipName(clip.name));
@@ -81,13 +195,24 @@ export default function ClipEditor({
   }, [clip]);
 
   useEffect(() => {
+    const cancelledRef = { cancelled: false };
+    setGroup(null);
+    setTrackLevels({});
+    loadGroup(cancelledRef);
+
+    return () => {
+      cancelledRef.cancelled = true;
+    };
+  }, [clip.path]);
+
+  useEffect(() => {
     function handleClickOutside(event) {
       if (
           editorRef.current && 
           !editorRef.current.contains(event.target) && 
           uploadMenuRef.current && 
           !uploadMenuRef.current.contains(event.target) &&
-          !event.target.closest?.(".MuiPopover-root, .MuiPopper-root, .clip-widgets")
+          !event.target.closest?.(".MuiPopover-root, .MuiPopper-root, .clip-widgets, .delete-modal")
       ) {
         onClose();
       }
@@ -102,27 +227,32 @@ export default function ClipEditor({
   // When video loads
   function handleLoadedMetadata(d) {
     setDuration(d);
-    setOutPoint(d);
+    if (switchingRef.current) {
+      switchingRef.current = false;
+      return;
+    }
+    setInPoint(0);
+    setOutPoint(Infinity);
   }
 
   // When video plays
   function handleTimeUpdate(time) {
-    setCurrentTime(time);
+    setCurrentTime(time + offset);
   }
 
 
   // Seek video
   function seek(time) {
-    playerRef.current?.seek(time);
+    playerRef.current?.seek(time - offset);
   }
 
   // In/out point shortcuts only — all playback keys are handled inside VideoPlayer
   function handleKeyShortcut(e) {
     if (e.key === "i") {
-      const newIn = Math.min(currentTime, outPoint - 0.1);
+      const newIn = Math.min(currentTime, outEnd - 0.1);
       setInPoint(newIn);
 
-      if (playerRef.current?.currentTime < newIn) {
+      if (playerRef.current?.currentTime + offset < newIn) {
         seek(newIn);
       }
     }
@@ -130,7 +260,7 @@ export default function ClipEditor({
       const newOut = Math.max(currentTime, inPoint + 0.1);
       setOutPoint(newOut);
 
-      if (playerRef.current?.currentTime > newOut) {
+      if (playerRef.current?.currentTime + offset > newOut) {
         seek(newOut);
       }
     }
@@ -201,25 +331,34 @@ export default function ClipEditor({
         <button className={"close-preview-btn"} onClick={onClose}>
           <CloseIcon fontSize={"large"} />
         </button>
-        <VideoPlayer
-          ref={playerRef}
-          src={`clipx://video?path=${encodeURIComponent(clip.path)}`}
-          poster={thumbSrc}
-          volume={volume}
-          muted={isMuted}
-          startTime={inPoint}
-          endTime={outPoint}
-          showSkipButtons
-          onNextClip={onNextClip}
-          onPrevClip={onPrevClip}
-          onLoadedMetadata={handleLoadedMetadata}
-          onTimeUpdate={handleTimeUpdate}
-          onVolumeChange={({ volume: v, muted: m }) => {
-            setVolume(v);
-            setIsMuted(m);
-          }}
-          onKeyDown={handleKeyShortcut}
-        />
+        <ScreenStage
+          views={views}
+          frontPath={activePath}
+          playerRef={playerRef}
+          onSelect={selectView}
+        >
+          <VideoPlayer
+            ref={playerRef}
+            src={toClipxUrl(activePath)}
+            crossOrigin="anonymous"
+            className={multiScreen ? "video-player-shell-fill" : undefined}
+            poster={activePath === clip.path ? thumbSrc : undefined}
+            volume={volume}
+            muted={isMuted}
+            startTime={inPoint - offset}
+            endTime={outPoint - offset}
+            showSkipButtons
+            onNextClip={onNextClip}
+            onPrevClip={onPrevClip}
+            onLoadedMetadata={handleLoadedMetadata}
+            onTimeUpdate={handleTimeUpdate}
+            onVolumeChange={({ volume: v, muted: m }) => {
+              setVolume(v);
+              setIsMuted(m);
+            }}
+            onKeyDown={handleKeyShortcut}
+          />
+        </ScreenStage>
 
         <Typography 
           variant="h5" 
@@ -247,14 +386,18 @@ export default function ClipEditor({
 
         {!isSavedClipsView && (
           <EditorTimeline
-            duration={duration}
+            duration={timelineDuration}
             currentTime={currentTime}
             inPoint={inPoint}
-            outPoint={outPoint}
+            outPoint={outEnd}
             onSeek={seek}
             onSetIn={setInPoint}
             onSetOut={setOutPoint}
           />
+        )}
+
+        {!isSavedClipsView && mixTracks.length > 0 && (
+          <AudioMixer tracks={mixTracks} levels={trackLevels} onChange={setTrackLevels} />
         )}
       </div>
 
@@ -262,12 +405,18 @@ export default function ClipEditor({
         <div className="upload-container" ref={uploadMenuRef}>
           <UploadMenu
             clip={clip}
-            start={inPoint}
-            end={outPoint}
+            group={group}
+            mix={mix}
+            screen={screen}
+            target={multiScreen ? frontView : null}
+            start={Math.max(0, inPoint - offset)}
+            end={outEnd - offset}
             session={authSession}
             onSaveQueueEvent={onSaveQueueEvent}
             onUploadQueueEvent={onUploadQueueEvent}
-            onDelete={onDelete}
+            screens={multiScreen ? views : null}
+            onDelete={(view) => onDelete(clip, view)}
+            onRenamed={onClipRenamed}
             onRefreshIndex={triggerClipIndexRefresh}
             uploading={uploading}
             saving={saving}
@@ -278,7 +427,8 @@ export default function ClipEditor({
   );
 }
 
-export function UploadMenu({clip, start, end, onRefreshIndex, onSaveQueueEvent, onUploadQueueEvent, onDelete, uploading, saving, session}) {
+export function UploadMenu({clip, group, mix, screen, screens, target, start, end, onRenamed, onRefreshIndex, onSaveQueueEvent, onUploadQueueEvent, onDelete, uploading, saving, session}) {
+  const [deleteAnchor, setDeleteAnchor] = useState(null);
   const [tags, setTags] = useState([]);
   const [friendsInClip, setFriendsInClip] = useState([]);
   const [peopleInput, setPeopleInput] = useState('');
@@ -288,6 +438,7 @@ export function UploadMenu({clip, start, end, onRefreshIndex, onSaveQueueEvent, 
   const [visibility, setVisibility] = useState("public");
   const [friendsOptions, setFriendsOptions] = useState([]);
   const userId = session?.user?.id;
+  const emptyRange = Boolean(screen) && end <= start;
 
   useEffect(() => {
     async function loadFriends() {
@@ -343,6 +494,11 @@ export function UploadMenu({clip, start, end, onRefreshIndex, onSaveQueueEvent, 
     loadFriends();
   }, [userId]);
 
+  const detected = group?.manifest?.game;
+  useEffect(() => {
+    setGame(detected?.id ? { id: detected.id, label: detected.label || detected.name, image: detected.image?.replace(/^https:/, "") || null } : null);
+  }, [clip.path, detected?.id]);
+
   async function saveClip(clip, start, end, title, game, tags) {
     if (!window?.clipx?.saveClip) {
       console.error("window.clipx.saveClip is not available (preload not wired?)");
@@ -354,10 +510,12 @@ export function UploadMenu({clip, start, end, onRefreshIndex, onSaveQueueEvent, 
     onSaveQueueEvent?.({ type: "started", id: saveId, name: displayName, path: clip?.path });
 
     try {
-      const response = await window.clipx.saveClip({clip, start, end, title, game, tags});
+      const response = await window.clipx.saveClip({clip, start, end, title, game, tags, mix, screen});
       if (response === 200){
-        const renameResponse = await window.clipx.renameClip(clip?.path, "[UNCUT] " + displayName);
-        if (!renameResponse?.path) {
+        const renameResponse = await window.clipx.renameClip(clip?.path, "[ORIGINAL] " + displayName);
+        if (renameResponse?.path) {
+          onRenamed?.(clip.path, renameResponse);
+        } else {
           console.error("Failed to rename clip after saving:", renameResponse);
         }
         onSaveQueueEvent?.({ type: "success", id: saveId });
@@ -407,7 +565,7 @@ export function UploadMenu({clip, start, end, onRefreshIndex, onSaveQueueEvent, 
         return;
       }
 
-      const response = await window.clipx.uploadClip({ clip, start, end, title: displayName, game, tags, userId });
+      const response = await window.clipx.uploadClip({ clip, start, end, title: displayName, game, tags, userId, mix, screen });
       if (response?.status === 200) {
         const { data: clipId, error } = await saveClipRecord({
           id: uploadId,
@@ -460,6 +618,12 @@ export function UploadMenu({clip, start, end, onRefreshIndex, onSaveQueueEvent, 
       <div className="upload-menu-header">
         <p className="eyebrow">Publish</p>
         <h4>Upload Details</h4>
+        {target && (
+          <span className="upload-menu-target" title="Save and Upload use this screen">
+            <ScreenIcon view={target} />
+            {target.label}
+          </span>
+        )}
       </div>
       <ClipDetailsFields
         title={clipTitle}
@@ -477,13 +641,52 @@ export function UploadMenu({clip, start, end, onRefreshIndex, onSaveQueueEvent, 
             <Button
               variant={"contained"}
               onClick={() => {uploadClip(clip, start, end, clipTitle, game, tags)}}
-              disabled={uploading || saving}
+              disabled={uploading || saving || emptyRange}
             >
             Upload
           </Button>)}
-        <Button variant={session ? "outlined" : "contained"} onClick={() => {saveClip(clip, start, end, clipTitle, game, tags)}} disabled={uploading || saving} >Save</Button>
-        <Button variant={"contained"} color={"error"} onClick={() => {onDelete(clip)}} disabled={uploading || saving} >Delete</Button>
+        <Button variant={session ? "outlined" : "contained"} onClick={() => {saveClip(clip, start, end, clipTitle, game, tags)}} disabled={uploading || saving || emptyRange} >Save</Button>
+        <Button
+          variant={"contained"}
+          color={"error"}
+          endIcon={screens ? <ArrowDropDownIcon /> : undefined}
+          onClick={(e) => (screens ? setDeleteAnchor(e.currentTarget) : onDelete(null))}
+          disabled={uploading || saving}
+        >
+          Delete
+        </Button>
       </div>
+      {emptyRange && <p className="upload-menu-note">This screen has no video in the trimmed part. Move the trim later or pick another screen.</p>}
+      {screens && (
+        <Menu anchorEl={deleteAnchor} open={Boolean(deleteAnchor)} onClose={() => setDeleteAnchor(null)}>
+          {screens.map((view) => (
+            <MenuItem
+              key={view.path}
+              className="delete-menu-item"
+              disabled={view.path === clip.path}
+              onClick={() => {
+                setDeleteAnchor(null);
+                onDelete(view);
+              }}
+            >
+              <ScreenIcon view={view} />
+              Delete {view.label.toLowerCase()}
+              {view.path === clip.path && <span className="delete-menu-note">Holds the audio</span>}
+            </MenuItem>
+          ))}
+          <Divider />
+          <MenuItem
+            className="delete-menu-item delete-menu-item--all"
+            onClick={() => {
+              setDeleteAnchor(null);
+              onDelete(null);
+            }}
+          >
+            <DeleteSweepIcon fontSize="small" />
+            Delete all screens
+          </MenuItem>
+        </Menu>
+      )}
     </div>
   );
 }

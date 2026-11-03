@@ -19,6 +19,7 @@ const PAGE_SIZE = 60;
 const TOP_INSERT_THRESHOLD = 120;
 const LOAD_MORE_SCROLL_THRESHOLD = 700;
 const LOCAL_CLIPS_STALE_MS = 5 * 60 * 1000;
+const indexedRootPaths = new Set();
 
 function localClipsQueryKey(rootPath, collection, cursor = null) {
   return ["localFiles", "clips", rootPath, collection, cursor || null, PAGE_SIZE];
@@ -81,6 +82,8 @@ export default function LocalFiles({ onSaveQueueEvent, onUploadQueueEvent, uploa
   const [error, setError] = useState(null);
   const [loadError, setLoadError] = useState(null);
   const [clipToDelete, setClipToDelete] = useState(null);
+  const [screenToDelete, setScreenToDelete] = useState(null);
+  const [deleteGroupSize, setDeleteGroupSize] = useState(1);
   const [clipToRename, setClipToRename] = useState(null);
   const [contextMenu, setContextMenu] = useState(null);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
@@ -345,7 +348,7 @@ export default function LocalFiles({ onSaveQueueEvent, onUploadQueueEvent, uploa
     loadingPageRef.current = false;
     pendingResetRef.current = false;
     setInitialLoadComplete(false);
-    const cachedFirstPage = getFreshCachedQueryData(queryClient, localClipsQueryKey(rootPath, collection));
+    const cachedFirstPage = indexedRootPaths.has(rootPath) ? getFreshCachedQueryData(queryClient, localClipsQueryKey(rootPath, collection)) : null;
     if (cachedFirstPage) {
       applyClipsPage(cachedFirstPage, { reset: true });
       setLoadingPage(false);
@@ -366,6 +369,7 @@ export default function LocalFiles({ onSaveQueueEvent, onUploadQueueEvent, uploa
       try {
         if (typeof window.clipx?.refreshLocalClipIndex === "function") {
           await window.clipx.refreshLocalClipIndex({ rootPath });
+          indexedRootPaths.add(rootPath);
         }
       } catch (error) {
         console.error("Failed to refresh local clip index:", error);
@@ -396,6 +400,7 @@ export default function LocalFiles({ onSaveQueueEvent, onUploadQueueEvent, uploa
       if (event.type === "indexing-status") {
         setIndexing(Boolean(event.indexing));
         if (!event.indexing) {
+          queryClient.invalidateQueries({ queryKey: ["localFiles", "clips", rootPath, collection] });
           loadPage({ reset: true });
         }
         return;
@@ -419,7 +424,7 @@ export default function LocalFiles({ onSaveQueueEvent, onUploadQueueEvent, uploa
         }
       }
     });
-  }, [collection, getScrollTop, loadPage, rootPath]);
+  }, [collection, getScrollTop, loadPage, queryClient, rootPath]);
 
   useEffect(() => {
     if (typeof window.clipx?.onOptionsChanged !== "function") {
@@ -501,6 +506,57 @@ export default function LocalFiles({ onSaveQueueEvent, onUploadQueueEvent, uploa
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
+
+  useEffect(() => {
+    if (!deleteClipModalOpen || !clipToDelete?.path) {
+      setDeleteGroupSize(1);
+      return undefined;
+    }
+
+    let cancelled = false;
+    window.clipx?.getClipGroup?.(clipToDelete.path)
+      .then((group) => {
+        if (!cancelled) {
+          setDeleteGroupSize(group?.files.length || 1);
+        }
+      })
+      .catch((error) => console.error("Failed to load the clip's screens:", error));
+
+    return () => {
+      cancelled = true;
+    };
+  }, [deleteClipModalOpen, clipToDelete]);
+
+  function openDeleteModal(targetClip, screenView = null) {
+    setClipToDelete(targetClip);
+    setScreenToDelete(screenView);
+    setDeleteClipModalOpen(true);
+  }
+
+  async function deleteSelected(deleteAll) {
+    setIsDeletingClip(true);
+    const closesOpenClip = clip?.path === clipToDelete.path && (deleteAll || !screenToDelete);
+    const deletedIndex = clipsRef.current.findIndex((item) => item.path === clipToDelete.path);
+    try {
+      if (deleteAll) {
+        await window.clipx.deleteClipGroup(clipToDelete.path);
+      } else {
+        await window.clipx.deleteClip(screenToDelete?.path || clipToDelete.path);
+      }
+      queryClient.invalidateQueries({ queryKey: ["localFiles", "clips", rootPath, collection] });
+      if (closesOpenClip) {
+        const remainingClips = clipsRef.current.filter((item) => item.path !== clipToDelete.path);
+        setClip(remainingClips[Math.max(0, Math.min(deletedIndex, remainingClips.length - 1))] || null);
+      }
+      setClipToDelete(null);
+    } catch (error) {
+      setError(`${error.message}`);
+      console.error("Failed to delete clip:", error);
+    }
+    setScreenToDelete(null);
+    setIsDeletingClip(false);
+    setDeleteClipModalOpen(false);
+  }
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -617,13 +673,13 @@ export default function LocalFiles({ onSaveQueueEvent, onUploadQueueEvent, uploa
           isSavedClipsView={showSavedFiles}
           onClose={() => setClip(null)}
           baseFolder={folderPath}
-          onDelete={(clip) => {
-            setClipToDelete(clip);
-            setDeleteClipModalOpen(true);
-          }}
+          onDelete={openDeleteModal}
           onNextClip={() => moveSelectedClip(1)}
           onPrevClip={() => moveSelectedClip(-1)}
           triggerClipIndexRefresh={() => refreshFiles()}
+          onClipRenamed={(oldPath, renamed) => {
+            setClip((current) => (current?.path === oldPath ? { ...current, path: renamed.path, name: renamed.name } : current));
+          }}
           uploading={uploadingPaths.includes(clip.path)}
           saving={savingPaths.includes(clip.path)}
         />
@@ -643,10 +699,7 @@ export default function LocalFiles({ onSaveQueueEvent, onUploadQueueEvent, uploa
             clip ? setContextMenu(clip) : setContextMenu(null);
             setMousePosition({ x: rect.x, y: rect.y });
           }}
-          onDelete={(clip) => {
-            setClipToDelete(clip);
-            setDeleteClipModalOpen(true);
-          }}
+          onDelete={(clip) => openDeleteModal(clip)}
         />
       )}
 
@@ -670,29 +723,15 @@ export default function LocalFiles({ onSaveQueueEvent, onUploadQueueEvent, uploa
             ) : (
               <>
                 <div className="delete-modal-message">
-                  Are you sure you want to delete this clip?
+                  {screenToDelete
+                    ? `Are you sure you want to delete the ${screenToDelete.label.toLowerCase()}?`
+                    : deleteGroupSize > 1
+                      ? "Are you sure you want to delete this clip and all its screens?"
+                      : "Are you sure you want to delete this clip?"}
                 </div>
                 <div style={{ display: "flex", marginLeft: "auto", marginRight: "auto", marginTop: "20px", width: "fit-content", gap: "12px" }}>
                   <button className="cancel-button" onClick={() => setDeleteClipModalOpen(false)}>Cancel</button>
-                  <button className="delete-button" onClick={async () => {
-                      if (window.clipx?.deleteClip) {
-                        try {
-                          setIsDeletingClip(true);
-                          const result = await window.clipx.deleteClip(clipToDelete.path);
-                          queryClient.invalidateQueries({ queryKey: ["localFiles", "clips", rootPath, collection] });
-                          setIsDeletingClip(false);
-                          setClipToDelete(null);
-                          if (clip){
-                            moveSelectedClip(1);
-                          }
-                        } catch (error) {
-                          setError(`${error.message}`);
-                          console.error("Failed to delete clip:", error);
-                          setIsDeletingClip(false);
-                        }
-                      }
-                    setDeleteClipModalOpen(false);
-                  }}>Delete</button>
+                  <button className="delete-button" onClick={() => deleteSelected(!screenToDelete)}>Delete</button>
                 </div>
             </>)}
           </div>
@@ -745,8 +784,7 @@ export default function LocalFiles({ onSaveQueueEvent, onUploadQueueEvent, uploa
             setContextMenu(null);
           }}
           onDelete={() => {
-            setClipToDelete(contextMenu);
-            setDeleteClipModalOpen(true);
+            openDeleteModal(contextMenu);
             setContextMenu(null);
           }}
           onRename={() => { 

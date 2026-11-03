@@ -13,6 +13,7 @@ import { getCachedThumbnailPath, setCachedThumbnailPath } from "./clipIndexServi
 
 ffmpeg.setFfmpegPath(resolveFfmpegPath(ffmpegPath));
 
+const APP_REFERRER = /^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?\//;
 const THUMBNAIL_CONCURRENCY = 2;
 const thumbnailQueue = [];
 const inFlightThumbnails = new Map();
@@ -54,6 +55,10 @@ export function registerClipxProtocol(protocol) {
     const requestUrl = new URL(request.url);
     const filePath = decodeURIComponent(requestUrl.searchParams.get("path") || "");
     const host = requestUrl.host;
+
+    if (!APP_REFERRER.test(request.referrer)) {
+      return new Response("Forbidden", { status: 403 });
+    }
 
     if (!filePath) {
       return new Response("Missing path", { status: 400 });

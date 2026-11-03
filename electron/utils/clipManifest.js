@@ -62,9 +62,13 @@ export function buildClipManifest({ folderName, createdAt, seconds, game, primar
   };
 }
 
+export function getScreenCount(files) {
+  const secondaryCount = files.filter((file) => file.role === "secondary").length;
+  return files.find((file) => file.role === "primary")?.follows ? secondaryCount : secondaryCount + 1;
+}
+
 export function describeClip(manifest) {
-  const secondaryCount = manifest.files.filter((file) => file.role === "secondary").length;
-  const screenCount = manifest.files[0]?.follows ? secondaryCount : secondaryCount + 1;
+  const screenCount = getScreenCount(manifest.files);
   return [
     manifest.game?.name,
     `last ${manifest.seconds} s`,
@@ -75,4 +79,18 @@ export function describeClip(manifest) {
 export function getManifestFile(manifest, fileName) {
   const name = String(fileName || "").toLowerCase();
   return manifest?.files?.find((entry) => String(entry.file).toLowerCase() === name) || null;
+}
+
+export function renameManifestFile(manifest, oldName, newName) {
+  const entry = getManifestFile(manifest, oldName);
+  if (!entry) {
+    return null;
+  }
+
+  return { ...manifest, files: manifest.files.map((file) => (file === entry ? { ...file, file: newName } : file)) };
+}
+
+export function removeManifestFile(manifest, fileName) {
+  const entry = getManifestFile(manifest, fileName);
+  return entry ? { ...manifest, files: manifest.files.filter((file) => file !== entry) } : null;
 }

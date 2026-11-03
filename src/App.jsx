@@ -53,6 +53,14 @@ export default function App() {
   const uploadingPaths = uploadingClips.filter((item) => item.status === "uploading").map((item) => item.path);
   const queryClient = useQueryClient();
 
+  useEffect(() => {
+    return window.clipx?.onLocalClipIndexChanged?.((event) => {
+      if (event?.type === "added" || event?.type === "updated" || event?.type === "removed") {
+        queryClient.invalidateQueries({ queryKey: ["localFiles", "clips"] });
+      }
+    });
+  }, [queryClient]);
+
   function upsertSavingClip(id, nextValues) {
     setSavingClips((prev) =>
       prev.map((item) => (item.id === id ? { ...item, ...nextValues } : item))

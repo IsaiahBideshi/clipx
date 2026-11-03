@@ -2,10 +2,46 @@ import fallBackThumb from "../assets/thumbnail.svg";
 import { useState, useEffect } from "react";
 
 import MoreVertIcon from '@mui/icons-material/MoreVert';
+import DesktopWindowsIcon from "@mui/icons-material/DesktopWindows";
+import { getScreenCount } from "../../electron/utils/clipManifest.js";
 
 function ClipCard({ clip, baseFolder, onClick, onContextMenuAction }) {
   const [thumbSrc, setThumbSrc] = useState(() => getThumbUrl(clip.thumbnailPath) || fallBackThumb);
   const [hasThumb, setHasThumb] = useState(Boolean(clip.thumbnailPath));
+  const [screenCount, setScreenCount] = useState(1);
+  const [groupVersion, setGroupVersion] = useState(0);
+
+  useEffect(() => {
+    if (!clip.groupPath) {
+      setScreenCount(1);
+      return undefined;
+    }
+
+    let mounted = true;
+    window.clipx?.getClipGroup?.(clip.path)
+      .then((group) => {
+        if (mounted) {
+          setScreenCount(group ? getScreenCount(group.files) : 1);
+        }
+      })
+      .catch((error) => console.error("Failed to load the clip's screens:", error));
+
+    return () => {
+      mounted = false;
+    };
+  }, [clip.path, clip.groupPath, clip.modifiedAt, groupVersion]);
+
+  useEffect(() => {
+    if (screenCount < 2 || typeof window.clipx?.onLocalClipIndexChanged !== "function") {
+      return undefined;
+    }
+
+    return window.clipx.onLocalClipIndexChanged((event) => {
+      if (event?.type === "removed" && event.clip?.groupPath === clip.groupPath) {
+        setGroupVersion((version) => version + 1);
+      }
+    });
+  }, [screenCount, clip.groupPath]);
 
   function getURL() {
     return `clipx://video?path=${encodeURIComponent(clip.path)}`;
@@ -49,7 +85,7 @@ function ClipCard({ clip, baseFolder, onClick, onContextMenuAction }) {
     };
   }, [baseFolder, clip.path, clip.thumbnailPath]);
   return (
-    <div className={`clip-card ${hasThumb ? "" : "no-thumb"}`} onClick={onClick} onContextMenu={(e) => {
+    <div className={`clip-card ${hasThumb ? "" : "no-thumb"} ${screenCount > 1 ? "clip-card--stacked" : ""}`} onClick={onClick} onContextMenu={(e) => {
       e.preventDefault();
       onContextMenuAction(clip, { x: e.clientX, y: e.clientY });
     }}>
@@ -57,6 +93,12 @@ function ClipCard({ clip, baseFolder, onClick, onContextMenuAction }) {
           <img src={thumbSrc} className="clip-thumb" />
         ) : (
           <div className="thumb-placeholder" />
+        )}
+        {screenCount > 1 && (
+          <span className="clip-screens-badge" title={`${screenCount} screens`}>
+            <DesktopWindowsIcon sx={{ fontSize: 14 }} />
+            {screenCount}
+          </span>
         )}
       <div style={{ flex: 1, display: "flex", flexDirection: "row", justifyContent: "space-between", width: "100%", alignItems: "center", gap: "8px" }}>
         <div>
