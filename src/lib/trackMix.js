@@ -39,9 +39,10 @@ export function onVideoSync(video, sync) {
 function createTrackMixer(video) {
   const context = new AudioContext();
   const videoGain = context.createGain();
+  const limiter = new DynamicsCompressorNode(context, { threshold: 0, knee: 0, ratio: 20, attack: 0 });
   const master = context.createGain();
   context.createMediaElementSource(video).connect(videoGain).connect(context.destination);
-  master.connect(context.destination);
+  limiter.connect(master).connect(context.destination);
 
   let stems = [];
   let settings = { mix: null, offset: 0, external: false, volume: 1, muted: false };
@@ -102,7 +103,7 @@ function createTrackMixer(video) {
         audio.src = toClipxUrl(track.path);
         audio.addEventListener("loadedmetadata", () => sync(true), { once: true });
         const gain = context.createGain();
-        context.createMediaElementSource(audio).connect(gain).connect(master);
+        context.createMediaElementSource(audio).connect(gain).connect(limiter);
         return { index: track.index, audio, gain };
       });
       apply();
