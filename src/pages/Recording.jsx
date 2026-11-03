@@ -556,7 +556,9 @@ export default function Recording() {
                   <InputLabel id="audio-app-label">App</InputLabel>
                   <Select labelId="audio-app-label" label="App" value={selectedApp} onChange={(event) => setSelectedApp(event.target.value)}>
                     {availableApps.map((app) => (
-                      <MenuItem key={app.exe} value={app.exe}>{app.exe} · {app.title}</MenuItem>
+                      <MenuItem key={app.exe} value={app.exe}>
+                        <span className="app-option"><TrackIcon kind="app" exe={app.exe} />{app.exe} · {app.title}</span>
+                      </MenuItem>
                     ))}
                   </Select>
                 </FormControl>
@@ -645,10 +647,14 @@ export default function Recording() {
                   >
                     {runningApps === null && <MenuItem disabled value="">Loading...</MenuItem>}
                     {(runningApps || []).map((runningApp) => (
-                      <MenuItem key={runningApp.exe} value={runningApp.exe}>{runningApp.exe} · {runningApp.title}</MenuItem>
+                      <MenuItem key={runningApp.exe} value={runningApp.exe}>
+                        <span className="app-option"><TrackIcon kind="app" exe={runningApp.exe} />{runningApp.exe} · {runningApp.title}</span>
+                      </MenuItem>
                     ))}
                     {assignExe && !runningApps?.some((runningApp) => runningApp.exe === assignExe) && (
-                      <MenuItem value={assignExe}>{assignExe}</MenuItem>
+                      <MenuItem value={assignExe}>
+                        <span className="app-option"><TrackIcon kind="app" exe={assignExe} />{assignExe}</span>
+                      </MenuItem>
                     )}
                   </Select>
                 </FormControl>

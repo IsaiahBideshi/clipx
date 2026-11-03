@@ -216,6 +216,12 @@
   word-break: break-word;
 }
 
+.app-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .detected-game-cover {
   width: 36px;
   height: 48px;
