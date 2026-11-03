@@ -59,11 +59,18 @@
 
 .screen-stage-front {
   position: relative;
-  width: min(100cqw, max(240px, 100cqh * var(--video-ratio)));
+  width: min(100cqw, max(260px, 100cqh * var(--video-ratio)));
   height: 100cqh;
   margin: 0 auto;
   overflow: hidden;
   box-shadow: 0 22px 44px rgba(0, 0, 0, 0.46);
+  container: player / inline-size;
+}
+
+@container player (max-width: 400px) {
+  .screen-stage .video-volume-slider {
+    display: none;
+  }
 }
 
 .screen-stage .video-player-shell {

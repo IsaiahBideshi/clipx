@@ -170,12 +170,15 @@
 }
 
 .quality-row {
-  display: grid;
-  grid-template-columns: 160px auto auto auto;
-  justify-content: start;
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 10px;
   margin: 8px 0;
+}
+
+.quality-row > span {
+  width: 160px;
 }
 
 .audio-track {
@@ -248,9 +251,5 @@
 @media (max-width: 860px) {
   .recording-hero-controls {
     justify-content: flex-start;
-  }
-
-  .quality-row {
-    grid-template-columns: 1fr auto auto auto;
   }
 }
