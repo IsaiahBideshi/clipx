@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.3.1
+
+- New: The Library filters suggest you, your friends and the games you've uploaded.
+- New: Keep only one screen of a multi-screen clip from the Delete menu in the clip editor.
+- New: Allow auto switch with only one screen recording turned on.
+- New: Delete the auto switch clip if no switches happen in the clip.
+- Fix: With auto switch on, your main Windows screen is recorded at primary quality.
+- Fix: ClipX no longer crashes in some cases while clip thumbnails load.
+- Fix: The "no video in the trimmed part" note no longer flashes while a screen loads in the clip editor.
+
 ## v1.3.0
 
 - New: Record clips in ClipX. Turn on clipping on the new Recording page and press your hotkey to save the last few seconds.

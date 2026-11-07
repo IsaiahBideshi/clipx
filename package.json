@@ -1,6 +1,6 @@
 {
   "name": "ClipX",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "description": "A desktop application for capturing, trimming, and sharing game clips with friends.",
   "author": "Isaiah Bideshi <isaiahbideshi@gmail.com>",
   "main": "electron/main.js",
