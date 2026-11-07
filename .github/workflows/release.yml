@@ -10,13 +10,11 @@ on:
 permissions:
   contents: write
 
-concurrency:
-  group: release
-  cancel-in-progress: false
-
 jobs:
-  build-and-release:
-    runs-on: windows-latest
+  resolve:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.release_tag.outputs.tag }}
 
     steps:
       - name: Checkout repository
@@ -24,17 +22,33 @@ jobs:
 
       - name: Resolve release tag
         id: release_tag
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            tag="$GITHUB_REF_NAME"
+          else
+            tag="v$(node -p "require('./package.json').version")"
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+  build-and-release:
+    needs: resolve
+    runs-on: windows-latest
+    concurrency:
+      group: release-${{ needs.resolve.outputs.tag }}
+      cancel-in-progress: false
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check for an existing release
+        id: existing
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.resolve.outputs.tag }}
         run: |
-          if ($env:GITHUB_REF -like 'refs/tags/*') {
-            $tag = $env:GITHUB_REF_NAME
-          } else {
-            $version = node -p "require('./package.json').version"
-            $tag = "v$version"
-          }
-
+          $tag = $env:TAG
           $lookup = gh api "repos/$env:GITHUB_REPOSITORY/releases/tags/$tag" --jq .id 2>&1
           if ($LASTEXITCODE -eq 0) {
             $released = $true
@@ -45,31 +59,30 @@ jobs:
             throw "Couldn't check whether $tag is already released: $lookup"
           }
 
-          "tag=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
           "released=$($released.ToString().ToLower())" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
           exit 0
 
       - name: Setup Node.js
-        if: steps.release_tag.outputs.released != 'true'
+        if: steps.existing.outputs.released != 'true'
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
 
       - name: Install dependencies
-        if: steps.release_tag.outputs.released != 'true'
+        if: steps.existing.outputs.released != 'true'
         run: npm ci
 
       - name: Build app
-        if: steps.release_tag.outputs.released != 'true'
+        if: steps.existing.outputs.released != 'true'
         run: npm run build
 
       - name: Extract release notes
-        if: steps.release_tag.outputs.released != 'true'
+        if: steps.existing.outputs.released != 'true'
         id: release_notes
         shell: pwsh
         run: |
-          $tag = "${{ steps.release_tag.outputs.tag }}"
+          $tag = "${{ needs.resolve.outputs.tag }}"
           $changelogPath = "CHANGELOG.md"
           $notesPath = Join-Path $env:RUNNER_TEMP "release-notes.md"
 
@@ -115,13 +128,13 @@ jobs:
           "path=$notesPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
 
       - name: Create GitHub release
-        if: steps.release_tag.outputs.released != 'true'
+        if: steps.existing.outputs.released != 'true'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.release_tag.outputs.tag }}
+          tag_name: ${{ needs.resolve.outputs.tag }}
           target_commitish: ${{ github.sha }}
           body_path: ${{ steps.release_notes.outputs.path }}
-          prerelease: ${{ contains(steps.release_tag.outputs.tag, '-') }}
+          prerelease: ${{ contains(needs.resolve.outputs.tag, '-') }}
           files: |
             dist/ClipX-Setup.exe
             dist/ClipX-Setup.exe.blockmap

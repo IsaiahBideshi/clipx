@@ -46,7 +46,10 @@ jobs:
             $files += "dist/latest.yml"
           } else {
             Write-Host "$env:TAG's build has no latest.yml, so any latest.yml on the release is removed."
-            gh release delete-asset $env:TAG latest.yml --yes --repo $env:GITHUB_REPOSITORY *> $null
+            $deletion = gh release delete-asset $env:TAG latest.yml --yes --repo $env:GITHUB_REPOSITORY 2>&1
+            if ($LASTEXITCODE -ne 0 -and "$deletion" -notmatch "asset latest.yml not found") {
+              throw "Couldn't remove latest.yml from ${env:TAG}: $deletion"
+            }
           }
 
           gh release upload $env:TAG @files --clobber --repo $env:GITHUB_REPOSITORY
