@@ -83,6 +83,7 @@ export default function LocalFiles({ onSaveQueueEvent, onUploadQueueEvent, uploa
   const [loadError, setLoadError] = useState(null);
   const [clipToDelete, setClipToDelete] = useState(null);
   const [screenToDelete, setScreenToDelete] = useState(null);
+  const [keepScreen, setKeepScreen] = useState(null);
   const [deleteGroupSize, setDeleteGroupSize] = useState(1);
   const [clipToRename, setClipToRename] = useState(null);
   const [contextMenu, setContextMenu] = useState(null);
@@ -527,18 +528,24 @@ export default function LocalFiles({ onSaveQueueEvent, onUploadQueueEvent, uploa
     };
   }, [deleteClipModalOpen, clipToDelete]);
 
-  function openDeleteModal(targetClip, screenView = null) {
+  function openDeleteModal(targetClip, screenView = null, keep = null) {
     setClipToDelete(targetClip);
     setScreenToDelete(screenView);
+    setKeepScreen(keep);
     setDeleteClipModalOpen(true);
   }
 
   async function deleteSelected(deleteAll) {
     setIsDeletingClip(true);
-    const closesOpenClip = clip?.path === clipToDelete.path && (deleteAll || !screenToDelete);
+    const closesOpenClip = !keepScreen && clip?.path === clipToDelete.path && (deleteAll || !screenToDelete);
     const deletedIndex = clipsRef.current.findIndex((item) => item.path === clipToDelete.path);
     try {
-      if (deleteAll) {
+      if (keepScreen) {
+        const kept = await window.clipx.keepClipScreen(clipToDelete.path, keepScreen.screen);
+        if (kept) {
+          setClip((current) => (current?.path === clipToDelete.path ? { ...current, ...kept } : current));
+        }
+      } else if (deleteAll) {
         await window.clipx.deleteClipGroup(clipToDelete.path);
       } else {
         await window.clipx.deleteClip(screenToDelete?.path || clipToDelete.path);
@@ -554,6 +561,7 @@ export default function LocalFiles({ onSaveQueueEvent, onUploadQueueEvent, uploa
       console.error("Failed to delete clip:", error);
     }
     setScreenToDelete(null);
+    setKeepScreen(null);
     setIsDeletingClip(false);
     setDeleteClipModalOpen(false);
   }
@@ -719,15 +727,17 @@ export default function LocalFiles({ onSaveQueueEvent, onUploadQueueEvent, uploa
         <div className="delete-modal">
           <div className="delete-modal-content" ref={deleteModalRef}>
             {isDeletingClip ? (
-              <p>Deleting clip...</p>
+              <p>{keepScreen ? "Deleting the other screens..." : "Deleting clip..."}</p>
             ) : (
               <>
                 <div className="delete-modal-message">
-                  {screenToDelete
-                    ? `Are you sure you want to delete the ${screenToDelete.label.toLowerCase()}?`
-                    : deleteGroupSize > 1
-                      ? "Are you sure you want to delete this clip and all its screens?"
-                      : "Are you sure you want to delete this clip?"}
+                  {keepScreen
+                    ? `Keep only the ${screenToDelete.label.toLowerCase()} and delete the other screens?`
+                    : screenToDelete
+                      ? `Are you sure you want to delete the ${screenToDelete.label.toLowerCase()}?`
+                      : deleteGroupSize > 1
+                        ? "Are you sure you want to delete this clip and all its screens?"
+                        : "Are you sure you want to delete this clip?"}
                 </div>
                 <div style={{ display: "flex", marginLeft: "auto", marginRight: "auto", marginTop: "20px", width: "fit-content", gap: "12px" }}>
                   <button className="cancel-button" onClick={() => setDeleteClipModalOpen(false)}>Cancel</button>

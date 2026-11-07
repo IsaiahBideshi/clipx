@@ -10,8 +10,9 @@ import { uploadClipToYoutube } from "./youtubeService.js";
 import { resolveFfmpegPath } from "../utils/ffmpeg.js";
 import { STREAM_COPY_BITRATE, buildStreamBlobName, renderStreamCopy } from "../utils/streamCopy.js";
 import { getIndexedClipData, setIndexedClipMetadata, markIndexedClipMissing, getWatchedRootForPath, upsertIndexedClip, getCachedThumbnailPath, getClipGroup } from "./clipIndexService.js";
-import { CLIP_MANIFEST_NAME, getManifestFile, removeManifestFile, renameManifestFile } from "../utils/clipManifest.js";
+import { CLIP_MANIFEST_NAME, getManifestFile, keepManifestFile, removeManifestFile, renameManifestFile } from "../utils/clipManifest.js";
 import { buildAudioOutputOptions } from "../utils/audioMix.js";
+import { copyScreenAudio } from "../utils/screenAudio.js";
 import { getSupabaseAccessToken } from "../ipc/authStorage.js";
 
 ffmpeg.setFfmpegPath(resolveFfmpegPath(ffmpegPath));
@@ -624,6 +625,62 @@ export async function deleteClipGroup(clipPath) {
     await deleteClipFile(file.path);
   }
   await removeClipManifest(group.path);
+}
+
+export async function keepClipScreen(clipPath, screen) {
+  if (typeof clipPath !== "string" || clipPath.length === 0) {
+    throw new TypeError("keep-clip-screen: clipPath must be a non-empty string");
+  }
+
+  const group = getClipGroup(clipPath);
+  const primary = group?.files.find((file) => file.path === clipPath && file.role === "primary");
+  if (!primary) {
+    throw new ClipServiceError("This clip has no other screens.", 404);
+  }
+
+  const source = getScreenSource(clipPath, screen);
+  let keptPath = primary.path;
+  let keptFile = primary.file;
+  if (source) {
+    keptFile = group.files.find((file) => file.path === source.videoPath).file;
+    keptPath = path.join(group.path, `${stripVideoExtension(primary.file)} (${stripVideoExtension(keptFile)}).mp4`);
+    if (fs.existsSync(keptPath)) {
+      throw new ClipServiceError(`A clip named "${path.basename(keptPath)}" already exists`, 409);
+    }
+
+    try {
+      await copyScreenAudio(source.videoPath, primary.path, keptPath);
+    } catch (error) {
+      await fs.promises.rm(keptPath, { force: true });
+      throw error;
+    }
+  }
+
+  const keptName = path.basename(keptPath);
+  const others = group.files.filter((file) => file.path !== keptPath);
+  try {
+    const manifest = keepManifestFile(group.manifest, keptFile, keptName, others.map((file) => file.file));
+    await fs.promises.writeFile(path.join(group.path, CLIP_MANIFEST_NAME), JSON.stringify(manifest, null, 2), "utf-8");
+  } catch (error) {
+    if (source) {
+      await fs.promises.rm(keptPath, { force: true });
+    }
+    throw error;
+  }
+
+  const left = [];
+  for (const file of others) {
+    await deleteClipFile(file.path).catch(() => left.push(file));
+  }
+  await updateClipManifest(group.path, (manifest) => keepManifestFile(manifest, keptName, keptName, left.map((file) => file.file)))
+    .catch((error) => console.error("ClipX: Failed to update clip manifest after keeping a screen:", error));
+
+  const root = getWatchedRootForPath(keptPath) || group.path;
+  for (const file of left) {
+    await upsertIndexedClip(root, file.path, { emitChange: true })
+      .catch((error) => console.error("ClipX: Failed to index a screen that couldn't be deleted:", error));
+  }
+  return upsertIndexedClip(root, keptPath, { emitChange: true });
 }
 
 function getThumbnailPath(clipPath) {

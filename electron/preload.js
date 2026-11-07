@@ -53,6 +53,7 @@ contextBridge.exposeInMainWorld("clipx", {
   renameClip: (clipPath, newName) => ipcRenderer.invoke("rename-clip", clipPath, newName),
   deleteClip: (clipPath) => ipcRenderer.invoke("delete-clip", clipPath),
   deleteClipGroup: (clipPath) => ipcRenderer.invoke("delete-clip-group", clipPath),
+  keepClipScreen: (clipPath, screen) => ipcRenderer.invoke("keep-clip-screen", clipPath, screen),
   linkYoutube: (userId) => ipcRenderer.invoke("link-youtube", userId),
   unlinkYoutube: (userId) => ipcRenderer.invoke("unlink-youtube", userId),
   getGoogleInfo: (userId) => ipcRenderer.invoke("get-google-info", userId),

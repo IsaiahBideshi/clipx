@@ -16,6 +16,7 @@ import { Divider, Menu, MenuItem, Typography } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import DeleteSweepIcon from "@mui/icons-material/DeleteSweep";
+import CenterFocusStrongIcon from "@mui/icons-material/CenterFocusStrong";
 import fallBackThumb from "../assets/thumbnail.svg";
 import { usePlayerPrefs } from "../lib/playerPrefs.js";
 
@@ -422,7 +423,7 @@ export default function ClipEditor({
             onSaveQueueEvent={onSaveQueueEvent}
             onUploadQueueEvent={onUploadQueueEvent}
             screens={multiScreen ? views : null}
-            onDelete={(view) => onDelete(clip, view)}
+            onDelete={(view, keep) => onDelete(clip, view, keep)}
             onRenamed={onClipRenamed}
             onRefreshIndex={triggerClipIndexRefresh}
             uploading={uploading}
@@ -682,6 +683,16 @@ export function UploadMenu({clip, group, mix, screen, screens, target, start, en
             </MenuItem>
           ))}
           <Divider />
+          <MenuItem
+            className="delete-menu-item delete-menu-item--all"
+            onClick={() => {
+              setDeleteAnchor(null);
+              onDelete(target, { screen });
+            }}
+          >
+            <CenterFocusStrongIcon fontSize="small" />
+            Keep only {target.label.toLowerCase()}
+          </MenuItem>
           <MenuItem
             className="delete-menu-item delete-menu-item--all"
             onClick={() => {

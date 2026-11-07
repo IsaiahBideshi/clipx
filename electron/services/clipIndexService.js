@@ -150,8 +150,11 @@ function readClipManifest(dirPath) {
 
 function getClipGroupInfo(filePath) {
   const dirPath = path.dirname(filePath);
-  const entry = getManifestFile(readClipManifest(dirPath), path.basename(filePath));
-  return entry ? { groupPath: dirPath, groupRole: entry.role } : { groupPath: null, groupRole: null };
+  const manifest = readClipManifest(dirPath);
+  const entry = getManifestFile(manifest, path.basename(filePath));
+  return entry
+    ? { groupPath: dirPath, groupRole: entry.role, createdAtMs: Date.parse(manifest.createdAt) }
+    : { groupPath: null, groupRole: null, createdAtMs: NaN };
 }
 
 function emitIndexEvent(event) {
@@ -369,7 +372,7 @@ export async function upsertIndexedClip(rootPath, filePath, options = {}) {
   const collection = getCollectionForPath(normalizedRootPath, normalizedFilePath);
   const existingRow = getRowByPath(normalizedFilePath);
   const savedMetadata = collection === "saved" ? findLegacyClipMetadata(normalizedFilePath) : null;
-  const { groupPath, groupRole } = getClipGroupInfo(normalizedFilePath);
+  const { groupPath, groupRole, createdAtMs } = getClipGroupInfo(normalizedFilePath);
 
   getDb()
     .prepare(`
@@ -410,7 +413,7 @@ export async function upsertIndexedClip(rootPath, filePath, options = {}) {
       collection,
       path.basename(normalizedFilePath),
       stats.size,
-      stats.birthtimeMs,
+      Number.isFinite(createdAtMs) ? createdAtMs : stats.birthtimeMs,
       stats.mtimeMs,
       Date.now(),
       savedMetadata ? JSON.stringify(savedMetadata) : null,
@@ -426,6 +429,8 @@ export async function upsertIndexedClip(rootPath, filePath, options = {}) {
       collection,
       clip,
     });
+  } else if (options.emitChange && existingRow && existingRow.group_role !== "secondary") {
+    emitIndexEvent({ type: "removed", rootPath: normalizedRootPath, collection, clip });
   }
 
   return clip;

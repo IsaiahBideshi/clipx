@@ -7,6 +7,7 @@ import {
   getRecordingOptions,
   estimateLoad,
   findMonitorItem,
+  getDuplicateScreen,
   numberScreens,
   pickFollowScreen,
   pickOtherAudioApps,
@@ -168,4 +169,53 @@ test("matches an OBS monitor by its desktop position", () => {
   assert.equal(findMonitorItem(items, screens[1]).itemValue, "a");
   assert.equal(findMonitorItem(items, screens[0]).itemValue, "c");
   assert.equal(findMonitorItem(items, { x: 0, y: 1 }), null);
+});
+
+test("finds the screen file that copies an auto switch recording that never switched", () => {
+  const plans = planRecorders(screens.filter((screen) => screen.id !== 30), {});
+  const copies = plans.slice(1).map((plan) => ({ plan, screenId: plan.screenId }));
+  const main = (screenId, screenSince) => ({ plan: plans[0], screenId, screenSince });
+
+  assert.deepEqual(getDuplicateScreen(main(20, 1000), copies, screens, 1000), { screenId: 20, keep: "main" });
+  assert.deepEqual(getDuplicateScreen(main(10, 0), copies, screens, 1000), { screenId: 10, keep: "main" });
+  assert.equal(getDuplicateScreen(main(20, 1001), copies, screens, 1000), null);
+  assert.equal(getDuplicateScreen(main(20, 0), [], screens, 1000), null);
+  assert.equal(getDuplicateScreen({ plan: { ...plans[0], screenId: 10 }, screenId: 10, screenSince: 0 }, copies, screens, 1000), null);
+  assert.equal(getDuplicateScreen(undefined, copies, screens, 1000), null);
+});
+
+test("keeps the screen file when the auto switch recording letterboxes a primary quality screen", () => {
+  const mixed = numberScreens([
+    { id: 1, x: 0, y: 0, width: 2304, height: 1440, primary: false },
+    { id: 2, x: 2304, y: 0, width: 1920, height: 1080, primary: true },
+  ]);
+  const plans = planRecorders(mixed, {});
+  const copies = plans.slice(1).map((plan) => ({ plan, screenId: plan.screenId }));
+  const main = (screenId) => ({ plan: plans[0], screenId, screenSince: 0 });
+
+  assert.deepEqual(getDuplicateScreen(main(2), copies, mixed, 1000), { screenId: 2, keep: "screen" });
+  assert.deepEqual(getDuplicateScreen(main(1), copies, mixed, 1000), { screenId: 1, keep: "main" });
+  const secondaryOnly = numberScreens([{ ...mixed[0], primary: true }, { ...mixed[1], primary: false }]);
+  const secondaryPlans = planRecorders(secondaryOnly, {});
+  const secondaryCopies = secondaryPlans.slice(1).map((plan) => ({ plan, screenId: plan.screenId }));
+  assert.equal(getDuplicateScreen({ plan: secondaryPlans[0], screenId: 2, screenSince: 0 }, secondaryCopies, secondaryOnly, 1000), null);
+});
+
+test("keeps whichever copy of the screen is recorded at better quality", () => {
+  const twin = numberScreens([
+    { id: 1, x: 0, y: 0, width: 1920, height: 1080, primary: true },
+    { id: 2, x: 1920, y: 0, width: 1920, height: 1080, primary: false },
+  ]);
+  const check = (options) => {
+    const plans = planRecorders(twin, options);
+    const copies = plans.slice(1).map((plan) => ({ plan, screenId: plan.screenId }));
+    return getDuplicateScreen({ plan: plans[0], screenId: 2, screenSince: 0 }, copies, twin, 1000);
+  };
+
+  assert.deepEqual(check({}), { screenId: 2, keep: "main" });
+  assert.equal(check({ clipPrimaryHeight: 720, clipPrimaryFps: 30, clipSecondaryHeight: 1080, clipSecondaryFps: 60 }), null);
+  assert.deepEqual(
+    check({ clipPrimaryHeight: 720, clipPrimaryFps: 30, clipPrimaryBitrate: 6, clipSecondaryHeight: 1080, clipSecondaryFps: 60, clipSecondaryBitrate: 20 }),
+    { screenId: 2, keep: "screen" },
+  );
 });

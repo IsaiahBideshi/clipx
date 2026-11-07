@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildClipManifest, describeClip, getAudioTrackNames, getClipName, getManifestFile, getScreenCount, removeManifestFile, renameManifestFile } from "../electron/utils/clipManifest.js";
+import { buildClipManifest, describeClip, getAudioTrackNames, getClipName, getManifestFile, getScreenCount, keepManifestFile, removeManifestFile, renameManifestFile } from "../electron/utils/clipManifest.js";
 
 test("describes a saved clip for its notification", () => {
   const files = (follows, secondaries) => [
@@ -78,4 +78,37 @@ test("removes a file from the manifest and counts screens", () => {
   assert.equal(getScreenCount(removed.files), 1);
   assert.equal(getScreenCount([{ role: "primary", follows: false }, { role: "secondary" }]), 2);
   assert.equal(removeManifestFile(manifest, "Screen 3.mp4"), null);
+});
+
+test("keeps one file of a clip as its primary", () => {
+  const tracks = [{ index: 1, name: "Full mix", kind: "mix" }];
+  const manifest = {
+    seconds: 30,
+    files: [
+      { file: "Clip.mp4", role: "primary", follows: true, screen: null, audioTracks: tracks },
+      { file: "Screen 1.mp4", role: "secondary", follows: false, screen: { number: 1 }, audioTracks: [] },
+      { file: "Screen 2.mp4", role: "secondary", follows: false, screen: { number: 2 }, audioTracks: [] },
+    ],
+  };
+
+  assert.deepEqual(keepManifestFile(manifest, "Clip.mp4").files, [manifest.files[0]]);
+  const kept = keepManifestFile(manifest, "screen 2.mp4", "Clip (Screen 2).mp4");
+  assert.equal(kept.seconds, 30);
+  assert.deepEqual(kept.files, [
+    { file: "Clip (Screen 2).mp4", role: "primary", follows: false, screen: { number: 2 }, audioTracks: tracks },
+  ]);
+  assert.equal(getScreenCount(kept.files), 1);
+  const partly = keepManifestFile(manifest, "Screen 2.mp4", "Clip (Screen 2).mp4", ["Clip.mp4", "Screen 1.mp4", "Screen 2.mp4"]);
+  assert.deepEqual(partly.files.map((entry) => [entry.file, entry.role]), [
+    ["Clip (Screen 2).mp4", "primary"],
+    ["Clip.mp4", "secondary"],
+    ["Screen 1.mp4", "secondary"],
+    ["Screen 2.mp4", "secondary"],
+  ]);
+  assert.deepEqual(keepManifestFile(partly, "Clip (Screen 2).mp4", "Clip (Screen 2).mp4", ["Screen 1.mp4"]).files.map((entry) => entry.file), [
+    "Clip (Screen 2).mp4",
+    "Screen 1.mp4",
+  ]);
+  assert.equal(keepManifestFile(manifest, "Screen 3.mp4"), null);
+  assert.equal(keepManifestFile(null, "Clip.mp4"), null);
 });

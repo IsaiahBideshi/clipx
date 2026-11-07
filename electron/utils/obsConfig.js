@@ -5,7 +5,7 @@ export const OBS_VERSION = "33.0.0";
 export const OBS_ZIP_URL = `https://github.com/obsproject/obs-studio/releases/download/${OBS_VERSION}/OBS-Studio-${OBS_VERSION}-Windows-x64.zip`;
 export const OBS_ZIP_SHA256 = "3369a3ecd67b5669a8a08d77357f87cc786d1fba42fbbd1054d841a69f6271a7";
 export const OBS_PROFILE_NAME = "ClipX";
-const KEYFRAME_PADDING_SECONDS = 5;
+export const KEYFRAME_PADDING_SECONDS = 5;
 
 const ENCODER_BY_GPU_VENDOR = {
   0x10de: "obs_nvenc_h264_tex",

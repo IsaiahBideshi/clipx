@@ -140,6 +140,28 @@ export function pickFollowScreen(enabledScreens, targetScreenId, currentScreenId
   return enabledScreens[0]?.id ?? null;
 }
 
+export function getDuplicateScreen(main, recorders, screens, clipStartMs) {
+  if (main?.plan.screenId !== null || !(main.screenSince <= clipStartMs)) {
+    return null;
+  }
+
+  const shown = screens.find((screen) => screen.id === main.screenId);
+  const copy = recorders.find((recorder) => recorder.plan.role === "secondary" && recorder.screenId === main.screenId);
+  if (!shown || !copy) {
+    return null;
+  }
+
+  const { width, height } = main.plan.canvas;
+  const fit = Math.min(width / shown.width, height / shown.height);
+  const mainHeight = (shown.height * fit * main.plan.output.height) / height;
+  const mainIsBetter = mainHeight >= copy.plan.output.height && main.plan.fps >= copy.plan.fps && main.plan.bitrate >= copy.plan.bitrate;
+  const copyIsBetter = copy.plan.output.height >= mainHeight && copy.plan.fps >= main.plan.fps && copy.plan.bitrate >= main.plan.bitrate;
+  if (mainIsBetter && shown.width * height === shown.height * width) {
+    return { screenId: shown.id, keep: "main" };
+  }
+  return copyIsBetter ? { screenId: shown.id, keep: "screen" } : null;
+}
+
 export function describeRecorders(recorders) {
   const screens = (count) => `${count} ${count === 1 ? "screen" : "screens"}`;
   const secondaryCount = recorders.filter((recorder) => recorder.role === "secondary").length;

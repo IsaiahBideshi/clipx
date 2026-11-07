@@ -94,3 +94,20 @@ export function removeManifestFile(manifest, fileName) {
   const entry = getManifestFile(manifest, fileName);
   return entry ? { ...manifest, files: manifest.files.filter((file) => file !== entry) } : null;
 }
+
+export function keepManifestFile(manifest, fileName, newName = fileName, leftFiles = []) {
+  const entry = getManifestFile(manifest, fileName);
+  const primary = manifest?.files?.find((file) => file.role === "primary");
+  if (!entry || !primary) {
+    return null;
+  }
+
+  const kept = entry === primary
+    ? primary
+    : { ...entry, file: newName, role: "primary", follows: false, audioTracks: primary.audioTracks };
+  const left = leftFiles
+    .map((name) => getManifestFile(manifest, name))
+    .filter((file) => file && file !== kept)
+    .map((file) => ({ ...file, role: "secondary" }));
+  return { ...manifest, files: [kept, ...left] };
+}
