@@ -1,0 +1,55 @@
+name: Rebuild release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to rebuild from its own commit, e.g. v1.2.4
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  rebuild:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout the tag
+        uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ inputs.tag }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build app
+        run: npm run build
+
+      - name: Replace the release's files
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          $files = @("dist/ClipX-Setup.exe", "dist/ClipX-Setup.exe.blockmap")
+          if (Test-Path dist/latest.yml) {
+            $published = gh release view $env:TAG --repo $env:GITHUB_REPOSITORY --json publishedAt --jq .publishedAt
+            $yml = (Get-Content dist/latest.yml) -replace "^releaseDate: .*", "releaseDate: '$published'"
+            Set-Content dist/latest.yml -Value $yml -Encoding utf8
+            $files += "dist/latest.yml"
+          } else {
+            Write-Host "$env:TAG's build has no latest.yml, so any latest.yml on the release is removed."
+            $deletion = gh release delete-asset $env:TAG latest.yml --yes --repo $env:GITHUB_REPOSITORY 2>&1
+            if ($LASTEXITCODE -ne 0 -and "$deletion" -notmatch "asset latest.yml not found") {
+              throw "Couldn't remove latest.yml from ${env:TAG}: $deletion"
+            }
+          }
+
+          gh release upload $env:TAG @files --clobber --repo $env:GITHUB_REPOSITORY
