@@ -155,7 +155,7 @@ function BitrateField({ value, onCommit }) {
   );
 }
 
-function ScreenMap({ screens, getRole, canPickPrimary, onToggle, onPick }) {
+function ScreenMap({ screens, getRole, isOn, canPickPrimary, onToggle, onPick }) {
   const minX = Math.min(...screens.map((screen) => screen.x));
   const minY = Math.min(...screens.map((screen) => screen.y));
   const totalWidth = Math.max(...screens.map((screen) => screen.x + screen.width)) - minX;
@@ -200,7 +200,7 @@ function ScreenMap({ screens, getRole, canPickPrimary, onToggle, onPick }) {
               <label className="screen-record" onClick={(event) => event.stopPropagation()}>
                 <Checkbox
                   size="small"
-                  checked={role !== "Off"}
+                  checked={isOn(screen)}
                   onChange={(event) => onToggle(screen, event.target.checked)}
                 />
                 Record
@@ -324,10 +324,12 @@ export default function Recording() {
   }
 
   function getRole(screen) {
-    if (!enabledIds.has(screen.id)) return "Off";
+    const roams = follows && enabledIds.size === 1;
+    if (!enabledIds.has(screen.id) && !roams) return "Off";
     if (!follows) return plan[0]?.screenId === screen.id ? "Primary" : "Secondary";
     if (!isRecording) return "Auto";
-    return clippingState.primaryScreenId === screen.id ? "Primary now" : "Secondary";
+    if (clippingState.primaryScreenId === screen.id) return "Primary now";
+    return roams ? "Auto" : "Secondary";
   }
 
   function toggleScreen(screen, enabled) {
@@ -472,6 +474,7 @@ export default function Recording() {
             <ScreenMap
               screens={screens}
               getRole={getRole}
+              isOn={(screen) => enabledIds.has(screen.id)}
               canPickPrimary={multipleScreens && !recording.clipAutoSwitch}
               onToggle={toggleScreen}
               onPick={(screen) => updateOption("clipPrimaryScreen", screen.id)}
