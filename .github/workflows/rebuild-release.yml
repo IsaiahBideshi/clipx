@@ -1,0 +1,50 @@
+name: Rebuild release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to rebuild from its own commit, e.g. v1.2.4
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  rebuild:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout the tag
+        uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ inputs.tag }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build app
+        run: npm run build
+
+      - name: Keep the release's original date in latest.yml
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          $published = gh release view $env:TAG --repo $env:GITHUB_REPOSITORY --json publishedAt --jq .publishedAt
+          $yml = (Get-Content dist/latest.yml) -replace "^releaseDate: .*", "releaseDate: '$published'"
+          Set-Content dist/latest.yml -Value $yml -Encoding utf8
+
+      - name: Replace the release's files
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: gh release upload $env:TAG dist/ClipX-Setup.exe dist/ClipX-Setup.exe.blockmap dist/latest.yml --clobber --repo $env:GITHUB_REPOSITORY
