@@ -14,6 +14,13 @@ export async function listClips(session, query = {}) {
   return response.json().catch(() => ({ data: null, error: "Invalid server response." }));
 }
 
+export async function listUploadedGames(session) {
+  const response = await fetch(`${getApiBase()}/api/games?uploaded=true`, {
+    headers: { Authorization: `Bearer ${session?.access_token}` },
+  });
+  return response.json().catch(() => ({ data: null, error: "Invalid server response." }));
+}
+
 export async function deleteClip(session, id) {
   const response = await fetch(`${getApiBase()}/api/clips`, {
     method: "DELETE",

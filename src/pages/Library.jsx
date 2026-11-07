@@ -1,10 +1,11 @@
-import {useEffect, useMemo, useRef, useState} from "react";
+import {useEffect, useLayoutEffect, useMemo, useRef, useState} from "react";
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import Fuse from "fuse.js";
 import STOREDGAMES from "../data/games.json";
 import { supabase } from '../lib/supabase.js';
 import { useAuthSession } from "../lib/authSession.js";
-import { listClips, getClipShareUrl, getClipTagsError, deleteClip } from "../lib/clipsApi.js";
+import { loadAccountData } from "../lib/accountApi.js";
+import { listClips, listUploadedGames, getClipShareUrl, getClipTagsError, deleteClip } from "../lib/clipsApi.js";
 import { isTextEntryActive } from '../lib/hotkeys.js';
 import { useNavigate } from "react-router-dom";
 
@@ -31,6 +32,7 @@ import ClipDetailsFields from "../components/ClipDetailsFields.jsx";
 import ClipContextMenu from "../components/ClipContextMenu.jsx";
 import { formatDate } from "../components/ClipCard.jsx";
 import { usePlayerPrefs } from "../lib/playerPrefs.js";
+import { countFittingNames } from "../lib/tagNames.js";
 
 const GRID_GAP = 20;
 const MIN_CARD_WIDTH = 270;
@@ -186,6 +188,36 @@ async function searchGames(gameName) {
   }
 }
 
+async function fetchUploadedGames(session) {
+  const { data, error } = await listUploadedGames(session);
+  if (error) {
+    throw new Error(error);
+  }
+  return (data || []).map(toGameOption);
+}
+
+function toGameOption(game) {
+  return {
+    id: game.id,
+    label: game.name + (game.first_release_date ? ` (${new Date(game.first_release_date * 1000).getFullYear()})` : ""),
+    image: game?.cover?.url,
+  };
+}
+
+function matchOptions(options, input) {
+  const text = input.trim().toLowerCase();
+  return options.filter((option) => option.label.toLowerCase().includes(text));
+}
+
+function mergeOptions(...lists) {
+  const seen = new Set();
+  return lists.flat().filter((option) => {
+    if (seen.has(option.id)) return false;
+    seen.add(option.id);
+    return true;
+  });
+}
+
 export default function Library() {
   const [selectedClip, setSelectedClip] = useState(null);
   const [editingClip, setEditingClip] = useState(null);
@@ -222,9 +254,25 @@ export default function Library() {
     enabled: Boolean(userId),
     placeholderData: [],
   });
+  const { data: account } = useQuery({
+    queryKey: ["profile", "account", userId],
+    queryFn: () => loadAccountData(session, userId),
+    enabled: Boolean(session && userId),
+  });
+  const uploadedGamesQuery = useQuery({
+    queryKey: ["library", "clips", "uploadedGames", userId],
+    queryFn: () => fetchUploadedGames(session),
+    enabled: Boolean(userId),
+    placeholderData: [],
+  });
   const clips = useMemo(() => (clipsQuery.data?.pages || []).flatMap((p) => p?.clips || []), [clipsQuery.data]);
   const clipTotal = clipsQuery.data?.pages?.[0]?.count ?? clips.length;
   const friendsOptions = friendsOptionsQuery.data || [];
+  const peopleOptions = account?.username
+    ? [{ id: userId, label: account.username, you: true }, ...friendsOptions]
+    : friendsOptions;
+  const ownerFilterOptions = mergeOptions(matchOptions(peopleOptions, ownerInput), ownerOptions);
+  const gameFilterOptions = mergeOptions(matchOptions(uploadedGamesQuery.data || [], draftGameInput), gameOptions);
   const loadingClips = clipsQuery.isInitialLoading;
 
   const userIds = useMemo(
@@ -331,16 +379,7 @@ export default function Library() {
   useEffect(() => {
     async function handleSearchGame() {
       const games = await searchGames(draftGameInput);
-      const options = games.map((entry) => ({
-        id: entry.id,
-        label:
-          entry.name +
-          (entry.first_release_date
-            ? ` (${new Date(entry.first_release_date * 1000).getFullYear()})`
-            : ""),
-        image: entry?.cover?.url,
-      }));
-      setGameOptions(options);
+      setGameOptions(games.map(toGameOption));
     }
 
     handleSearchGame();
@@ -348,16 +387,11 @@ export default function Library() {
 
   useEffect(() => {
     async function handleSearchOwner() {
-      if (!ownerInput.trim()) {
-        setOwnerOptions(userId ? [{ id: userId, label: "Me" }] : []);
-        return;
-      }
-      const options = await searchOwners(ownerInput);
-      setOwnerOptions(options);
+      setOwnerOptions(await searchOwners(ownerInput));
     }
 
     handleSearchOwner();
-  }, [ownerInput, userId]);
+  }, [ownerInput]);
 
   function applyFilters() {
     setFilters({
@@ -464,7 +498,7 @@ export default function Library() {
             <label className="field-label" htmlFor="search-game">Game</label>
             <AutoComplete
               id="search-game"
-              options={gameOptions}
+              options={gameFilterOptions}
               filterOptions={(options) => options}
               freeSolo
               value={draftGame}
@@ -499,8 +533,9 @@ export default function Library() {
             <label className="field-label" htmlFor="search-owner">Owner</label>
             <AutoComplete
               id="search-owner"
-              options={ownerOptions}
+              options={ownerFilterOptions}
               filterOptions={(options) => options}
+              isOptionEqualToValue={(option, value) => option.id === value.id}
               value={draftOwner}
               inputValue={ownerInput}
               onInputChange={(_e, newInputValue) => setOwnerInput(newInputValue)}
@@ -508,6 +543,12 @@ export default function Library() {
                 setDraftOwner(newValue);
                 setOwnerInput(newValue?.label ?? "");
               }}
+              renderOption={({ key, ...optionProps }, option) => (
+                <li key={key} {...optionProps}>
+                  {option.label}
+                  {option.you && <span className="you-pill">YOU</span>}
+                </li>
+              )}
               renderInput={(params) => (
                 <TextField
                   {...params}
@@ -520,7 +561,7 @@ export default function Library() {
           <div className="field">
             <label className="field-label" htmlFor="search-tags">Tags</label>
             <TagsAutoComplete
-              options={friendsOptions}
+              options={peopleOptions}
               value={draftTags}
               onChange={(_e, newValue) => setDraftTags(newValue)}
               freeSolo
@@ -776,13 +817,46 @@ export function ClipCard({clip, userMap, onSelect, onContextMenu, onEdit, onDele
               <div className="clip-tag-avatar clip-tag-more">+{tagged.length - MAX_TAG_AVATARS}</div>
             )}
           </div>
-          <div className="clip-tag-label">
-            {tagged.length === 1
-              ? tagged[0].username
-              : `${tagged[0].username?.split(" ")[0]} and ${tagged.length - 1} other${tagged.length > 2 ? "s" : ""}`}
-          </div>
+          <TagNames names={tagged.map((user) => user.username)} />
         </div>
       )}
+    </div>
+  );
+}
+
+let measureContext = null;
+
+function fitTagNames(names, element) {
+  const style = getComputedStyle(element);
+  measureContext ??= document.createElement("canvas").getContext("2d");
+  measureContext.font = `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+  return countFittingNames(
+    names,
+    element.getBoundingClientRect().width,
+    (text) => measureContext.measureText(text).width,
+    parseFloat(style.columnGap) || 0
+  );
+}
+
+function TagNames({names}) {
+  const ref = useRef(null);
+  const [shown, setShown] = useState(names.length);
+  const label = names.join(", ");
+
+  useLayoutEffect(() => {
+    const element = ref.current;
+    const fit = () => setShown(fitTagNames(names, element));
+    fit();
+    const observer = new ResizeObserver(fit);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [label]);
+
+  const hidden = names.length - shown;
+  return (
+    <div className="clip-tag-label" ref={ref}>
+      <span className="clip-tag-names">{names.slice(0, shown).join(", ")}</span>
+      {hidden > 0 && <span>+{hidden}</span>}
     </div>
   );
 }

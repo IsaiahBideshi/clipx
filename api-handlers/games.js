@@ -1,4 +1,4 @@
-import { getAuthenticatedUser } from './auth.js'
+import { supabase, getAuthenticatedUser } from './auth.js'
 import { queryIgdb } from './igdb.js'
 
 export default async function handler(req, res) {
@@ -15,12 +15,40 @@ export default async function handler(req, res) {
     return res.status(405).json({ data: null, error: 'Method not allowed' })
   }
 
-  const { error: authError } = await getAuthenticatedUser(req)
+  const { user, error: authError } = await getAuthenticatedUser(req)
   if (authError) {
     return res.status(401).json({ data: null, error: authError })
   }
 
   try {
+    if (req.query.uploaded !== undefined) {
+      const { data: clips, error } = await supabase
+        .from('clips')
+        .select('game_id')
+        .eq('owner_id', user.id)
+        .not('game_id', 'is', null)
+        .order('created_at', { ascending: false })
+      if (error) {
+        console.error('Error fetching uploaded game ids:', error)
+        return res.status(500).json({ data: null, error: error.message })
+      }
+
+      const ids = [...new Set(clips.map((clip) => Number(clip.game_id)))]
+        .filter((id) => Number.isSafeInteger(id) && id > 0)
+        .slice(0, 500)
+      if (ids.length === 0) {
+        return res.status(200).json({ data: [], error: null })
+      }
+
+      const games = await queryGames(`
+        fields name, cover.url, first_release_date;
+        where id = (${ids.join(',')});
+        limit 500;
+      `)
+      games.sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id))
+      return res.status(200).json({ data: games, error: null })
+    }
+
     if (req.query.id !== undefined) {
       const id = Number(req.query.id)
       if (!Number.isSafeInteger(id) || id <= 0) {
