@@ -650,22 +650,30 @@ export async function keepClipScreen(clipPath, screen) {
 
     try {
       await copyScreenAudio(source.videoPath, primary.path, keptPath);
-      await deleteClipFile(primary.path);
     } catch (error) {
-      if (fs.existsSync(primary.path)) {
-        await fs.promises.rm(keptPath, { force: true });
-        throw error;
-      }
+      await fs.promises.rm(keptPath, { force: true });
+      throw error;
     }
   }
 
-  const leftFiles = [];
-  for (const file of group.files) {
-    if (file !== primary) {
-      await deleteClipFile(file.path).catch(() => leftFiles.push(file.file));
+  const keptName = path.basename(keptPath);
+  const others = group.files.filter((file) => file.path !== keptPath);
+  try {
+    const manifest = keepManifestFile(group.manifest, keptFile, keptName, others.map((file) => file.file));
+    await fs.promises.writeFile(path.join(group.path, CLIP_MANIFEST_NAME), JSON.stringify(manifest, null, 2), "utf-8");
+  } catch (error) {
+    if (source) {
+      await fs.promises.rm(keptPath, { force: true });
     }
+    throw error;
   }
-  await updateClipManifest(group.path, (manifest) => keepManifestFile(manifest, keptFile, path.basename(keptPath), leftFiles));
+
+  const leftFiles = [];
+  for (const file of others) {
+    await deleteClipFile(file.path).catch(() => leftFiles.push(file.file));
+  }
+  await updateClipManifest(group.path, (manifest) => keepManifestFile(manifest, keptName, keptName, leftFiles))
+    .catch((error) => console.error("ClipX: Failed to update clip manifest after keeping a screen:", error));
 
   const root = getWatchedRootForPath(keptPath) || group.path;
   return upsertIndexedClip(root, keptPath, { emitChange: true });

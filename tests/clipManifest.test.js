@@ -98,11 +98,16 @@ test("keeps one file of a clip as its primary", () => {
     { file: "Clip (Screen 2).mp4", role: "primary", follows: false, screen: { number: 2 }, audioTracks: tracks },
   ]);
   assert.equal(getScreenCount(kept.files), 1);
-  const partly = keepManifestFile(manifest, "Screen 2.mp4", "Clip (Screen 2).mp4", ["Screen 1.mp4", "Screen 2.mp4"]);
+  const partly = keepManifestFile(manifest, "Screen 2.mp4", "Clip (Screen 2).mp4", ["Clip.mp4", "Screen 1.mp4", "Screen 2.mp4"]);
   assert.deepEqual(partly.files.map((entry) => [entry.file, entry.role]), [
     ["Clip (Screen 2).mp4", "primary"],
+    ["Clip.mp4", "secondary"],
     ["Screen 1.mp4", "secondary"],
     ["Screen 2.mp4", "secondary"],
+  ]);
+  assert.deepEqual(keepManifestFile(partly, "Clip (Screen 2).mp4", "Clip (Screen 2).mp4", ["Screen 1.mp4"]).files.map((entry) => entry.file), [
+    "Clip (Screen 2).mp4",
+    "Screen 1.mp4",
   ]);
   assert.equal(keepManifestFile(manifest, "Screen 3.mp4"), null);
   assert.equal(keepManifestFile(null, "Clip.mp4"), null);

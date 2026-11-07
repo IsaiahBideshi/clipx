@@ -105,6 +105,9 @@ export function keepManifestFile(manifest, fileName, newName = fileName, leftFil
   const kept = entry === primary
     ? primary
     : { ...entry, file: newName, role: "primary", follows: false, audioTracks: primary.audioTracks };
-  const left = leftFiles.map((name) => getManifestFile(manifest, name)).filter(Boolean);
+  const left = leftFiles
+    .map((name) => getManifestFile(manifest, name))
+    .filter((file) => file && file !== kept)
+    .map((file) => ({ ...file, role: "secondary" }));
   return { ...manifest, files: [kept, ...left] };
 }
