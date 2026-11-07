@@ -44,7 +44,9 @@ test("follows the active screen and records every enabled screen when auto switc
   assert.deepEqual(recorders.map((recorder) => recorder.key), ["main", "screen-10", "screen-20"]);
   assert.equal(recorders[0].screenId, null);
   assert.deepEqual(recorders[0].canvas, { width: 2560, height: 1440 });
-  assert.equal(recorders[1].fps, 30);
+  assert.equal(recorders[1].fps, 60);
+  assert.deepEqual(recorders[1].output, { width: 2560, height: 1440 });
+  assert.equal(recorders[2].fps, 30);
 });
 
 test("skips the fixed primary screen's secondary recording when auto switch is off", () => {
@@ -90,7 +92,7 @@ test("keeps the bitrate in range and gives each recorder its screen's bitrate", 
   assert.equal(getRecordingOptions({}).clipSecondaryBitrate, 6);
 
   const recorders = planRecorders(screens, { clipPrimaryBitrate: 40, clipSecondaryBitrate: 10 });
-  assert.deepEqual(recorders.map((recorder) => recorder.bitrate), [40, 10, 10, 10]);
+  assert.deepEqual(recorders.map((recorder) => [recorder.key, recorder.bitrate]), [["main", 40], ["screen-30", 10], ["screen-10", 40], ["screen-20", 10]]);
 });
 
 test("describes what each recording is", () => {

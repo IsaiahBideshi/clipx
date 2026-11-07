@@ -108,19 +108,23 @@ export function planRecorders(screens, options) {
     audio: true,
   };
 
+  const windowsPrimary = getFixedPrimaryScreen(enabled, null);
   const secondaries = enabled.length > 1
     ? enabled
       .filter((screen) => follows || screen.id !== fixedPrimary.id)
-      .map((screen) => ({
-        key: `screen-${screen.id}`,
-        role: "secondary",
-        screenId: screen.id,
-        canvas: { width: screen.width, height: screen.height },
-        output: toOutputSize(screen.width, screen.height, recording.clipSecondaryHeight),
-        fps: recording.clipSecondaryFps,
-        bitrate: recording.clipSecondaryBitrate,
-        audio: false,
-      }))
+      .map((screen) => {
+        const primaryQuality = follows && screen.id === windowsPrimary.id;
+        return {
+          key: `screen-${screen.id}`,
+          role: "secondary",
+          screenId: screen.id,
+          canvas: { width: screen.width, height: screen.height },
+          output: toOutputSize(screen.width, screen.height, primaryQuality ? recording.clipPrimaryHeight : recording.clipSecondaryHeight),
+          fps: primaryQuality ? recording.clipPrimaryFps : recording.clipSecondaryFps,
+          bitrate: primaryQuality ? recording.clipPrimaryBitrate : recording.clipSecondaryBitrate,
+          audio: false,
+        };
+      })
     : [];
 
   return [main, ...secondaries];
