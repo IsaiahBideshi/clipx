@@ -668,14 +668,18 @@ export async function keepClipScreen(clipPath, screen) {
     throw error;
   }
 
-  const leftFiles = [];
+  const left = [];
   for (const file of others) {
-    await deleteClipFile(file.path).catch(() => leftFiles.push(file.file));
+    await deleteClipFile(file.path).catch(() => left.push(file));
   }
-  await updateClipManifest(group.path, (manifest) => keepManifestFile(manifest, keptName, keptName, leftFiles))
+  await updateClipManifest(group.path, (manifest) => keepManifestFile(manifest, keptName, keptName, left.map((file) => file.file)))
     .catch((error) => console.error("ClipX: Failed to update clip manifest after keeping a screen:", error));
 
   const root = getWatchedRootForPath(keptPath) || group.path;
+  for (const file of left) {
+    await upsertIndexedClip(root, file.path, { emitChange: true })
+      .catch((error) => console.error("ClipX: Failed to index a screen that couldn't be deleted:", error));
+  }
   return upsertIndexedClip(root, keptPath, { emitChange: true });
 }
 

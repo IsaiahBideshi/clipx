@@ -429,6 +429,8 @@ export async function upsertIndexedClip(rootPath, filePath, options = {}) {
       collection,
       clip,
     });
+  } else if (options.emitChange && existingRow && existingRow.group_role !== "secondary") {
+    emitIndexEvent({ type: "removed", rootPath: normalizedRootPath, collection, clip });
   }
 
   return clip;
