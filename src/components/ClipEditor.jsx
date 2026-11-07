@@ -136,6 +136,7 @@ export default function ClipEditor({
   const screen = activePath !== clip.path ? { path: activePath, shift: offset } : null;
   const timelineDuration = duration + offset;
   const outEnd = Math.min(outPoint, timelineDuration);
+  const timelineLoaded = duration > 0 && Boolean(durations[clip.path] && durations[activePath]);
 
   useTrackMix(
     playerRef,
@@ -416,6 +417,7 @@ export default function ClipEditor({
             target={multiScreen ? frontView : null}
             start={Math.max(0, inPoint - offset)}
             end={outEnd - offset}
+            timelineLoaded={timelineLoaded}
             session={authSession}
             onSaveQueueEvent={onSaveQueueEvent}
             onUploadQueueEvent={onUploadQueueEvent}
@@ -432,7 +434,7 @@ export default function ClipEditor({
   );
 }
 
-export function UploadMenu({clip, group, mix, screen, screens, target, start, end, onRenamed, onRefreshIndex, onSaveQueueEvent, onUploadQueueEvent, onDelete, uploading, saving, session}) {
+export function UploadMenu({clip, group, mix, screen, screens, target, start, end, timelineLoaded, onRenamed, onRefreshIndex, onSaveQueueEvent, onUploadQueueEvent, onDelete, uploading, saving, session}) {
   const [deleteAnchor, setDeleteAnchor] = useState(null);
   const [tags, setTags] = useState([]);
   const [friendsInClip, setFriendsInClip] = useState([]);
@@ -443,7 +445,7 @@ export function UploadMenu({clip, group, mix, screen, screens, target, start, en
   const [visibility, setVisibility] = useState("public");
   const [friendsOptions, setFriendsOptions] = useState([]);
   const userId = session?.user?.id;
-  const emptyRange = Boolean(screen) && end <= start;
+  const emptyRange = Boolean(screen) && timelineLoaded && end <= start;
 
   useEffect(() => {
     async function loadFriends() {
