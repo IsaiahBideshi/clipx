@@ -10,6 +10,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
   build-and-release:
     runs-on: windows-latest
@@ -31,10 +35,14 @@ jobs:
             $tag = "v$version"
           }
 
-          gh release view $tag --repo $env:GITHUB_REPOSITORY *> $null
-          $released = $LASTEXITCODE -eq 0
-          if ($released) {
+          $lookup = gh api "repos/$env:GITHUB_REPOSITORY/releases/tags/$tag" --jq .id 2>&1
+          if ($LASTEXITCODE -eq 0) {
+            $released = $true
             Write-Host "$tag is already released, so this push doesn't rebuild it."
+          } elseif ("$lookup" -match "HTTP 404") {
+            $released = $false
+          } else {
+            throw "Couldn't check whether $tag is already released: $lookup"
           }
 
           "tag=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8

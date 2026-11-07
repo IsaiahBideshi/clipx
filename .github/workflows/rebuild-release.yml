@@ -32,19 +32,21 @@ jobs:
       - name: Build app
         run: npm run build
 
-      - name: Keep the release's original date in latest.yml
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ github.token }}
-          TAG: ${{ inputs.tag }}
-        run: |
-          $published = gh release view $env:TAG --repo $env:GITHUB_REPOSITORY --json publishedAt --jq .publishedAt
-          $yml = (Get-Content dist/latest.yml) -replace "^releaseDate: .*", "releaseDate: '$published'"
-          Set-Content dist/latest.yml -Value $yml -Encoding utf8
-
       - name: Replace the release's files
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ inputs.tag }}
-        run: gh release upload $env:TAG dist/ClipX-Setup.exe dist/ClipX-Setup.exe.blockmap dist/latest.yml --clobber --repo $env:GITHUB_REPOSITORY
+        run: |
+          $files = @("dist/ClipX-Setup.exe", "dist/ClipX-Setup.exe.blockmap")
+          if (Test-Path dist/latest.yml) {
+            $published = gh release view $env:TAG --repo $env:GITHUB_REPOSITORY --json publishedAt --jq .publishedAt
+            $yml = (Get-Content dist/latest.yml) -replace "^releaseDate: .*", "releaseDate: '$published'"
+            Set-Content dist/latest.yml -Value $yml -Encoding utf8
+            $files += "dist/latest.yml"
+          } else {
+            Write-Host "$env:TAG's build has no latest.yml, so any latest.yml on the release is removed."
+            gh release delete-asset $env:TAG latest.yml --yes --repo $env:GITHUB_REPOSITORY *> $null
+          }
+
+          gh release upload $env:TAG @files --clobber --repo $env:GITHUB_REPOSITORY
