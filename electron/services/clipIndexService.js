@@ -91,6 +91,12 @@ function getDb() {
   if (!columns.has("group_role")) {
     db.exec("ALTER TABLE clips ADD COLUMN group_role TEXT");
   }
+  if (!columns.has("session_id")) {
+    db.exec("ALTER TABLE clips ADD COLUMN session_id TEXT");
+  }
+  if (!columns.has("game_name")) {
+    db.exec("ALTER TABLE clips ADD COLUMN game_name TEXT");
+  }
 
   return db;
 }
@@ -134,6 +140,8 @@ function rowToClip(row) {
     savedMetadata: parseJson(row.saved_metadata_json),
     groupPath: row.group_path || null,
     groupRole: row.group_role || null,
+    sessionId: row.session_id || null,
+    gameName: row.game_name || null,
   };
 }
 
@@ -153,8 +161,14 @@ function getClipGroupInfo(filePath) {
   const manifest = readClipManifest(dirPath);
   const entry = getManifestFile(manifest, path.basename(filePath));
   return entry
-    ? { groupPath: dirPath, groupRole: entry.role, createdAtMs: Date.parse(manifest.createdAt) }
-    : { groupPath: null, groupRole: null, createdAtMs: NaN };
+    ? {
+        groupPath: dirPath,
+        groupRole: entry.role,
+        createdAtMs: Date.parse(manifest.createdAt),
+        sessionId: manifest.sessionId || null,
+        gameName: manifest.game?.name || null,
+      }
+    : { groupPath: null, groupRole: null, createdAtMs: NaN, sessionId: null, gameName: null };
 }
 
 function emitIndexEvent(event) {
@@ -372,7 +386,7 @@ export async function upsertIndexedClip(rootPath, filePath, options = {}) {
   const collection = getCollectionForPath(normalizedRootPath, normalizedFilePath);
   const existingRow = getRowByPath(normalizedFilePath);
   const savedMetadata = collection === "saved" ? findLegacyClipMetadata(normalizedFilePath) : null;
-  const { groupPath, groupRole, createdAtMs } = getClipGroupInfo(normalizedFilePath);
+  const { groupPath, groupRole, createdAtMs, sessionId, gameName } = getClipGroupInfo(normalizedFilePath);
 
   getDb()
     .prepare(`
@@ -389,12 +403,16 @@ export async function upsertIndexedClip(rootPath, filePath, options = {}) {
         missing,
         saved_metadata_json,
         group_path,
-        group_role
+        group_role,
+        session_id,
+        game_name
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?)
       ON CONFLICT(path) DO UPDATE SET
         group_path = excluded.group_path,
         group_role = excluded.group_role,
+        session_id = excluded.session_id,
+        game_name = excluded.game_name,
         id = excluded.id,
         root_path = excluded.root_path,
         collection = excluded.collection,
@@ -418,7 +436,9 @@ export async function upsertIndexedClip(rootPath, filePath, options = {}) {
       Date.now(),
       savedMetadata ? JSON.stringify(savedMetadata) : null,
       groupPath,
-      groupRole
+      groupRole,
+      sessionId,
+      gameName
     );
 
   const clip = rowToClip(getRowByPath(normalizedFilePath));

@@ -37,12 +37,13 @@ export function getAudioTrackNames({ tracks = [], desktopTrack = null, otherApps
   ];
 }
 
-export function buildClipManifest({ folderName, createdAt, seconds, game, primary, secondaries = [] }) {
+export function buildClipManifest({ folderName, createdAt, seconds, game, sessionId, primary, secondaries = [] }) {
   return {
     version: 1,
     createdAt,
     seconds,
     game: game || null,
+    sessionId: sessionId || null,
     files: [
       {
         file: `${folderName}.mp4`,

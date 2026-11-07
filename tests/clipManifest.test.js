@@ -31,6 +31,7 @@ test("describes the primary and secondary files of a clip", () => {
     createdAt: "2026-10-05T13:03:07.000Z",
     seconds: 30,
     game: { id: 242408, name: "Counter-Strike 2" },
+    sessionId: "session-1",
     primary: { follows: true, audioTracks: getAudioTrackNames({ tracks: [{ kind: "mic", index: 2 }, { kind: "app", exe: "Discord.exe", index: 3 }], otherAppsTrack: 4 }) },
     secondaries: [{ screen: { number: 2, label: "DELL", width: 1920, height: 1080 } }],
   });
@@ -42,6 +43,7 @@ test("describes the primary and secondary files of a clip", () => {
   assert.equal(getManifestFile(manifest, "screen 2.MP4").role, "secondary");
   assert.equal(getManifestFile(manifest, "other.mp4"), null);
   assert.equal(manifest.game.id, 242408);
+  assert.equal(manifest.sessionId, "session-1");
 });
 
 test("renames a file in the manifest and leaves the rest alone", () => {

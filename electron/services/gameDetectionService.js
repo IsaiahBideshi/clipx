@@ -1,5 +1,6 @@
 import { app } from "electron";
 import { execFile } from "child_process";
+import { randomUUID } from "node:crypto";
 import fs from "fs";
 import path from "path";
 import { promisify } from "util";
@@ -31,6 +32,7 @@ function runPowerShell(command, env = {}) {
 const POLL_INTERVAL_MS = 2000;
 const KNOWN_GAMES_REFRESH_MS = 10 * 60 * 1000;
 const LOOKUP_RETRY_MS = 60 * 1000;
+const SESSION_RESUME_MS = 15 * 60 * 1000;
 
 let pollTimer = null;
 let polling = false;
@@ -222,7 +224,17 @@ async function poll() {
 
     if (current?.exePath !== target.exePath) {
       const mapped = getGameMapping(getMappings(), target.exePath);
-      current = { exePath: target.exePath, pid: target.pid, name: guessGameName({ exePath: target.exePath }), game: mapped?.game || null, lookedUpAt: 0 };
+      const resumed = lastGame
+        && getExeName(lastGame.exePath).toLowerCase() === getExeName(target.exePath).toLowerCase()
+        && Date.now() - lastGame.exitedAt <= SESSION_RESUME_MS;
+      current = {
+        exePath: target.exePath,
+        pid: target.pid,
+        name: guessGameName({ exePath: target.exePath }),
+        game: mapped?.game || null,
+        lookedUpAt: 0,
+        sessionId: resumed ? lastGame.sessionId : randomUUID(),
+      };
       onGameChange(getCurrentGame());
     }
     current.pid = target.pid;
@@ -258,13 +270,18 @@ export function getCurrentGame() {
 
 export function getGameForClip(clipSeconds) {
   const closedDuringClip = lastGame && Date.now() - lastGame.exitedAt <= clipSeconds * 1000;
-  const detected = describeGame(current || (closedDuringClip ? lastGame : null));
+  const entry = current || (closedDuringClip ? lastGame : null);
+  const detected = describeGame(entry);
   if (!detected) {
-    return null;
+    const resumable = lastGame && Date.now() - lastGame.exitedAt <= SESSION_RESUME_MS;
+    return { game: null, sessionId: resumable ? lastGame.sessionId : null };
   }
 
   const game = detected.game || getGameMapping(getMappings(), detected.exePath)?.game;
-  return { ...(game || { id: null, name: detected.name, label: detected.name, image: null }), exe: detected.exe };
+  return {
+    game: { ...(game || { id: null, name: detected.name, label: detected.name, image: null }), exe: detected.exe },
+    sessionId: entry.sessionId,
+  };
 }
 
 export async function setGameForCurrentExe(game) {
