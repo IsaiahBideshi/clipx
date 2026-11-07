@@ -27,7 +27,7 @@ import {
   OBS_AUDIO_TRACKS,
   findMonitorItem,
   getDuplicateScreen,
-  getEnabledScreens,
+  getFollowScreens,
   getRecordingOptions,
   numberScreens,
   pickFollowScreen,
@@ -539,7 +539,7 @@ async function setupRecorder(recorder, options) {
 
   await refreshMonitorItems(recorder);
   await pointRecorderAt(recorder, recorder.plan.screenId ?? pickFollowScreen(
-    getEnabledScreens(getScreens(), options.clipDisabledScreens),
+    getFollowScreens(getScreens(), options),
     getFollowTargetId(options),
     null,
   ));
@@ -630,8 +630,7 @@ function startFollowing() {
       return;
     }
 
-    const enabled = getEnabledScreens(getScreens(), appliedOptions.clipDisabledScreens);
-    const next = pickFollowScreen(enabled, getFollowTargetId(appliedOptions), main.screenId);
+    const next = pickFollowScreen(getFollowScreens(getScreens(), appliedOptions), getFollowTargetId(appliedOptions), main.screenId);
     if (next === main.screenId) {
       return;
     }

@@ -77,6 +77,12 @@ export function getEnabledScreens(screens, disabledScreens = []) {
   return screens.filter((screen) => !disabled.has(String(screen.id)));
 }
 
+export function getFollowScreens(screens, options) {
+  const recording = getRecordingOptions(options);
+  const enabled = getEnabledScreens(screens, recording.clipDisabledScreens);
+  return recording.clipAutoSwitch && enabled.length === 1 ? screens : enabled;
+}
+
 export function getFixedPrimaryScreen(enabledScreens, primaryScreenId) {
   return enabledScreens.find((screen) => String(screen.id) === String(primaryScreenId))
     || enabledScreens.find((screen) => screen.primary)
@@ -91,10 +97,11 @@ export function planRecorders(screens, options) {
     return [];
   }
 
-  const follows = recording.clipAutoSwitch && enabled.length > 1;
+  const followScreens = getFollowScreens(screens, recording);
+  const follows = recording.clipAutoSwitch && followScreens.length > 1;
   const fixedPrimary = getFixedPrimaryScreen(enabled, recording.clipPrimaryScreen);
   const mainCanvas = follows
-    ? { width: Math.max(...enabled.map((screen) => screen.width)), height: Math.max(...enabled.map((screen) => screen.height)) }
+    ? { width: Math.max(...followScreens.map((screen) => screen.width)), height: Math.max(...followScreens.map((screen) => screen.height)) }
     : { width: fixedPrimary.width, height: fixedPrimary.height };
 
   const main = {
@@ -167,7 +174,7 @@ export function describeRecorders(recorders) {
   const secondaryCount = recorders.filter((recorder) => recorder.role === "secondary").length;
   const follows = recorders.some((recorder) => recorder.role === "primary" && recorder.screenId === null);
   if (follows) {
-    return `1 following you + ${screens(secondaryCount)}`;
+    return secondaryCount ? `1 following you + ${screens(secondaryCount)}` : "1 following you";
   }
   return screens(recorders.length);
 }

@@ -8,6 +8,7 @@ import {
   estimateLoad,
   findMonitorItem,
   getDuplicateScreen,
+  getFollowScreens,
   numberScreens,
   pickFollowScreen,
   pickOtherAudioApps,
@@ -35,9 +36,18 @@ test("scales output to the chosen height without upscaling or going past 4096 wi
 });
 
 test("records only the main screen when one screen is enabled", () => {
-  const recorders = planRecorders(screens, { clipDisabledScreens: [20, 30] });
+  const recorders = planRecorders(screens, { clipAutoSwitch: false, clipDisabledScreens: [20, 30] });
   assert.equal(recorders.length, 1);
   assert.equal(recorders[0].screenId, 10);
+});
+
+test("follows across every screen with one recording when auto switch is on and one screen is enabled", () => {
+  const recorders = planRecorders(screens, { clipAutoSwitch: true, clipDisabledScreens: [20, 30] });
+  assert.deepEqual(recorders.map((recorder) => recorder.key), ["main"]);
+  assert.equal(recorders[0].screenId, null);
+  assert.deepEqual(recorders[0].canvas, { width: 2560, height: 1920 });
+  assert.deepEqual(getFollowScreens(screens, { clipAutoSwitch: true, clipDisabledScreens: [20, 30] }), screens);
+  assert.deepEqual(getFollowScreens(screens, { clipAutoSwitch: true, clipDisabledScreens: [30] }).map((screen) => screen.id), [10, 20]);
 });
 
 test("follows the active screen and records every enabled screen when auto switch is on", () => {
@@ -99,7 +109,8 @@ test("keeps the bitrate in range and gives each recorder its screen's bitrate", 
 test("describes what each recording is", () => {
   assert.equal(describeRecorders(planRecorders(screens, { clipAutoSwitch: true, clipDisabledScreens: [30] })), "1 following you + 2 screens");
   assert.equal(describeRecorders(planRecorders(screens, { clipAutoSwitch: false })), "3 screens");
-  assert.equal(describeRecorders(planRecorders(screens, { clipDisabledScreens: [20, 30] })), "1 screen");
+  assert.equal(describeRecorders(planRecorders(screens, { clipAutoSwitch: false, clipDisabledScreens: [20, 30] })), "1 screen");
+  assert.equal(describeRecorders(planRecorders(screens, { clipAutoSwitch: true, clipDisabledScreens: [20, 30] })), "1 following you");
 });
 
 test("estimates load from resolution and fps", () => {
