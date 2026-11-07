@@ -224,6 +224,7 @@ export default function Library() {
     queryKey: ["library", "clips", "uploadedGames", userId],
     queryFn: () => fetchUploadedGames(session),
     enabled: Boolean(userId),
+    refetchOnMount: (query) => query.state.isInvalidated,
     placeholderData: [],
   });
   const clips = useMemo(() => (clipsQuery.data?.pages || []).flatMap((p) => p?.clips || []), [clipsQuery.data]);
@@ -404,7 +405,10 @@ export default function Library() {
           <h2>Library</h2>
           <div className="library-hero-actions">
             <div className="clip-count">{clipTotal} clip{clipTotal === 1 ? "" : "s"}</div>
-            <RefreshButton onRefresh={() => clipsQuery.refetch()} />
+            <RefreshButton onRefresh={() => {
+              clipsQuery.refetch();
+              uploadedGamesQuery.refetch();
+            }} />
           </div>
         </div>
       </div>
