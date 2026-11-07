@@ -100,7 +100,7 @@ export function registerClipxProtocol(protocol) {
   }
 
     if (host === "image") {
-      return new Response(fs.createReadStream(filePath), {
+      return new Response(await fs.promises.readFile(filePath), {
         headers: {
           "Content-Type": getMimeType(filePath),
         },
