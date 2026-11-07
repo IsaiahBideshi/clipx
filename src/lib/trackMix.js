@@ -46,6 +46,7 @@ function createTrackMixer(video) {
 
   let stems = [];
   let settings = { mix: null, offset: 0, external: false, volume: 1, muted: false };
+  let closed = false;
 
   const isAudible = () => Boolean(settings.mix || settings.external) && stems.length > 0;
 
@@ -96,6 +97,9 @@ function createTrackMixer(video) {
     },
     setStems(tracks) {
       clearStems();
+      if (closed) {
+        return;
+      }
       stems = tracks.map((track) => {
         const audio = new Audio();
         audio.crossOrigin = "anonymous";
@@ -110,6 +114,7 @@ function createTrackMixer(video) {
     },
     clearStems,
     close() {
+      closed = true;
       stopSync();
       clearStems();
       context.close().catch(() => {});
@@ -119,7 +124,7 @@ function createTrackMixer(video) {
 
 export function useTrackMix(playerRef, clipPath, { mix, offset = 0, external = false }, volume, muted) {
   const mixerRef = useRef(null);
-  const stemsPathRef = useRef(null);
+  const stemsRef = useRef(null);
 
   useEffect(() => () => {
     mixerRef.current?.close();
@@ -131,7 +136,7 @@ export function useTrackMix(playerRef, clipPath, { mix, offset = 0, external = f
     if (mixerRef.current && mixerRef.current.video !== video) {
       mixerRef.current.close();
       mixerRef.current = null;
-      stemsPathRef.current = null;
+      stemsRef.current = null;
     }
     if (!mixerRef.current && (mix || external) && video) {
       mixerRef.current = createTrackMixer(video);
@@ -142,23 +147,26 @@ export function useTrackMix(playerRef, clipPath, { mix, offset = 0, external = f
       return;
     }
 
-    if (stemsPathRef.current && stemsPathRef.current !== clipPath) {
-      stemsPathRef.current = null;
+    if (stemsRef.current && stemsRef.current.path !== clipPath) {
+      stemsRef.current = null;
       mixer.clearStems();
     }
     mixer.setSettings({ mix, offset, external, volume, muted });
 
-    if ((mix || external) && !stemsPathRef.current) {
-      stemsPathRef.current = clipPath;
+    if ((mix || external) && !stemsRef.current) {
+      const request = { path: clipPath };
+      stemsRef.current = request;
       window.clipx.extractClipTracks(clipPath)
         .then((tracks) => {
-          if (stemsPathRef.current === clipPath) {
+          if (stemsRef.current === request) {
             mixer.setStems(tracks);
           }
         })
         .catch((error) => {
           console.error("Failed to load the clip's audio tracks:", error);
-          stemsPathRef.current = null;
+          if (stemsRef.current === request) {
+            stemsRef.current = null;
+          }
         });
     }
   }, [playerRef, clipPath, mix, offset, external, volume, muted]);

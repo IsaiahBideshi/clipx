@@ -64,7 +64,10 @@ export function registerClipxProtocol(protocol) {
       return new Response("Missing path", { status: 400 });
     }
 
-    const fileStat = await fs.promises.stat(filePath);
+    const fileStat = await fs.promises.stat(filePath).catch(() => null);
+    if (!fileStat) {
+      return new Response("Not found", { status: 404 });
+    }
     const range = request.headers.get("range");
     let start = 0;
     let end = fileStat.size - 1;
