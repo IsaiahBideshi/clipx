@@ -54,18 +54,19 @@ function isProcessRunning(pid) {
   }
 }
 
-function getSessionKey(exePath) {
-  return getExeName(exePath).toLowerCase();
+function isSameExe(a, b) {
+  const bare = !/[\\/]/.test(a) || !/[\\/]/.test(b);
+  return bare ? getExeName(a).toLowerCase() === getExeName(b).toLowerCase() : a.toLowerCase() === b.toLowerCase();
 }
 
-function getSessionId(exePath) {
-  const running = runningSessions.get(getSessionKey(exePath));
-  if (running && isProcessRunning(running.pid)) {
+function getSessionId(target) {
+  const running = runningSessions.get(target.pid);
+  if (running && isSameExe(running.exePath, target.exePath)) {
     return running.id;
   }
 
   const resumed = lastGame
-    && getSessionKey(lastGame.exePath) === getSessionKey(exePath)
+    && isSameExe(lastGame.exePath, target.exePath)
     && Date.now() - lastGame.exitedAt <= SESSION_RESUME_MS;
   return resumed ? lastGame.sessionId : randomUUID();
 }
@@ -221,7 +222,7 @@ async function poll() {
   try {
     await refreshKnownGames();
     if (current && !isProcessRunning(current.pid)) {
-      runningSessions.delete(getSessionKey(current.exePath));
+      runningSessions.delete(current.pid);
       lastGame = { ...current, exitedAt: Date.now() };
       current = null;
       onGameChange(getCurrentGame());
@@ -248,12 +249,12 @@ async function poll() {
         name: guessGameName({ exePath: target.exePath }),
         game: mapped?.game || null,
         lookedUpAt: 0,
-        sessionId: getSessionId(target.exePath),
+        sessionId: getSessionId(target),
       };
       onGameChange(getCurrentGame());
     }
     current.pid = target.pid;
-    runningSessions.set(getSessionKey(current.exePath), { id: current.sessionId, pid: current.pid });
+    runningSessions.set(current.pid, { id: current.sessionId, exePath: current.exePath });
 
     if (!current.game && !lookingUp && Date.now() - current.lookedUpAt > LOOKUP_RETRY_MS) {
       void resolveCurrentGame();
