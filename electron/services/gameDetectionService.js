@@ -42,6 +42,7 @@ let knownGamesLoadedAt = 0;
 let mappings = null;
 let current = null;
 let lastGame = null;
+let runningSessions = new Map();
 let onGameChange = () => {};
 
 function isProcessRunning(pid) {
@@ -51,6 +52,22 @@ function isProcessRunning(pid) {
   } catch (error) {
     return error?.code === "EPERM";
   }
+}
+
+function getSessionKey(exePath) {
+  return getExeName(exePath).toLowerCase();
+}
+
+function getSessionId(exePath) {
+  const running = runningSessions.get(getSessionKey(exePath));
+  if (running && isProcessRunning(running.pid)) {
+    return running.id;
+  }
+
+  const resumed = lastGame
+    && getSessionKey(lastGame.exePath) === getSessionKey(exePath)
+    && Date.now() - lastGame.exitedAt <= SESSION_RESUME_MS;
+  return resumed ? lastGame.sessionId : randomUUID();
 }
 
 function describeGame(entry) {
@@ -204,6 +221,7 @@ async function poll() {
   try {
     await refreshKnownGames();
     if (current && !isProcessRunning(current.pid)) {
+      runningSessions.delete(getSessionKey(current.exePath));
       lastGame = { ...current, exitedAt: Date.now() };
       current = null;
       onGameChange(getCurrentGame());
@@ -224,20 +242,18 @@ async function poll() {
 
     if (current?.exePath !== target.exePath) {
       const mapped = getGameMapping(getMappings(), target.exePath);
-      const resumed = lastGame
-        && getExeName(lastGame.exePath).toLowerCase() === getExeName(target.exePath).toLowerCase()
-        && Date.now() - lastGame.exitedAt <= SESSION_RESUME_MS;
       current = {
         exePath: target.exePath,
         pid: target.pid,
         name: guessGameName({ exePath: target.exePath }),
         game: mapped?.game || null,
         lookedUpAt: 0,
-        sessionId: resumed ? lastGame.sessionId : randomUUID(),
+        sessionId: getSessionId(target.exePath),
       };
       onGameChange(getCurrentGame());
     }
     current.pid = target.pid;
+    runningSessions.set(getSessionKey(current.exePath), { id: current.sessionId, pid: current.pid });
 
     if (!current.game && !lookingUp && Date.now() - current.lookedUpAt > LOOKUP_RETRY_MS) {
       void resolveCurrentGame();
@@ -262,6 +278,7 @@ export function stopGameDetection() {
   pollTimer = null;
   current = null;
   lastGame = null;
+  runningSessions = new Map();
 }
 
 export function getCurrentGame() {
