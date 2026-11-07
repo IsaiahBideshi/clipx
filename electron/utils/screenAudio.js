@@ -7,19 +7,25 @@ import { resolveFfmpegPath } from "./ffmpeg.js";
 
 const execFileAsync = promisify(execFile);
 
-export async function getMediaDuration(filePath) {
+async function getMediaDuration(filePath) {
   const { stderr } = await execFileAsync(resolveFfmpegPath(ffmpegPath), ["-hide_banner", "-i", filePath]).catch((error) => error);
   const match = /Duration: (\d+):(\d+):(\d+(?:\.\d+)?)/.exec(String(stderr));
   return match ? Number(match[1]) * 3600 + Number(match[2]) * 60 + Number(match[3]) : null;
 }
 
-export async function copyScreenAudio(source, outputPath) {
+export async function copyScreenAudio(videoPath, audioPath, outputPath) {
+  const [audioDuration, videoDuration] = await Promise.all([getMediaDuration(audioPath), getMediaDuration(videoPath)]);
+  if (audioDuration === null || videoDuration === null) {
+    throw new Error("Couldn't read the recordings' lengths.");
+  }
+
+  const shift = audioDuration - videoDuration;
   await new Promise((resolve, reject) => {
-    const command = ffmpeg(source.videoPath).input(source.audioPath);
-    if (source.shift >= 0) {
-      command.seekInput(source.shift);
+    const command = ffmpeg(videoPath).input(audioPath);
+    if (shift >= 0) {
+      command.seekInput(shift);
     } else {
-      command.inputOptions(["-itsoffset", String(-source.shift)]);
+      command.inputOptions(["-itsoffset", String(-shift)]);
     }
     command
       .output(outputPath)

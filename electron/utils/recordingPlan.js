@@ -122,7 +122,6 @@ export function planRecorders(screens, options) {
           output: toOutputSize(screen.width, screen.height, primaryQuality ? recording.clipPrimaryHeight : recording.clipSecondaryHeight),
           fps: primaryQuality ? recording.clipPrimaryFps : recording.clipSecondaryFps,
           bitrate: primaryQuality ? recording.clipPrimaryBitrate : recording.clipSecondaryBitrate,
-          primaryQuality,
           audio: false,
         };
       })
@@ -153,10 +152,14 @@ export function getDuplicateScreen(main, recorders, screens, clipStartMs) {
   }
 
   const { width, height } = main.plan.canvas;
-  if (shown.width * height === shown.height * width) {
+  const fit = Math.min(width / shown.width, height / shown.height);
+  const mainHeight = (shown.height * fit * main.plan.output.height) / height;
+  const mainIsBetter = mainHeight >= copy.plan.output.height && main.plan.fps >= copy.plan.fps && main.plan.bitrate >= copy.plan.bitrate;
+  const copyIsBetter = copy.plan.output.height >= mainHeight && copy.plan.fps >= main.plan.fps && copy.plan.bitrate >= main.plan.bitrate;
+  if (mainIsBetter && shown.width * height === shown.height * width) {
     return { screenId: shown.id, keep: "main" };
   }
-  return copy.plan.primaryQuality ? { screenId: shown.id, keep: "screen" } : null;
+  return copyIsBetter ? { screenId: shown.id, keep: "screen" } : null;
 }
 
 export function describeRecorders(recorders) {

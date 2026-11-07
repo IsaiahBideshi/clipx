@@ -649,19 +649,23 @@ export async function keepClipScreen(clipPath, screen) {
     }
 
     try {
-      await copyScreenAudio(source, keptPath);
+      await copyScreenAudio(source.videoPath, primary.path, keptPath);
+      await deleteClipFile(primary.path);
     } catch (error) {
-      await fs.promises.rm(keptPath, { force: true });
-      throw error;
+      if (fs.existsSync(primary.path)) {
+        await fs.promises.rm(keptPath, { force: true });
+        throw error;
+      }
     }
   }
 
-  await updateClipManifest(group.path, (manifest) => keepManifestFile(manifest, keptFile, path.basename(keptPath)));
+  const leftFiles = [];
   for (const file of group.files) {
-    if (file.path !== keptPath) {
-      await deleteClipFile(file.path);
+    if (file !== primary) {
+      await deleteClipFile(file.path).catch(() => leftFiles.push(file.file));
     }
   }
+  await updateClipManifest(group.path, (manifest) => keepManifestFile(manifest, keptFile, path.basename(keptPath), leftFiles));
 
   const root = getWatchedRootForPath(keptPath) || group.path;
   return upsertIndexedClip(root, keptPath, { emitChange: true });

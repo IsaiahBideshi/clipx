@@ -37,7 +37,7 @@ import {
   toAudioTrackMap,
 } from "../utils/recordingPlan.js";
 import { CLIP_MANIFEST_NAME, buildClipManifest, describeClip, getAudioTrackNames, getClipName } from "../utils/clipManifest.js";
-import { copyScreenAudio, getMediaDuration } from "../utils/screenAudio.js";
+import { copyScreenAudio } from "../utils/screenAudio.js";
 import { showToast } from "./toastService.js";
 
 const execFileAsync = promisify(execFile);
@@ -713,13 +713,8 @@ async function getUniqueDir(parentDir, name) {
 }
 
 async function moveAudioToScreen(screenPath, mainPath) {
-  const [mainDuration, screenDuration] = await Promise.all([getMediaDuration(mainPath), getMediaDuration(screenPath)]);
-  if (mainDuration === null || screenDuration === null) {
-    throw new Error("Couldn't read the recordings' lengths.");
-  }
-
   const outputPath = path.join(path.dirname(screenPath), "with-audio.mp4");
-  await copyScreenAudio({ videoPath: screenPath, audioPath: mainPath, shift: mainDuration - screenDuration }, outputPath);
+  await copyScreenAudio(screenPath, mainPath, outputPath);
   await fs.promises.rm(mainPath, { force: true });
   await fs.promises.rm(screenPath, { force: true });
   return outputPath;

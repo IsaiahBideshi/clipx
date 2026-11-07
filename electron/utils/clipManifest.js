@@ -95,7 +95,7 @@ export function removeManifestFile(manifest, fileName) {
   return entry ? { ...manifest, files: manifest.files.filter((file) => file !== entry) } : null;
 }
 
-export function keepManifestFile(manifest, fileName, newName = fileName) {
+export function keepManifestFile(manifest, fileName, newName = fileName, leftFiles = []) {
   const entry = getManifestFile(manifest, fileName);
   const primary = manifest?.files?.find((file) => file.role === "primary");
   if (!entry || !primary) {
@@ -105,5 +105,6 @@ export function keepManifestFile(manifest, fileName, newName = fileName) {
   const kept = entry === primary
     ? primary
     : { ...entry, file: newName, role: "primary", follows: false, audioTracks: primary.audioTracks };
-  return { ...manifest, files: [kept] };
+  const left = leftFiles.map((name) => getManifestFile(manifest, name)).filter(Boolean);
+  return { ...manifest, files: [kept, ...left] };
 }

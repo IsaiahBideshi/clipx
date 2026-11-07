@@ -200,3 +200,22 @@ test("keeps the screen file when the auto switch recording letterboxes a primary
   const secondaryCopies = secondaryPlans.slice(1).map((plan) => ({ plan, screenId: plan.screenId }));
   assert.equal(getDuplicateScreen({ plan: secondaryPlans[0], screenId: 2, screenSince: 0 }, secondaryCopies, secondaryOnly, 1000), null);
 });
+
+test("keeps whichever copy of the screen is recorded at better quality", () => {
+  const twin = numberScreens([
+    { id: 1, x: 0, y: 0, width: 1920, height: 1080, primary: true },
+    { id: 2, x: 1920, y: 0, width: 1920, height: 1080, primary: false },
+  ]);
+  const check = (options) => {
+    const plans = planRecorders(twin, options);
+    const copies = plans.slice(1).map((plan) => ({ plan, screenId: plan.screenId }));
+    return getDuplicateScreen({ plan: plans[0], screenId: 2, screenSince: 0 }, copies, twin, 1000);
+  };
+
+  assert.deepEqual(check({}), { screenId: 2, keep: "main" });
+  assert.equal(check({ clipPrimaryHeight: 720, clipPrimaryFps: 30, clipSecondaryHeight: 1080, clipSecondaryFps: 60 }), null);
+  assert.deepEqual(
+    check({ clipPrimaryHeight: 720, clipPrimaryFps: 30, clipPrimaryBitrate: 6, clipSecondaryHeight: 1080, clipSecondaryFps: 60, clipSecondaryBitrate: 20 }),
+    { screenId: 2, keep: "screen" },
+  );
+});
