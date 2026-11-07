@@ -105,6 +105,7 @@ export default function App() {
     if (event.type === "success") {
       upsertUploadingClip(event.id, { status: "uploaded", shareUrl: event.shareUrl });
       queryClient.invalidateQueries({ queryKey: ["library", "newClips"] });
+      queryClient.invalidateQueries({ queryKey: ["library", "clips", "uploadedGames"] });
       return;
     }
 

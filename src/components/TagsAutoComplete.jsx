@@ -51,6 +51,7 @@ export default function TagsAutoComplete({ options, onChange, saveNewTags = fals
       renderOption={({ key, ...optionProps }, option) => (
         <li key={key} {...optionProps}>
           {option.label ?? option}
+          {option.you && <span className="you-pill">YOU</span>}
           {typeof option === "string" && (
             <IconButton
               size="small"
