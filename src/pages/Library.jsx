@@ -32,7 +32,9 @@ import ClipContextMenu from "../components/ClipContextMenu.jsx";
 import { formatDate } from "../components/ClipCard.jsx";
 import { usePlayerPrefs } from "../lib/playerPrefs.js";
 import { countFittingNames } from "../lib/tagNames.js";
-import { toGameOption, useGameSearch } from "../lib/gameSearch.js";
+import { searchGames, toGameOption } from "../lib/gameSearch.js";
+import { useSearch } from "../lib/search.js";
+import SearchField from "../components/SearchField.jsx";
 
 const GRID_GAP = 20;
 const MIN_CARD_WIDTH = 270;
@@ -140,10 +142,7 @@ async function fetchFriendsOptions(userId) {
     .filter(Boolean);
 }
 
-async function searchOwners(query) {
-  const name = String(query || "").trim();
-  if (name.length < 3) return [];
-
+async function searchOwners(name) {
   const { data, error } = await supabase
     .from("users")
     .select("id, username")
@@ -190,10 +189,10 @@ export default function Library() {
   const [draftGame, setDraftGame] = useState(null);
   const [draftGameInput, setDraftGameInput] = useState("");
   const [draftTags, setDraftTags] = useState([]);
-  const gameOptions = useGameSearch(draftGameInput);
-  const [ownerOptions, setOwnerOptions] = useState([]);
+  const { options: gameOptions, loading: loadingGames } = useSearch(draftGameInput, searchGames);
   const [draftOwner, setDraftOwner] = useState(null);
   const [ownerInput, setOwnerInput] = useState("");
+  const { options: ownerOptions, loading: loadingOwners } = useSearch(ownerInput, searchOwners);
   const [filters, setFilters] = useState({ title: "", game: null, tags: [], owner: null });
   const { session, loading: loadingSession } = useAuthSession();
 
@@ -338,14 +337,6 @@ export default function Library() {
     }
   }, [loadingSession, navigate, session]);
 
-  useEffect(() => {
-    async function handleSearchOwner() {
-      setOwnerOptions(await searchOwners(ownerInput));
-    }
-
-    handleSearchOwner();
-  }, [ownerInput]);
-
   function applyFilters() {
     setFilters({
       title: draftTitle.trim(),
@@ -474,8 +465,9 @@ export default function Library() {
                 </li>
               )}
               renderInput={(params) => (
-                <TextField
+                <SearchField
                   {...params}
+                  loading={loadingGames}
                   fullWidth
                   placeholder="Search game"
                 />
@@ -503,8 +495,9 @@ export default function Library() {
                 </li>
               )}
               renderInput={(params) => (
-                <TextField
+                <SearchField
                   {...params}
+                  loading={loadingOwners}
                   fullWidth
                   placeholder="Search owner"
                 />

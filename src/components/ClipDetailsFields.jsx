@@ -4,11 +4,13 @@ import TagsAutoComplete from "./TagsAutoComplete.jsx";
 import TextField from '@mui/material/TextField';
 import AutoComplete from '@mui/material/Autocomplete';
 import { InputLabel, MenuItem, Select, FormControl } from '@mui/material';
-import { useGameSearch } from "../lib/gameSearch.js";
+import { searchGames } from "../lib/gameSearch.js";
+import { useSearch } from "../lib/search.js";
+import SearchField from "./SearchField.jsx";
 
 export default function ClipDetailsFields({ title, onTitleChange, game, onGameChange, tags, onTagsChange, visibility, onVisibilityChange, friendsOptions }) {
   const [gameInput, setGameInput] = useState("");
-  const gameOptions = useGameSearch(gameInput);
+  const { options: gameOptions, loading: loadingGames } = useSearch(gameInput, searchGames);
 
   useEffect(() => {
     if (!game) {
@@ -43,8 +45,9 @@ export default function ClipDetailsFields({ title, onTitleChange, game, onGameCh
             </li>
           )}
           renderInput={(params) => (
-            <TextField
+            <SearchField
               {...params}
+              loading={loadingGames}
               label="Game"
             />
           )}
