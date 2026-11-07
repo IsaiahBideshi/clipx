@@ -45,7 +45,8 @@ export default async function handler(req, res) {
         where id = (${ids.join(',')});
         limit 500;
       `)
-      games.sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id))
+      const order = new Map(ids.map((id, index) => [id, index]))
+      games.sort((a, b) => order.get(a.id) - order.get(b.id))
       return res.status(200).json({ data: games, error: null })
     }
 

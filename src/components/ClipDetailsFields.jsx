@@ -1,68 +1,20 @@
 import { useEffect, useState } from "react";
-import Fuse from "fuse.js";
-import STOREDGAMES from "../data/games.json"
 
 import TagsAutoComplete from "./TagsAutoComplete.jsx";
 import TextField from '@mui/material/TextField';
 import AutoComplete from '@mui/material/Autocomplete';
 import { InputLabel, MenuItem, Select, FormControl } from '@mui/material';
-
-async function checkStoredGames(query) {
-  const fuseOptions ={
-    threshold: 0.3,
-    keys: ["name"]
-  }
-
-  const fuse = new Fuse(STOREDGAMES, fuseOptions);
-  const results = fuse.search(query);
-  const resultItems = results.map(result => result.item);
-  return resultItems;
-}
-async function searchGames(gameName) {
-  if (!gameName) return [];
-  if (gameName.length < 3) return [];
-
-
-  const localGames = await checkStoredGames(gameName);
-  if (localGames.length > 5) return localGames;
-
-  const api = window?.clipx?.searchGames;
-  if (typeof api !== "function") return [];
-
-  try {
-    const fetchedGames = await api(gameName);
-    const allGames = [...localGames, ...fetchedGames];
-    return allGames;
-  } catch (e) {
-    console.error("searchGames failed:", e);
-    return [];
-  }
-}
+import { useGameSearch } from "../lib/gameSearch.js";
 
 export default function ClipDetailsFields({ title, onTitleChange, game, onGameChange, tags, onTagsChange, visibility, onVisibilityChange, friendsOptions }) {
   const [gameInput, setGameInput] = useState("");
-  const [gameOptions, setGameOptions] = useState([]);
-
-  useEffect(() => {
-    handleSearchGame();
-  }, [gameInput]);
+  const gameOptions = useGameSearch(gameInput);
 
   useEffect(() => {
     if (!game) {
       setGameInput("");
     }
   }, [game]);
-
-  const handleSearchGame = async () => {
-    const games = await searchGames(gameInput);
-    const options = games.map(game => ({
-      id: game.id,
-      label: game.name + (game.first_release_date ? ` (${new Date(game.first_release_date * 1000).getFullYear()})` : ''),
-      image: game?.cover?.url,
-    }));
-
-    setGameOptions(options);
-  }
 
   return (
     <form className="upload-menu-form">

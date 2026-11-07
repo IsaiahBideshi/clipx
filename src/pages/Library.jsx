@@ -1,6 +1,5 @@
 import {useEffect, useLayoutEffect, useMemo, useRef, useState} from "react";
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
-import Fuse from "fuse.js";
 import STOREDGAMES from "../data/games.json";
 import { supabase } from '../lib/supabase.js';
 import { useAuthSession } from "../lib/authSession.js";
@@ -33,6 +32,7 @@ import ClipContextMenu from "../components/ClipContextMenu.jsx";
 import { formatDate } from "../components/ClipCard.jsx";
 import { usePlayerPrefs } from "../lib/playerPrefs.js";
 import { countFittingNames } from "../lib/tagNames.js";
+import { toGameOption, useGameSearch } from "../lib/gameSearch.js";
 
 const GRID_GAP = 20;
 const MIN_CARD_WIDTH = 270;
@@ -158,50 +158,12 @@ async function searchOwners(query) {
   return (data || []).map((user) => ({ id: user.id, label: user.username }));
 }
 
-async function checkStoredGames(query) {
-  const fuseOptions = {
-    threshold: 0.3,
-    keys: ["name"],
-  };
-
-  const fuse = new Fuse(STOREDGAMES, fuseOptions);
-  const results = fuse.search(query);
-  return results.map((result) => result.item);
-}
-
-async function searchGames(gameName) {
-  if (!gameName) return [];
-  if (gameName.length < 3) return [];
-
-  const localGames = await checkStoredGames(gameName);
-  if (localGames.length > 5) return localGames;
-
-  const api = window?.clipx?.searchGames;
-  if (typeof api !== "function") return localGames;
-
-  try {
-    const fetchedGames = await api(gameName);
-    return [...localGames, ...fetchedGames];
-  } catch (e) {
-    console.error("searchGames failed:", e);
-    return localGames;
-  }
-}
-
 async function fetchUploadedGames(session) {
   const { data, error } = await listUploadedGames(session);
   if (error) {
     throw new Error(error);
   }
   return (data || []).map(toGameOption);
-}
-
-function toGameOption(game) {
-  return {
-    id: game.id,
-    label: game.name + (game.first_release_date ? ` (${new Date(game.first_release_date * 1000).getFullYear()})` : ""),
-    image: game?.cover?.url,
-  };
 }
 
 function matchOptions(options, input) {
@@ -228,7 +190,7 @@ export default function Library() {
   const [draftGame, setDraftGame] = useState(null);
   const [draftGameInput, setDraftGameInput] = useState("");
   const [draftTags, setDraftTags] = useState([]);
-  const [gameOptions, setGameOptions] = useState([]);
+  const gameOptions = useGameSearch(draftGameInput);
   const [ownerOptions, setOwnerOptions] = useState([]);
   const [draftOwner, setDraftOwner] = useState(null);
   const [ownerInput, setOwnerInput] = useState("");
@@ -375,15 +337,6 @@ export default function Library() {
       navigate("/login", { replace: true });
     }
   }, [loadingSession, navigate, session]);
-
-  useEffect(() => {
-    async function handleSearchGame() {
-      const games = await searchGames(draftGameInput);
-      setGameOptions(games.map(toGameOption));
-    }
-
-    handleSearchGame();
-  }, [draftGameInput]);
 
   useEffect(() => {
     async function handleSearchOwner() {
