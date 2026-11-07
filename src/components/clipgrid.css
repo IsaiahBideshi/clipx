@@ -737,6 +737,26 @@
   -webkit-line-clamp: 1;
 }
 
+.clip-session-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-sizing: border-box;
+  height: 28px;
+  padding-left: 12px;
+  border-left: 3px solid var(--accent);
+  font-size: 0.85rem;
+}
+
+.clip-session-game {
+  font-weight: 600;
+  color: #f7f8ff;
+}
+
+.clip-session-meta {
+  color: rgba(255, 255, 255, 0.55);
+}
+
 .clip-grid-loader-row .clip-card-skeleton {
   opacity: 0.82;
 }

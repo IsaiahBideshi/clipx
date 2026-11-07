@@ -721,7 +721,7 @@ async function moveAudioToScreen(screenPath, mainPath) {
 
 async function finalizeClip(createdAt, savedFiles, options, duplicate) {
   const replaysDir = path.join(options.clipsFolder, REPLAYS_DIR_NAME);
-  const game = options.clipDetectGame ? getGameForClip(options.clipSeconds) : null;
+  const { game, sessionId } = options.clipDetectGame ? getGameForClip(options.clipSeconds) : { game: null, sessionId: null };
   const folderName = await getUniqueDir(replaysDir, getClipName(createdAt, game?.name));
   const clipDir = path.join(replaysDir, folderName);
   const screens = getScreens();
@@ -756,6 +756,7 @@ async function finalizeClip(createdAt, savedFiles, options, duplicate) {
     createdAt: createdAt.toISOString(),
     seconds: options.clipSeconds,
     game,
+    sessionId,
     primary: {
       follows,
       screen: follows ? null : describeScreen(fixedScreenId ?? primary.recorder.screenId),

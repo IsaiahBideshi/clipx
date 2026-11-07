@@ -1,5 +1,6 @@
 import { app } from "electron";
 import { execFile } from "child_process";
+import { randomUUID } from "node:crypto";
 import fs from "fs";
 import path from "path";
 import { promisify } from "util";
@@ -31,6 +32,7 @@ function runPowerShell(command, env = {}) {
 const POLL_INTERVAL_MS = 2000;
 const KNOWN_GAMES_REFRESH_MS = 10 * 60 * 1000;
 const LOOKUP_RETRY_MS = 60 * 1000;
+const SESSION_RESUME_MS = 15 * 60 * 1000;
 
 let pollTimer = null;
 let polling = false;
@@ -40,6 +42,7 @@ let knownGamesLoadedAt = 0;
 let mappings = null;
 let current = null;
 let lastGame = null;
+let runningSessions = new Map();
 let onGameChange = () => {};
 
 function isProcessRunning(pid) {
@@ -49,6 +52,23 @@ function isProcessRunning(pid) {
   } catch (error) {
     return error?.code === "EPERM";
   }
+}
+
+function isSameExe(a, b) {
+  const bare = !/[\\/]/.test(a) || !/[\\/]/.test(b);
+  return bare ? getExeName(a).toLowerCase() === getExeName(b).toLowerCase() : a.toLowerCase() === b.toLowerCase();
+}
+
+function getSessionId(target) {
+  const running = runningSessions.get(target.pid);
+  if (running && isSameExe(running.exePath, target.exePath)) {
+    return running.id;
+  }
+
+  const resumed = lastGame
+    && isSameExe(lastGame.exePath, target.exePath)
+    && Date.now() - lastGame.exitedAt <= SESSION_RESUME_MS;
+  return resumed ? lastGame.sessionId : randomUUID();
 }
 
 function describeGame(entry) {
@@ -202,6 +222,7 @@ async function poll() {
   try {
     await refreshKnownGames();
     if (current && !isProcessRunning(current.pid)) {
+      runningSessions.delete(current.pid);
       lastGame = { ...current, exitedAt: Date.now() };
       current = null;
       onGameChange(getCurrentGame());
@@ -222,10 +243,18 @@ async function poll() {
 
     if (current?.exePath !== target.exePath) {
       const mapped = getGameMapping(getMappings(), target.exePath);
-      current = { exePath: target.exePath, pid: target.pid, name: guessGameName({ exePath: target.exePath }), game: mapped?.game || null, lookedUpAt: 0 };
+      current = {
+        exePath: target.exePath,
+        pid: target.pid,
+        name: guessGameName({ exePath: target.exePath }),
+        game: mapped?.game || null,
+        lookedUpAt: 0,
+        sessionId: getSessionId(target),
+      };
       onGameChange(getCurrentGame());
     }
     current.pid = target.pid;
+    runningSessions.set(current.pid, { id: current.sessionId, exePath: current.exePath });
 
     if (!current.game && !lookingUp && Date.now() - current.lookedUpAt > LOOKUP_RETRY_MS) {
       void resolveCurrentGame();
@@ -250,6 +279,7 @@ export function stopGameDetection() {
   pollTimer = null;
   current = null;
   lastGame = null;
+  runningSessions = new Map();
 }
 
 export function getCurrentGame() {
@@ -258,13 +288,18 @@ export function getCurrentGame() {
 
 export function getGameForClip(clipSeconds) {
   const closedDuringClip = lastGame && Date.now() - lastGame.exitedAt <= clipSeconds * 1000;
-  const detected = describeGame(current || (closedDuringClip ? lastGame : null));
+  const entry = current || (closedDuringClip ? lastGame : null);
+  const detected = describeGame(entry);
   if (!detected) {
-    return null;
+    const resumable = lastGame && Date.now() - lastGame.exitedAt <= SESSION_RESUME_MS;
+    return { game: null, sessionId: resumable ? lastGame.sessionId : null };
   }
 
   const game = detected.game || getGameMapping(getMappings(), detected.exePath)?.game;
-  return { ...(game || { id: null, name: detected.name, label: detected.name, image: null }), exe: detected.exe };
+  return {
+    game: { ...(game || { id: null, name: detected.name, label: detected.name, image: null }), exe: detected.exe },
+    sessionId: entry.sessionId,
+  };
 }
 
 export async function setGameForCurrentExe(game) {
