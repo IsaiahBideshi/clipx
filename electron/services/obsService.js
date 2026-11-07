@@ -14,6 +14,7 @@ import { findProcessPath, getForegroundWindow, listProcesses } from "../utils/fo
 import { isHotkeyDown, parseAccelerator } from "../utils/accelerator.js";
 import { isKeyDown } from "../utils/keyState.js";
 import {
+  KEYFRAME_PADDING_SECONDS,
   OBS_PROFILE_NAME,
   OBS_VERSION,
   OBS_ZIP_SHA256,
@@ -25,6 +26,7 @@ import {
 import {
   OBS_AUDIO_TRACKS,
   findMonitorItem,
+  getDuplicateScreen,
   getEnabledScreens,
   getRecordingOptions,
   numberScreens,
@@ -35,6 +37,7 @@ import {
   toAudioTrackMap,
 } from "../utils/recordingPlan.js";
 import { CLIP_MANIFEST_NAME, buildClipManifest, describeClip, getAudioTrackNames, getClipName } from "../utils/clipManifest.js";
+import { copyScreenAudio, getMediaDuration } from "../utils/screenAudio.js";
 import { showToast } from "./toastService.js";
 
 const execFileAsync = promisify(execFile);
@@ -387,6 +390,9 @@ async function pointRecorderAt(recorder, screenId) {
     inputName: DISPLAY_INPUT_NAME,
     inputSettings: { monitor_id: item.itemValue },
   });
+  if (recorder.screenId !== screenId) {
+    recorder.screenSince = recorder.screenId === null ? 0 : Date.now();
+  }
   recorder.screenId = screenId;
 }
 
@@ -706,7 +712,20 @@ async function getUniqueDir(parentDir, name) {
   }
 }
 
-async function finalizeClip(createdAt, savedFiles, options) {
+async function moveAudioToScreen(screenPath, mainPath) {
+  const [mainDuration, screenDuration] = await Promise.all([getMediaDuration(mainPath), getMediaDuration(screenPath)]);
+  if (mainDuration === null || screenDuration === null) {
+    throw new Error("Couldn't read the recordings' lengths.");
+  }
+
+  const outputPath = path.join(path.dirname(screenPath), "with-audio.mp4");
+  await copyScreenAudio({ videoPath: screenPath, audioPath: mainPath, shift: mainDuration - screenDuration }, outputPath);
+  await fs.promises.rm(mainPath, { force: true });
+  await fs.promises.rm(screenPath, { force: true });
+  return outputPath;
+}
+
+async function finalizeClip(createdAt, savedFiles, options, duplicate) {
   const replaysDir = path.join(options.clipsFolder, REPLAYS_DIR_NAME);
   const game = options.clipDetectGame ? getGameForClip(options.clipSeconds) : null;
   const folderName = await getUniqueDir(replaysDir, getClipName(createdAt, game?.name));
@@ -719,12 +738,25 @@ async function finalizeClip(createdAt, savedFiles, options) {
       : null;
   };
 
-  const primary = savedFiles.find(({ recorder }) => recorder.key === "main");
-  const secondaries = savedFiles
+  let primary = savedFiles.find(({ recorder }) => recorder.key === "main");
+  let secondaries = savedFiles
     .filter(({ recorder }) => recorder.key !== "main")
     .map((saved) => ({ ...saved, screen: describeScreen(saved.recorder.screenId) }))
     .filter((saved) => saved.screen);
-  const follows = primary.recorder.plan.screenId === null;
+  let fixedScreenId = duplicate?.keep === "main" ? duplicate.screenId : null;
+  const copy = duplicate?.keep === "screen" && secondaries.find((saved) => saved.recorder.screenId === duplicate.screenId);
+  if (copy) {
+    const mergedPath = await moveAudioToScreen(copy.savedPath, primary.savedPath).catch((error) => {
+      console.error("ClipX: Failed to move the clip's audio to its screen file:", error);
+      return null;
+    });
+    if (mergedPath) {
+      primary = { ...primary, savedPath: mergedPath };
+      secondaries = secondaries.filter((saved) => saved !== copy);
+      fixedScreenId = duplicate.screenId;
+    }
+  }
+  const follows = primary.recorder.plan.screenId === null && fixedScreenId === null;
   const manifest = buildClipManifest({
     folderName,
     createdAt: createdAt.toISOString(),
@@ -732,7 +764,7 @@ async function finalizeClip(createdAt, savedFiles, options) {
     game,
     primary: {
       follows,
-      screen: follows ? null : describeScreen(primary.recorder.screenId),
+      screen: follows ? null : describeScreen(fixedScreenId ?? primary.recorder.screenId),
       audioTracks: getAudioTrackNames(planAudioTracks(options.clipAudioTracks)),
     },
     secondaries,
@@ -768,8 +800,12 @@ async function saveClip() {
 
 async function writeClip(options) {
   const createdAt = new Date();
+  const clipStartMs = createdAt.getTime() - (options.clipSeconds + KEYFRAME_PADDING_SECONDS) * 1000;
+  const all = [...recorders.values()];
+  const duplicate = getDuplicateScreen(recorders.get("main"), all, getScreens(), clipStartMs);
+  const skippedScreenId = duplicate?.keep === "main" ? duplicate.screenId : null;
   try {
-    const active = [...recorders.values()];
+    const active = all.filter((recorder) => recorder.key === "main" || recorder.screenId !== skippedScreenId);
     const results = await Promise.allSettled(active.map((recorder) => waitForSave(recorder)));
     const savedFiles = results
       .map((result, index) => (result.status === "fulfilled" ? { recorder: active[index], savedPath: result.value } : null))
@@ -779,7 +815,7 @@ async function writeClip(options) {
       throw results[active.findIndex((recorder) => recorder.key === "main")].reason;
     }
 
-    const manifest = await finalizeClip(createdAt, savedFiles, options);
+    const manifest = await finalizeClip(createdAt, savedFiles, options, duplicate);
     const failedCount = results.length - savedFiles.length;
     results.forEach((result, index) => {
       if (result.status === "rejected") {

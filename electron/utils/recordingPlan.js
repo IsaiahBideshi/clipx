@@ -122,6 +122,7 @@ export function planRecorders(screens, options) {
           output: toOutputSize(screen.width, screen.height, primaryQuality ? recording.clipPrimaryHeight : recording.clipSecondaryHeight),
           fps: primaryQuality ? recording.clipPrimaryFps : recording.clipSecondaryFps,
           bitrate: primaryQuality ? recording.clipPrimaryBitrate : recording.clipSecondaryBitrate,
+          primaryQuality,
           audio: false,
         };
       })
@@ -138,6 +139,24 @@ export function pickFollowScreen(enabledScreens, targetScreenId, currentScreenId
     return currentScreenId;
   }
   return enabledScreens[0]?.id ?? null;
+}
+
+export function getDuplicateScreen(main, recorders, screens, clipStartMs) {
+  if (main?.plan.screenId !== null || !(main.screenSince <= clipStartMs)) {
+    return null;
+  }
+
+  const shown = screens.find((screen) => screen.id === main.screenId);
+  const copy = recorders.find((recorder) => recorder.plan.role === "secondary" && recorder.screenId === main.screenId);
+  if (!shown || !copy) {
+    return null;
+  }
+
+  const { width, height } = main.plan.canvas;
+  if (shown.width * height === shown.height * width) {
+    return { screenId: shown.id, keep: "main" };
+  }
+  return copy.plan.primaryQuality ? { screenId: shown.id, keep: "screen" } : null;
 }
 
 export function describeRecorders(recorders) {
