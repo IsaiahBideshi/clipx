@@ -29,7 +29,8 @@ export async function copyScreenAudio(videoPath, audioPath, outputPath) {
     }
     command
       .output(outputPath)
-      .outputOptions(["-map", "0:v:0", "-map", "1:a?", "-c", "copy", "-movflags +faststart"])
+      .format("mp4")
+      .outputOptions(["-map", "0:v:0", "-map", "1:a?", "-c", "copy"])
       .on("end", resolve)
       .on("error", reject)
       .run();
