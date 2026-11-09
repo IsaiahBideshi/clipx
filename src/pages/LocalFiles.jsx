@@ -62,7 +62,9 @@ function upsertClipInList(currentClips, clip) {
 }
 
 function findClipIndex(clips, target) {
-  const index = clips.findIndex((item) => item.path === (target.savedPath || target.path));
+  const savedIndex = clips.findIndex((item) => item.path === target.savedPath);
+  if (savedIndex >= 0) return savedIndex;
+  const index = clips.findIndex((item) => item.path === target.path);
   return index >= 0 ? index : clips.findIndex((item) => item.savedMetadata?.originalPath === target.path);
 }
 
