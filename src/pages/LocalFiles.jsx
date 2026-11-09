@@ -417,6 +417,7 @@ export default function LocalFiles({ onSaveQueueEvent, onUploadQueueEvent, uploa
       }
 
       if ((event.type === "added" || event.type === "updated") && event.clip?.path) {
+        setClip((current) => (current?.path === event.clip.path && current.id !== event.clip.id ? { ...event.clip, reloadKey: event.clip.id } : current));
         const clipAlreadyLoaded = clipsRef.current.some((item) => item.path === event.clip.path);
         if (clipAlreadyLoaded || getScrollTop() < TOP_INSERT_THRESHOLD) {
           setClips((currentClips) => upsertClipInList(currentClips, event.clip));
@@ -674,6 +675,7 @@ export default function LocalFiles({ onSaveQueueEvent, onUploadQueueEvent, uploa
 
       {clip && rootPath && (
         <ClipEditor
+          key={clip.reloadKey}
           clip={clip}
           authSession={session}
           onSaveQueueEvent={onSaveQueueEvent}

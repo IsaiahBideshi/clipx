@@ -8,7 +8,7 @@ import { Readable } from "stream";
 import { pipeline } from "stream/promises";
 import { promisify } from "util";
 
-import { getClipGroup, markIndexedClipMissing, upsertIndexedClip } from "./clipIndexService.js";
+import { getCachedThumbnailPath, getClipGroup, markIndexedClipMissing, upsertIndexedClip } from "./clipIndexService.js";
 import { getCurrentGame, getGameForClip, setGameForCurrentExe, startGameDetection, stopGameDetection } from "./gameDetectionService.js";
 import { findProcessPath, getForegroundWindow, listProcesses } from "../utils/foregroundWindow.js";
 import { isHotkeyDown, parseAccelerator } from "../utils/accelerator.js";
@@ -723,8 +723,12 @@ async function moveAudioToScreen(clipsFolder, primaryPath, screenFile) {
       throw new Error("The clip changed while its audio was being moved.");
     }
 
+    const thumbnailPath = getCachedThumbnailPath(primaryPath);
     await fs.promises.rename(partPath, primaryPath);
     try {
+      if (thumbnailPath) {
+        await fs.promises.rm(thumbnailPath, { force: true });
+      }
       await fs.promises.rm(screenEntry.path);
       markIndexedClipMissing(screenEntry.path, { emitChange: true });
       const others = group.files.filter((file) => file !== primary && file !== screenEntry).map((file) => file.file);
