@@ -62,7 +62,8 @@ function upsertClipInList(currentClips, clip) {
 }
 
 function findClipIndex(clips, target) {
-  return clips.findIndex((item) => item.path === target.path || item.savedMetadata?.originalPath === target.path);
+  const index = clips.findIndex((item) => item.path === (target.savedPath || target.path));
+  return index >= 0 ? index : clips.findIndex((item) => item.savedMetadata?.originalPath === target.path);
 }
 
 export default function LocalFiles({ onSaveQueueEvent, onUploadQueueEvent, uploadingPaths, savingPaths }) {
@@ -689,7 +690,7 @@ export default function LocalFiles({ onSaveQueueEvent, onUploadQueueEvent, uploa
           onNextClip={() => moveSelectedClip(1)}
           onPrevClip={() => moveSelectedClip(-1)}
           triggerClipIndexRefresh={() => refreshFiles()}
-          onViewOriginal={setClip}
+          onViewOriginal={(original) => setClip({ ...original, savedPath: clip.path })}
           uploading={uploadingPaths.includes(clip.path)}
           saving={savingPaths.includes(clip.path)}
         />

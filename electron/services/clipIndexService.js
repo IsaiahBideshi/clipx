@@ -434,7 +434,9 @@ export async function upsertIndexedClip(rootPath, filePath, options = {}) {
   const id = await getFastFileId(normalizedFilePath, stats);
   const collection = getCollectionForPath(normalizedRootPath, normalizedFilePath);
   const existingRow = getRowByPath(normalizedFilePath);
-  const savedMetadata = options.savedMetadata || (collection === "saved" ? findLegacyClipMetadata(normalizedFilePath) : null);
+  const savedMetadata =
+    options.savedMetadata ||
+    (collection === "saved" && !existingRow?.saved_metadata_json ? findLegacyClipMetadata(normalizedFilePath) : null);
   const { groupPath, groupRole, createdAtMs, sessionId, gameName } = getClipGroupInfo(normalizedFilePath);
 
   getDb()
