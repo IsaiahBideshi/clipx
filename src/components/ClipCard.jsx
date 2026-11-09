@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import DesktopWindowsIcon from "@mui/icons-material/DesktopWindows";
+import BookmarkIcon from "@mui/icons-material/Bookmark";
 import { getScreenCount } from "../../electron/utils/clipManifest.js";
 
 function ClipCard({ clip, baseFolder, onClick, onContextMenuAction }) {
@@ -93,6 +94,11 @@ function ClipCard({ clip, baseFolder, onClick, onContextMenuAction }) {
           <img src={thumbSrc} className="clip-thumb" />
         ) : (
           <div className="thumb-placeholder" />
+        )}
+        {clip.collection === "saved" && (
+          <span className="clip-saved-badge" title="Saved clip">
+            <BookmarkIcon sx={{ fontSize: 16 }} />
+          </span>
         )}
         {screenCount > 1 && (
           <span className="clip-screens-badge" title={`${screenCount} screens`}>

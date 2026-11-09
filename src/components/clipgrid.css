@@ -251,6 +251,24 @@
   font-size: 0.75rem;
   font-weight: 600;
 }
+.clip-saved-badge {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  display: inline-flex;
+  padding: 4px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.7);
+  color: var(--accent);
+}
+.clip-editor-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 92%;
+  margin: 0 auto;
+}
 .clip-card.filler {
   visibility: hidden;
   padding: 0;
