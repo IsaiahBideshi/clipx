@@ -756,7 +756,9 @@ export default function LocalFiles({ onSaveQueueEvent, onUploadQueueEvent, uploa
                 </div>
                 <div style={{ display: "flex", marginLeft: "auto", marginRight: "auto", marginTop: "20px", width: "fit-content", gap: "12px" }}>
                   <button className="cancel-button" onClick={() => setDeleteClipModalOpen(false)}>Cancel</button>
-                  <button className="delete-button" onClick={() => deleteSelected(!screenToDelete)}>Delete</button>
+                  <button className="delete-button" onClick={() => deleteSelected(!screenToDelete)}>
+                    {keepScreen ? "Delete" : screenToDelete ? "Delete screen" : deleteGroupSize > 1 ? "Delete all" : "Delete"}
+                  </button>
                 </div>
             </>)}
           </div>
