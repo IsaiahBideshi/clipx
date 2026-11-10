@@ -9,7 +9,7 @@ import { rename } from "fs/promises";
 import { uploadClipToYoutube } from "./youtubeService.js";
 import { resolveFfmpegPath } from "../utils/ffmpeg.js";
 import { STREAM_COPY_BITRATE, buildStreamBlobName, renderStreamCopy } from "../utils/streamCopy.js";
-import { getIndexedClipData, setIndexedClipMetadata, markIndexedClipMissing, getWatchedRootForPath, upsertIndexedClip, getCachedThumbnailPath, getClipGroup, moveSavedClipOriginal } from "./clipIndexService.js";
+import { getIndexedClipData, setIndexedClipMetadata, markIndexedClipMissing, getWatchedRootForPath, upsertIndexedClip, getCachedThumbnailPath, getClipGroup, moveSavedClipOriginal, isIndexedClipNew } from "./clipIndexService.js";
 import { CLIP_MANIFEST_NAME, getManifestFile, keepManifestFile, removeManifestFile, renameManifestFile } from "../utils/clipManifest.js";
 import { buildAudioOutputOptions } from "../utils/audioMix.js";
 import { copyScreenAudio } from "../utils/screenAudio.js";
@@ -567,6 +567,7 @@ export async function renameClip(clipPath, newName) {
 
   const thumbPath = getCachedThumbnailPath(clipPath) || getThumbnailPath(clipPath);
   const savedData = getIndexedClipData(clipPath);
+  const isNew = isIndexedClipNew(clipPath);
 
   try {
     await rename(clipPath, newClipPath);
@@ -582,6 +583,7 @@ export async function renameClip(clipPath, newName) {
     moveSavedClipOriginal(clipPath, newClipPath);
     await upsertIndexedClip(root, newClipPath, {
       emitChange: true,
+      isNew,
       savedMetadata: savedData ? { ...savedData, path: newClipPath, name: path.basename(newClipPath) } : null,
     });
     if (newClipPath !== clipPath) {

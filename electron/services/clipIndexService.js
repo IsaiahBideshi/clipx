@@ -97,6 +97,9 @@ function getDb() {
   if (!columns.has("game_name")) {
     db.exec("ALTER TABLE clips ADD COLUMN game_name TEXT");
   }
+  if (!columns.has("is_new")) {
+    db.exec("ALTER TABLE clips ADD COLUMN is_new INTEGER NOT NULL DEFAULT 0");
+  }
   db.exec(`
     CREATE INDEX IF NOT EXISTS idx_clips_original
       ON clips(json_extract(saved_metadata_json, '$.originalPath'))
@@ -146,6 +149,7 @@ function rowToClip(row) {
     groupRole: row.group_role || null,
     sessionId: row.session_id || null,
     gameName: row.game_name || null,
+    isNew: Boolean(row.is_new),
   };
 }
 
@@ -397,6 +401,23 @@ export function getIndexedClipData(clipPath) {
   return parseJson(row?.saved_metadata_json);
 }
 
+export function isIndexedClipNew(clipPath) {
+  return Boolean(getRowByPath(clipPath)?.is_new);
+}
+
+export function markIndexedClipSeen(clipPath) {
+  const normalizedPath = normalizeStoredPath(clipPath);
+  const { changes } = getDb()
+    .prepare("UPDATE clips SET is_new = 0 WHERE path = ? AND is_new = 1")
+    .run(normalizedPath);
+  if (!changes) {
+    return;
+  }
+
+  const row = getRowByPath(normalizedPath);
+  emitIndexEvent({ type: "updated", rootPath: row.root_path, collection: row.collection, clip: rowToClip(row) });
+}
+
 export function setIndexedClipMetadata(clipPath, metadata) {
   if (!metadata || typeof metadata !== "object") {
     return;
@@ -456,10 +477,12 @@ export async function upsertIndexedClip(rootPath, filePath, options = {}) {
         group_path,
         group_role,
         session_id,
-        game_name
+        game_name,
+        is_new
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(path) DO UPDATE SET
+        is_new = MAX(clips.is_new, excluded.is_new),
         group_path = excluded.group_path,
         group_role = excluded.group_role,
         session_id = excluded.session_id,
@@ -489,7 +512,8 @@ export async function upsertIndexedClip(rootPath, filePath, options = {}) {
       groupPath,
       groupRole,
       sessionId,
-      gameName
+      gameName,
+      options.isNew ? 1 : 0
     );
 
   const row = getRowByPath(normalizedFilePath);

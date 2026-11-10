@@ -82,7 +82,7 @@ export default function LocalFiles({ onSaveQueueEvent, onUploadQueueEvent, uploa
   const [loadingPage, setLoadingPage] = useState(false);
   const [indexing, setIndexing] = useState(false);
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
-  const [newClipCount, setNewClipCount] = useState(0);
+  const [newClipPaths, setNewClipPaths] = useState([]);
   const [scrollElement, setScrollElement] = useState(null);
   const [deleteClipModalOpen, setDeleteClipModalOpen] = useState(false);
   const [isDeletingClip, setIsDeletingClip] = useState(false);
@@ -131,6 +131,13 @@ export default function LocalFiles({ onSaveQueueEvent, onUploadQueueEvent, uploa
   useEffect(() => {
     clipRef.current = clip;
   }, [clip]);
+
+  useEffect(() => {
+    if (clip?.isNew) {
+      window.clipx?.markLocalClipSeen?.(clip.path)
+        .catch((error) => console.error("Failed to mark the clip as seen:", error));
+    }
+  }, [clip?.path, clip?.isNew]);
 
   useEffect(() => {
     cursorRef.current = cursor;
@@ -361,7 +368,7 @@ export default function LocalFiles({ onSaveQueueEvent, onUploadQueueEvent, uploa
       applyClipsPage(cachedFirstPage, { reset: true });
       setLoadingPage(false);
       setIndexing(false);
-      setNewClipCount(0);
+      setNewClipPaths([]);
       return;
     }
 
@@ -371,7 +378,7 @@ export default function LocalFiles({ onSaveQueueEvent, onUploadQueueEvent, uploa
     setLoadingInitial(true);
     setLoadingPage(false);
     setIndexing(true);
-    setNewClipCount(0);
+    setNewClipPaths([]);
 
     async function startIndexAndLoad() {
       try {
@@ -420,6 +427,7 @@ export default function LocalFiles({ onSaveQueueEvent, onUploadQueueEvent, uploa
 
       if (event.type === "removed" && event.clip?.path) {
         setClips((currentClips) => currentClips.filter((item) => item.path !== event.clip.path));
+        setNewClipPaths((paths) => paths.filter((item) => item !== event.clip.path));
         return;
       }
 
@@ -429,7 +437,7 @@ export default function LocalFiles({ onSaveQueueEvent, onUploadQueueEvent, uploa
         if (clipAlreadyLoaded || getScrollTop() < TOP_INSERT_THRESHOLD) {
           setClips((currentClips) => upsertClipInList(currentClips, event.clip));
         } else {
-          setNewClipCount((count) => count + 1);
+          setNewClipPaths((paths) => (paths.includes(event.clip.path) ? paths : [...paths, event.clip.path]));
         }
       }
     });
@@ -456,7 +464,7 @@ export default function LocalFiles({ onSaveQueueEvent, onUploadQueueEvent, uploa
   };
 
   const showNewClips = () => {
-    setNewClipCount(0);
+    setNewClipPaths([]);
     scrollToTop();
     loadPage({ reset: true });
   };
@@ -672,9 +680,9 @@ export default function LocalFiles({ onSaveQueueEvent, onUploadQueueEvent, uploa
         </div>
       )}
 
-      {rootPath && newClipCount > 0 && (
+      {rootPath && newClipPaths.length > 0 && (
         <button type="button" className="local-files-new-clips" onClick={showNewClips}>
-          {newClipCount === 1 ? "1 new clip" : `${newClipCount} new clips`}
+          {newClipPaths.length === 1 ? "1 new clip" : `${newClipPaths.length} new clips`}
         </button>
       )}
 
