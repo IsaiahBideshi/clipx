@@ -90,10 +90,6 @@
   font-size: 1.02rem;
 }
 
-.yt-card {
-  grid-column: 1 / -1;
-}
-
 .options-form{
   display: flex;
   flex-direction: column;
@@ -118,39 +114,11 @@
   word-break: break-word;
 }
 
-.yt {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-
-.yt-profile {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.yt-avatar {
-  width: 44px;
-  height: 44px;
-  border-radius: 999px;
-  object-fit: cover;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-}
-
 .state-loader {
   display: flex;
   justify-content: center;
   align-items: center;
   min-height: 160px;
-}
-
-.yt-btns{
-  display: flex;
-  justify-content: center;
-  gap: 10px;
 }
 
 @media (max-width: 860px) {
@@ -164,9 +132,5 @@
 
   .settings-grid {
     grid-template-columns: 1fr;
-  }
-
-  .yt-card {
-    grid-column: auto;
   }
 }

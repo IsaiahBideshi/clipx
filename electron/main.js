@@ -8,7 +8,6 @@ import { fileURLToPath } from "url";
 import { registerClipIpcHandlers } from "./ipc/clips.js";
 import { registerFileIpcHandlers } from "./ipc/files.js";
 import { registerSettingsIpcHandlers } from "./ipc/settings.js";
-import { registerYoutubeIpcHandlers } from "./ipc/youtube.js";
 import { registerClipxProtocol } from "./services/fileService.js";
 import { closeClipIndexService } from "./services/clipIndexService.js";
 import { registerGoogleAuthIpcHandlers } from "./ipc/googleAuth.js";
@@ -361,7 +360,6 @@ function registerIpcHandlers() {
   registerFileIpcHandlers();
   registerSettingsIpcHandlers();
   registerClipIpcHandlers();
-  registerYoutubeIpcHandlers();
   registerGoogleAuthIpcHandlers();
   registerUpdateIpcHandlers();
   registerClippingIpcHandlers();
