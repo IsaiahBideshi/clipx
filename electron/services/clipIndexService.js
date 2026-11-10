@@ -482,7 +482,7 @@ export async function upsertIndexedClip(rootPath, filePath, options = {}) {
       )
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(path) DO UPDATE SET
-        is_new = MAX(clips.is_new, excluded.is_new),
+        is_new = COALESCE(?, clips.is_new),
         group_path = excluded.group_path,
         group_role = excluded.group_role,
         session_id = excluded.session_id,
@@ -513,7 +513,8 @@ export async function upsertIndexedClip(rootPath, filePath, options = {}) {
       groupRole,
       sessionId,
       gameName,
-      options.isNew ? 1 : 0
+      options.isNew ? 1 : 0,
+      options.isNew == null ? null : Number(options.isNew)
     );
 
   const row = getRowByPath(normalizedFilePath);
