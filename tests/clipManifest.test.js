@@ -111,6 +111,10 @@ test("keeps one file of a clip as its primary", () => {
     "Clip (Screen 2).mp4",
     "Screen 1.mp4",
   ]);
+  assert.deepEqual(keepManifestFile(manifest, "Screen 1.mp4", "Clip.mp4", ["Screen 2.mp4"]).files, [
+    { file: "Clip.mp4", role: "primary", follows: false, screen: { number: 1 }, audioTracks: tracks },
+    manifest.files[2],
+  ]);
   assert.equal(keepManifestFile(manifest, "Screen 3.mp4"), null);
   assert.equal(keepManifestFile(null, "Clip.mp4"), null);
 });

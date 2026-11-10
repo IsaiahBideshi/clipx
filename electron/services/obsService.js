@@ -8,7 +8,7 @@ import { Readable } from "stream";
 import { pipeline } from "stream/promises";
 import { promisify } from "util";
 
-import { upsertIndexedClip } from "./clipIndexService.js";
+import { getCachedThumbnailPath, getClipGroup, markIndexedClipMissing, upsertIndexedClip } from "./clipIndexService.js";
 import { getCurrentGame, getGameForClip, setGameForCurrentExe, startGameDetection, stopGameDetection } from "./gameDetectionService.js";
 import { findProcessPath, getForegroundWindow, listProcesses } from "../utils/foregroundWindow.js";
 import { isHotkeyDown, parseAccelerator } from "../utils/accelerator.js";
@@ -36,7 +36,7 @@ import {
   planRecorders,
   toAudioTrackMap,
 } from "../utils/recordingPlan.js";
-import { CLIP_MANIFEST_NAME, buildClipManifest, describeClip, getAudioTrackNames, getClipName } from "../utils/clipManifest.js";
+import { CLIP_MANIFEST_NAME, buildClipManifest, describeClip, getAudioTrackNames, getClipName, keepManifestFile } from "../utils/clipManifest.js";
 import { copyScreenAudio } from "../utils/screenAudio.js";
 import { showToast } from "./toastService.js";
 
@@ -711,12 +711,36 @@ async function getUniqueDir(parentDir, name) {
   }
 }
 
-async function moveAudioToScreen(screenPath, mainPath) {
-  const outputPath = path.join(path.dirname(screenPath), "with-audio.mp4");
-  await copyScreenAudio(screenPath, mainPath, outputPath);
-  await fs.promises.rm(mainPath, { force: true });
-  await fs.promises.rm(screenPath, { force: true });
-  return outputPath;
+async function moveAudioToScreen(clipsFolder, primaryPath, screenFile) {
+  const partPath = `${primaryPath}.part`;
+  try {
+    await copyScreenAudio(path.join(path.dirname(primaryPath), screenFile), primaryPath, partPath);
+
+    const group = getClipGroup(primaryPath);
+    const primary = group?.files.find((file) => file.role === "primary");
+    const screenEntry = group?.files.find((file) => file.role === "secondary" && file.file === screenFile);
+    if (primary?.file !== path.basename(primaryPath) || !screenEntry) {
+      throw new Error("The clip changed while its audio was being moved.");
+    }
+
+    const thumbnailPath = getCachedThumbnailPath(primaryPath);
+    await fs.promises.rename(partPath, primaryPath);
+    try {
+      if (thumbnailPath) {
+        await fs.promises.rm(thumbnailPath, { force: true });
+      }
+      await fs.promises.rm(screenEntry.path);
+      markIndexedClipMissing(screenEntry.path, { emitChange: true });
+      const others = group.files.filter((file) => file !== primary && file !== screenEntry).map((file) => file.file);
+      const manifest = keepManifestFile(group.manifest, screenFile, primary.file, others);
+      await fs.promises.writeFile(path.join(group.path, CLIP_MANIFEST_NAME), JSON.stringify(manifest, null, 2), "utf-8");
+    } finally {
+      await upsertIndexedClip(clipsFolder, primaryPath, { emitChange: true });
+    }
+  } catch (error) {
+    console.error("ClipX: Failed to move the clip's audio to its screen file:", error);
+    await fs.promises.rm(partPath, { force: true }).catch(() => {});
+  }
 }
 
 async function finalizeClip(createdAt, savedFiles, options, duplicate) {
@@ -732,24 +756,12 @@ async function finalizeClip(createdAt, savedFiles, options, duplicate) {
       : null;
   };
 
-  let primary = savedFiles.find(({ recorder }) => recorder.key === "main");
-  let secondaries = savedFiles
+  const primary = savedFiles.find(({ recorder }) => recorder.key === "main");
+  const secondaries = savedFiles
     .filter(({ recorder }) => recorder.key !== "main")
     .map((saved) => ({ ...saved, screen: describeScreen(saved.recorder.screenId) }))
     .filter((saved) => saved.screen);
-  let fixedScreenId = duplicate?.keep === "main" ? duplicate.screenId : null;
-  const copy = duplicate?.keep === "screen" && secondaries.find((saved) => saved.recorder.screenId === duplicate.screenId);
-  if (copy) {
-    const mergedPath = await moveAudioToScreen(copy.savedPath, primary.savedPath).catch((error) => {
-      console.error("ClipX: Failed to move the clip's audio to its screen file:", error);
-      return null;
-    });
-    if (mergedPath) {
-      primary = { ...primary, savedPath: mergedPath };
-      secondaries = secondaries.filter((saved) => saved !== copy);
-      fixedScreenId = duplicate.screenId;
-    }
-  }
+  const fixedScreenId = duplicate?.keep === "main" ? duplicate.screenId : null;
   const follows = primary.recorder.plan.screenId === null && fixedScreenId === null;
   const manifest = buildClipManifest({
     folderName,
@@ -774,6 +786,11 @@ async function finalizeClip(createdAt, savedFiles, options, duplicate) {
     await fs.promises.rename(sources[index].savedPath, destination);
     await upsertIndexedClip(options.clipsFolder, destination, { emitChange: entry.role === "primary" })
       .catch((error) => console.error("ClipX: Failed to index saved clip:", error));
+  }
+
+  const copyIndex = duplicate?.keep === "screen" ? secondaries.findIndex((saved) => saved.recorder.screenId === duplicate.screenId) : -1;
+  if (copyIndex !== -1) {
+    void moveAudioToScreen(options.clipsFolder, path.join(clipDir, manifest.files[0].file), manifest.files[copyIndex + 1].file);
   }
 
   return manifest;
