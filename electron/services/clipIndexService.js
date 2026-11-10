@@ -97,6 +97,10 @@ function getDb() {
   if (!columns.has("game_name")) {
     db.exec("ALTER TABLE clips ADD COLUMN game_name TEXT");
   }
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_clips_original
+      ON clips(json_extract(saved_metadata_json, '$.originalPath'))
+  `);
 
   return db;
 }
@@ -255,6 +259,45 @@ function getRowByPath(filePath) {
     .get(normalizeStoredPath(filePath));
 }
 
+function isHiddenOriginal(filePath) {
+  return Boolean(
+    getDb()
+      .prepare("SELECT 1 FROM clips WHERE missing = 0 AND json_extract(saved_metadata_json, '$.originalPath') = ?")
+      .get(normalizeStoredPath(filePath))
+  );
+}
+
+function emitOriginalVisibility(savedRow) {
+  const originalPath = parseJson(savedRow?.saved_metadata_json)?.originalPath;
+  const original = originalPath ? getRowByPath(originalPath) : null;
+  if (!original || original.missing || original.group_role === "secondary") {
+    return;
+  }
+
+  emitIndexEvent({
+    type: isHiddenOriginal(original.path) ? "removed" : "updated",
+    rootPath: original.root_path,
+    collection: original.collection,
+    clip: rowToClip(original),
+  });
+}
+
+export function getOriginalClip(clipPath) {
+  const originalPath = getIndexedClipData(clipPath)?.originalPath;
+  const row = originalPath ? getRowByPath(originalPath) : null;
+  return row && !row.missing ? rowToClip(row) : null;
+}
+
+export function moveSavedClipOriginal(oldPath, newPath) {
+  getDb()
+    .prepare(`
+      UPDATE clips
+      SET saved_metadata_json = json_set(saved_metadata_json, '$.originalPath', ?)
+      WHERE json_extract(saved_metadata_json, '$.originalPath') = ?
+    `)
+    .run(normalizeStoredPath(newPath), normalizeStoredPath(oldPath));
+}
+
 export function listLocalClips(options = {}) {
   const rootPath = normalizeStoredPath(options.rootPath);
   const collection = options.collection === "saved" ? "saved" : "source";
@@ -299,6 +342,12 @@ export function listLocalClips(options = {}) {
         ${collectionClause}
         AND missing = 0
         AND (group_role IS NULL OR group_role != 'secondary')
+        AND NOT EXISTS (
+          SELECT 1
+          FROM clips saved
+          WHERE saved.missing = 0
+            AND json_extract(saved.saved_metadata_json, '$.originalPath') = +clips.path
+        )
         ${cursorClause}
       ORDER BY created_at_ms DESC, id DESC
       LIMIT ?
@@ -385,7 +434,9 @@ export async function upsertIndexedClip(rootPath, filePath, options = {}) {
   const id = await getFastFileId(normalizedFilePath, stats);
   const collection = getCollectionForPath(normalizedRootPath, normalizedFilePath);
   const existingRow = getRowByPath(normalizedFilePath);
-  const savedMetadata = collection === "saved" ? findLegacyClipMetadata(normalizedFilePath) : null;
+  const savedMetadata =
+    options.savedMetadata ||
+    (collection === "saved" && !existingRow?.saved_metadata_json ? findLegacyClipMetadata(normalizedFilePath) : null);
   const { groupPath, groupRole, createdAtMs, sessionId, gameName } = getClipGroupInfo(normalizedFilePath);
 
   getDb()
@@ -441,8 +492,9 @@ export async function upsertIndexedClip(rootPath, filePath, options = {}) {
       gameName
     );
 
-  const clip = rowToClip(getRowByPath(normalizedFilePath));
-  if (options.emitChange && groupRole !== "secondary") {
+  const row = getRowByPath(normalizedFilePath);
+  const clip = rowToClip(row);
+  if (options.emitChange && groupRole !== "secondary" && !isHiddenOriginal(normalizedFilePath)) {
     emitIndexEvent({
       type: existingRow ? "updated" : "added",
       rootPath: normalizedRootPath,
@@ -451,6 +503,9 @@ export async function upsertIndexedClip(rootPath, filePath, options = {}) {
     });
   } else if (options.emitChange && existingRow && existingRow.group_role !== "secondary") {
     emitIndexEvent({ type: "removed", rootPath: normalizedRootPath, collection, clip });
+  }
+  if (options.emitChange) {
+    emitOriginalVisibility(row);
   }
 
   return clip;
@@ -492,6 +547,7 @@ export function markIndexedClipMissing(filePath, options = {}) {
       collection: existingRow.collection,
       clip,
     });
+    emitOriginalVisibility(existingRow);
   }
 
   return clip;

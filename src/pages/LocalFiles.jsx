@@ -61,6 +61,13 @@ function upsertClipInList(currentClips, clip) {
   return mergeClipLists(currentClips.filter((item) => item.path !== clip.path), [clip]);
 }
 
+function findClipIndex(clips, target) {
+  const savedIndex = clips.findIndex((item) => item.path === target.savedPath);
+  if (savedIndex >= 0) return savedIndex;
+  const index = clips.findIndex((item) => item.path === target.path);
+  return index >= 0 ? index : clips.findIndex((item) => item.savedMetadata?.originalPath === target.path);
+}
+
 export default function LocalFiles({ onSaveQueueEvent, onUploadQueueEvent, uploadingPaths, savingPaths }) {
   const navigate = useNavigate();
   const [rootPath, setRootPath] = useState("");
@@ -472,7 +479,7 @@ export default function LocalFiles({ onSaveQueueEvent, onUploadQueueEvent, uploa
         return;
       }
 
-      const currentIndex = loadedClips.findIndex((item) => item.path === currentClip.path);
+      const currentIndex = findClipIndex(loadedClips, currentClip);
       if (currentIndex < 0) {
         setClip(direction > 0 ? loadedClips[0] : loadedClips[loadedClips.length - 1]);
         return;
@@ -539,7 +546,7 @@ export default function LocalFiles({ onSaveQueueEvent, onUploadQueueEvent, uploa
   async function deleteSelected(deleteAll) {
     setIsDeletingClip(true);
     const closesOpenClip = !keepScreen && clip?.path === clipToDelete.path && (deleteAll || !screenToDelete);
-    const deletedIndex = clipsRef.current.findIndex((item) => item.path === clipToDelete.path);
+    const deletedIndex = findClipIndex(clipsRef.current, clipToDelete);
     try {
       if (keepScreen) {
         const kept = await window.clipx.keepClipScreen(clipToDelete.path, keepScreen.screen);
@@ -680,16 +687,14 @@ export default function LocalFiles({ onSaveQueueEvent, onUploadQueueEvent, uploa
           authSession={session}
           onSaveQueueEvent={onSaveQueueEvent}
           onUploadQueueEvent={onUploadQueueEvent}
-          isSavedClipsView={showSavedFiles}
+          isSavedClipsView={showSavedFiles && clip.collection === "saved"}
           onClose={() => setClip(null)}
           baseFolder={folderPath}
           onDelete={openDeleteModal}
           onNextClip={() => moveSelectedClip(1)}
           onPrevClip={() => moveSelectedClip(-1)}
           triggerClipIndexRefresh={() => refreshFiles()}
-          onClipRenamed={(oldPath, renamed) => {
-            setClip((current) => (current?.path === oldPath ? { ...current, path: renamed.path, name: renamed.name } : current));
-          }}
+          onViewOriginal={(original) => setClip({ ...original, savedPath: clip.path })}
           uploading={uploadingPaths.includes(clip.path)}
           saving={savingPaths.includes(clip.path)}
         />

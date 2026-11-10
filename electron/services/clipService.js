@@ -9,7 +9,7 @@ import { rename } from "fs/promises";
 import { uploadClipToYoutube } from "./youtubeService.js";
 import { resolveFfmpegPath } from "../utils/ffmpeg.js";
 import { STREAM_COPY_BITRATE, buildStreamBlobName, renderStreamCopy } from "../utils/streamCopy.js";
-import { getIndexedClipData, setIndexedClipMetadata, markIndexedClipMissing, getWatchedRootForPath, upsertIndexedClip, getCachedThumbnailPath, getClipGroup } from "./clipIndexService.js";
+import { getIndexedClipData, setIndexedClipMetadata, markIndexedClipMissing, getWatchedRootForPath, upsertIndexedClip, getCachedThumbnailPath, getClipGroup, moveSavedClipOriginal } from "./clipIndexService.js";
 import { CLIP_MANIFEST_NAME, getManifestFile, keepManifestFile, removeManifestFile, renameManifestFile } from "../utils/clipManifest.js";
 import { buildAudioOutputOptions } from "../utils/audioMix.js";
 import { copyScreenAudio } from "../utils/screenAudio.js";
@@ -226,6 +226,7 @@ export async function saveClip(options) {
     path: outputPath,
     name: path.basename(outputPath),
     sourcePath: screen?.videoPath || videoPath,
+    originalPath: videoPath,
     size: stat.size,
     modifiedAt: stat.mtimeMs,
     startTime,
@@ -565,6 +566,7 @@ export async function renameClip(clipPath, newName) {
   }
 
   const thumbPath = getCachedThumbnailPath(clipPath) || getThumbnailPath(clipPath);
+  const savedData = getIndexedClipData(clipPath);
 
   try {
     await rename(clipPath, newClipPath);
@@ -577,8 +579,14 @@ export async function renameClip(clipPath, newName) {
       .catch((error) => console.error("ClipX: Failed to update clip manifest after rename:", error));
 
     const root = getWatchedRootForPath(newClipPath) || clipDir;
-    markIndexedClipMissing(clipPath, { emitChange: true });
-    await upsertIndexedClip(root, newClipPath, { emitChange: true });
+    moveSavedClipOriginal(clipPath, newClipPath);
+    await upsertIndexedClip(root, newClipPath, {
+      emitChange: true,
+      savedMetadata: savedData ? { ...savedData, path: newClipPath, name: path.basename(newClipPath) } : null,
+    });
+    if (newClipPath !== clipPath) {
+      markIndexedClipMissing(clipPath, { emitChange: true });
+    }
 
     return { path: newClipPath, name: path.basename(newClipPath) };
   } catch (error) {
@@ -676,6 +684,7 @@ export async function keepClipScreen(clipPath, screen) {
     .catch((error) => console.error("ClipX: Failed to update clip manifest after keeping a screen:", error));
 
   const root = getWatchedRootForPath(keptPath) || group.path;
+  moveSavedClipOriginal(primary.path, keptPath);
   for (const file of left) {
     await upsertIndexedClip(root, file.path, { emitChange: true })
       .catch((error) => console.error("ClipX: Failed to index a screen that couldn't be deleted:", error));

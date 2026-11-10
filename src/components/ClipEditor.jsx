@@ -17,6 +17,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import DeleteSweepIcon from "@mui/icons-material/DeleteSweep";
 import CenterFocusStrongIcon from "@mui/icons-material/CenterFocusStrong";
+import HistoryIcon from "@mui/icons-material/History";
 import fallBackThumb from "../assets/thumbnail.svg";
 import { usePlayerPrefs } from "../lib/playerPrefs.js";
 
@@ -87,7 +88,7 @@ export default function ClipEditor({
   onClose, 
   baseFolder,
   triggerClipIndexRefresh,
-  onClipRenamed,
+  onViewOriginal,
   authSession,
   uploading,
   saving
@@ -106,6 +107,7 @@ export default function ClipEditor({
   const { volume, muted: isMuted, setVolume, setMuted: setIsMuted } = usePlayerPrefs();
 
   const [clipData, setClipData] = useState(null);
+  const [original, setOriginal] = useState(null);
 
   const [isEdittingClipName, setIsEdittingClipName] = useState(false);
   const [clipName, setClipName] = useState(null);
@@ -330,6 +332,23 @@ export default function ClipEditor({
     loadClipData();
   }, [clip]);
 
+  useEffect(() => {
+    let cancelled = false;
+    setOriginal(null);
+    if (clip.collection === "saved") {
+      window.clipx?.getOriginalClip?.(clip.path)
+        .then((originalClip) => {
+          if (!cancelled) {
+            setOriginal(originalClip);
+          }
+        })
+        .catch((error) => console.error("Failed to load the original clip:", error));
+    }
+
+    return () => {
+      cancelled = true;
+    };
+  }, [clip.path, clip.collection]);
 
   return (
     <div className="clip-editor-container">
@@ -367,19 +386,37 @@ export default function ClipEditor({
           />
         </ScreenStage>
 
-        <Typography 
-          variant="h5" 
-          sx={{
-            margin: "0 auto",
-            width: "92%",
-            textAlign: "left",
-            fontWeight: "bold",
-          }}
-          onClick={() => setIsEdittingClipName(true)}
-        >
-          {clipName || "Untitled Clip"}
-        </Typography>
-        
+        <div className="clip-editor-title-row">
+          <Typography
+            variant="h5"
+            sx={{
+              minWidth: 0,
+              textAlign: "left",
+              fontWeight: "bold",
+            }}
+            onClick={() => setIsEdittingClipName(true)}
+          >
+            {clipName || "Untitled Clip"}
+          </Typography>
+          {original && (
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<HistoryIcon />}
+              sx={{ flexShrink: 0 }}
+              onClick={async () => {
+                const originalClip = await window.clipx.getOriginalClip(clip.path).catch((error) => {
+                  console.error("Failed to load the original clip:", error);
+                  return null;
+                });
+                originalClip ? onViewOriginal(originalClip) : setOriginal(null);
+              }}
+            >
+              View original
+            </Button>
+          )}
+        </div>
+
 
         {isSavedClipsView && clipData && (
           <div className={"clip-info"}>
@@ -424,7 +461,6 @@ export default function ClipEditor({
             onUploadQueueEvent={onUploadQueueEvent}
             screens={multiScreen ? views : null}
             onDelete={(view, keep) => onDelete(clip, view, keep)}
-            onRenamed={onClipRenamed}
             onRefreshIndex={triggerClipIndexRefresh}
             uploading={uploading}
             saving={saving}
@@ -435,7 +471,7 @@ export default function ClipEditor({
   );
 }
 
-export function UploadMenu({clip, group, mix, screen, screens, target, start, end, timelineLoaded, onRenamed, onRefreshIndex, onSaveQueueEvent, onUploadQueueEvent, onDelete, uploading, saving, session}) {
+export function UploadMenu({clip, group, mix, screen, screens, target, start, end, timelineLoaded, onRefreshIndex, onSaveQueueEvent, onUploadQueueEvent, onDelete, uploading, saving, session}) {
   const [deleteAnchor, setDeleteAnchor] = useState(null);
   const [tags, setTags] = useState([]);
   const [friendsInClip, setFriendsInClip] = useState([]);
@@ -520,12 +556,6 @@ export function UploadMenu({clip, group, mix, screen, screens, target, start, en
     try {
       const response = await window.clipx.saveClip({clip, start, end, title, game, tags, mix, screen});
       if (response === 200){
-        const renameResponse = await window.clipx.renameClip(clip?.path, "[ORIGINAL] " + displayName);
-        if (renameResponse?.path) {
-          onRenamed?.(clip.path, renameResponse);
-        } else {
-          console.error("Failed to rename clip after saving:", renameResponse);
-        }
         onSaveQueueEvent?.({ type: "success", id: saveId });
         return;
       }
