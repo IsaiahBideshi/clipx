@@ -784,7 +784,7 @@ async function finalizeClip(createdAt, savedFiles, options, duplicate) {
   for (const [index, entry] of [...manifest.files.entries()].reverse()) {
     const destination = path.join(clipDir, entry.file);
     await fs.promises.rename(sources[index].savedPath, destination);
-    await upsertIndexedClip(options.clipsFolder, destination, { emitChange: entry.role === "primary" })
+    await upsertIndexedClip(options.clipsFolder, destination, { emitChange: entry.role === "primary", isNew: entry.role === "primary" })
       .catch((error) => console.error("ClipX: Failed to index saved clip:", error));
   }
 

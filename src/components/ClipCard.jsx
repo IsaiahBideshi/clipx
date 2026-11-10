@@ -95,6 +95,7 @@ function ClipCard({ clip, baseFolder, onClick, onContextMenuAction }) {
         ) : (
           <div className="thumb-placeholder" />
         )}
+        {clip.isNew && <span className="clip-new-badge">New</span>}
         {clip.collection === "saved" && (
           <span className="clip-saved-badge" title="Saved clip">
             <BookmarkIcon sx={{ fontSize: 16 }} />
