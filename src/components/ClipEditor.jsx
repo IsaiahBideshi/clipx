@@ -404,7 +404,13 @@ export default function ClipEditor({
               size="small"
               startIcon={<HistoryIcon />}
               sx={{ flexShrink: 0 }}
-              onClick={() => onViewOriginal(original)}
+              onClick={async () => {
+                const originalClip = await window.clipx.getOriginalClip(clip.path).catch((error) => {
+                  console.error("Failed to load the original clip:", error);
+                  return null;
+                });
+                originalClip ? onViewOriginal(originalClip) : setOriginal(null);
+              }}
             >
               View original
             </Button>
