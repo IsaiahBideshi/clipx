@@ -41,9 +41,9 @@ The main process is ESM (`"type": "module"`), and so is `api/`.
 
 ### Configuration
 
-- `electron/main.js` loads `.env` via `dotenv/config`; the renderer gets `VITE_*` from the same `.env` at build time. `.env.local` isn't loaded by anything, so it can't clobber `process.env` (`vercel env pull` may create one for the Vercel CLI).
+- `electron/main.js` loads only `.env`, via `dotenv/config`. Vite loads `.env` and `.env.local` for the renderer's `VITE_*` values at build time. The main process reads `VITE_DATABASE_URL` too, so set it in `.env`: in `.env.local` it would only reach the renderer. (`vercel env pull` may create a `.env.local` for the Vercel CLI.)
 - The renderer's API base is `import.meta.env.VITE_DATABASE_URL`, defaulting to `https://clipx.bideshi.tech` (see `src/lib/accountApi.js`).
-- The Google OAuth client ID and secret are fetched at runtime by the main process from `{API_BASE}/api/keys`, not read from env.
+- The main process fetches the Google OAuth client ID at runtime from `{API_BASE}/api/keys`. The client secret stays on the server (`GOOGLE_CLIENT_SECRET`), where `/api/google/token` uses it.
 - `CLIPX_ALLOW_PRERELEASE=true` in the user's environment opts a stable install into pre-releases (see [Releases](#releases)).
 
 ### Auth
@@ -78,7 +78,7 @@ Each recording is its own OBS process:
 
 `planRecorders` in `electron/utils/recordingPlan.js` decides the set; the renderer imports the same file to preview it.
 
-Each recorder runs from `userData/obs/recorders/<key>/` with junctions to the shared install, so it gets its own `config/` (portable OBS resolves `../../config` from its working folder). Recorders are spawned hidden (`windowsHide` plus `SysTrayEnabled=false` in `user.ini`, so no window or tray icon, though they still show as "OBS Studio" in Task Manager), driven over obs-websocket on random ports, and killed by Node's job object when ClipX exits.
+Each recorder runs from `userData/obs/recorders/<key>/` with junctions to the shared install, so it gets its own `config/` (portable OBS resolves `../../config` from its working folder). Recorders are spawned hidden (`windowsHide` plus `SysTrayEnabled=false` in `user.ini`, so no window or tray icon, though they still show as "OBS Studio" in Task Manager), and driven over obs-websocket on random ports. They aren't spawned `detached`, so Node puts them in its own kill-on-close job object and Windows ends them when ClipX exits.
 
 ### Clip folders and `clip.json`
 

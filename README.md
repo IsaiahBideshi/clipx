@@ -12,7 +12,7 @@ ClipX updates itself when a new version is out.
 ## Features
 
 **Record**
-- Turn on clipping on the Recording page and press your hotkey to save the last few seconds. The hotkey works while you're in a game, even in fullscreen.
+- Turn on clipping on the Recording page and press your hotkey to save the last few seconds. The hotkey works while you're in a game, even in fullscreen, but not while an app running as administrator is focused.
 - Record all your screens at once, with the main recording following your mouse or the app you're using.
 - Put your mic, your game and apps like Discord on their own audio tracks.
 - ClipX detects the game you're playing and names the clip after it. For apps it doesn't recognize, pick the game yourself.
@@ -34,7 +34,7 @@ You need a ClipX account to upload clips and use the Library.
 
 ClipX is an Electron + React app with a small API on Vercel and Supabase for accounts and data. Uploaded clips are stored in Azure Blob Storage, and recording uses a portable copy of OBS Studio that ClipX downloads itself. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for how it fits together.
 
-You need Windows and Node.js 22 or later. In PowerShell, use `npm.cmd` instead of `npm`.
+You need Windows and Node.js 22.12 or later. In PowerShell, use `npm.cmd` instead of `npm`.
 
 ```bash
 npm.cmd install

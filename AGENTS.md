@@ -19,6 +19,7 @@ PowerShell here has execution-policy disabled, so `npm` fails; always use `npm.c
 ## Rules
 
 - The renderer only runs inside Electron and reaches the main process through `window.clipx.*` in `electron/preload.js`. Anything added on one side must be mirrored on the other.
+- The exception is the share page player (`src/sharePlayer.jsx`, which bundles `VideoPlayer.jsx` and `playerPrefs.js`). It runs in a normal browser, so code it uses must work without `window.clipx`.
 - Everything is ESM (`"type": "module"`), including `api/`.
 - Secrets live in the gitignored `.env`. Never commit or echo their values, and never expose the Supabase service-role key to the renderer.
 - Tests go in `tests/`, not next to the source (electron-builder packages everything under `electron/`). They may only import modules that load in plain Node: no `electron` import, no Supabase client created when the module loads (e.g. `api-handlers/auth.js`), no top-level `import.meta.env`.
