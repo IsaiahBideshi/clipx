@@ -50,12 +50,12 @@ The main process is ESM (`"type": "module"`), and so is `api/`.
 
 - The renderer uses Supabase auth with a custom storage adapter that persists the session through IPC (`window.clipx.authStorage*`), falling back to `localStorage` outside Electron.
 - API functions use `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` (service role, never exposed to the renderer). Routes that need a signed-in user authenticate callers with the user's Supabase access token as a Bearer token (`getAuthenticatedUser` in `api-handlers/auth.js`). `/api/keys`, `/api/latest-version`, `/api/users`, `/api/clips?visibility=public` and the `/clip/<id>` share page don't need one.
-- Google OAuth uses a PKCE loopback flow on an OS-assigned `127.0.0.1` port (a fixed port can land in a Windows excluded port range and fail with `EACCES`). The app sends its `redirect_uri` to `/api/google/token`, which falls back to port **51723** for builds up to v1.2.5 that don't send one. YouTube refresh tokens are stored in the OS keychain via keytar.
+- Google OAuth uses a PKCE loopback flow on an OS-assigned `127.0.0.1` port (a fixed port can land in a Windows excluded port range and fail with `EACCES`). The app sends its `redirect_uri` to `/api/google/token`, which falls back to port **51723** for builds up to v1.2.5 that don't send one.
 
 ### Local clip index
 
 - Clip metadata lives in SQLite at `%APPDATA%/clipx/clip-index.sqlite` (WAL mode, with chokidar watching the clip folders), plus a legacy `clipsData.json` in `%APPDATA%/`. In dev, userData is redirected to `%APPDATA%/clipx-dev`.
-- `better-sqlite3` and `keytar` are native modules and must be rebuilt for Electron's ABI after a fresh `npm install` (`npm.cmd run rebuild:electron`).
+- `better-sqlite3` is a native module and must be rebuilt for Electron's ABI after a fresh `npm install` (`npm.cmd run rebuild:electron`).
 - FFmpeg comes from `ffmpeg-static`, driven through fluent-ffmpeg. The binary must stay unpacked (`asarUnpack`); `electron/utils/ffmpeg.js` rewrites the path to `app.asar.unpacked`.
 
 ## Recording

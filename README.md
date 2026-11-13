@@ -48,7 +48,7 @@ npm.cmd run rebuild:electron
 npm.cmd run dev
 ```
 
-`rebuild:electron` rebuilds the native modules (`better-sqlite3`, `keytar`) for Electron; run it again after every `npm install`. `dev` starts Vite and opens the app.
+`rebuild:electron` rebuilds the native module `better-sqlite3` for Electron; run it again after every `npm install`. `dev` starts Vite and opens the app.
 
 Without a `.env`, the app talks to the live API at `clipx.bideshi.tech`. To use another one, set `VITE_DATABASE_URL` in `.env`. The API's own secrets (Supabase service role, Azure, Google and IGDB keys) are set in Vercel.
 

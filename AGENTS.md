@@ -9,11 +9,11 @@ ClipX is a Windows Electron app (main process in `electron/`, React renderer in 
 
 PowerShell here has execution-policy disabled, so `npm` fails; always use `npm.cmd`.
 
-- `npm.cmd run dev`: Vite on `127.0.0.1:5173`, then Electron. Most features (IPC, keytar, better-sqlite3) need Electron open.
+- `npm.cmd run dev`: Vite on `127.0.0.1:5173`, then Electron. Most features (IPC, better-sqlite3) need Electron open.
 - `npm.cmd test`: Node's built-in runner over `tests/**/*.test.js`.
 - `npm.cmd run build`: renderer + `dist/ClipX-Setup.exe` and `latest.yml`. `build:react` and `build:electron` are the two halves.
 - `npm.cmd run build:player`: rebuilds the share player into `public/clip-player/`.
-- `npm.cmd run rebuild:electron`: rebuilds `better-sqlite3` and `keytar` for Electron. Needed after a fresh `npm install`.
+- `npm.cmd run rebuild:electron`: rebuilds `better-sqlite3` for Electron. Needed after a fresh `npm install`.
 - There's no lint: `eslint.config.js` exists but eslint isn't installed. Don't claim to have run it.
 
 ## Rules

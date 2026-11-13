@@ -1,21 +1,6 @@
-import { supabase, getAuthenticatedUser } from '../auth.js'
-
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token'
 const REDIRECT_URI = 'http://127.0.0.1:51723'
 const LOOPBACK_REDIRECT_URI = /^http:\/\/127\.0\.0\.1:\d+$/
-
-async function getStoredRefreshToken(userId) {
-  const { data, error } = await supabase
-    .from('google_accounts')
-    .select('refresh_token')
-    .eq('user_id', userId)
-    .maybeSingle()
-
-  if (error) {
-    return null
-  }
-  return data?.refresh_token || null
-}
 
 export default async function handler(req, res) {
   const allowedOrigin = process.env.CORS_ORIGIN || '*'
@@ -38,7 +23,6 @@ export default async function handler(req, res) {
   }
 
   const body = req.body || {}
-  let authenticatedUserId = null
   const params = {
     client_id: clientId,
     client_secret: clientSecret,
@@ -52,25 +36,6 @@ export default async function handler(req, res) {
     params.redirect_uri = LOOPBACK_REDIRECT_URI.test(body.redirect_uri) ? body.redirect_uri : REDIRECT_URI
     params.code = body.code
     params.code_verifier = body.code_verifier
-  } else if (body.grant_type === 'refresh_token') {
-    if (!body.refresh_token) {
-      return res.status(400).json({ data: null, error: 'Missing refresh_token', ok: false })
-    }
-
-    // Refreshing requires a signed-in caller whose stored token matches the
-    // one being exchanged, so a leaked refresh token is useless on its own.
-    const { user, error: authError } = await getAuthenticatedUser(req)
-    if (authError) {
-      return res.status(401).json({ data: null, error: authError, ok: false })
-    }
-
-    const storedToken = await getStoredRefreshToken(user.id)
-    if (!storedToken || body.refresh_token !== storedToken) {
-      return res.status(403).json({ data: null, error: 'Refresh token does not belong to the authenticated user', ok: false })
-    }
-
-    authenticatedUserId = user.id
-    params.refresh_token = body.refresh_token
   } else {
     return res.status(400).json({ data: null, error: 'Unsupported grant_type', ok: false })
   }
@@ -86,13 +51,8 @@ export default async function handler(req, res) {
 
     const data = await response.json()
     if (!response.ok || data.error) {
-      // Keep the machine-readable OAuth error code in `error` (clients branch
-      // on e.g. invalid_grant) and pass Google's prose separately.
-      if (authenticatedUserId && data.error === 'invalid_grant') {
-        // The stored credential is dead; remove it so the next link attempt
-        // starts a clean OAuth flow instead of retrying a revoked token.
-        await supabase.from('google_accounts').delete().eq('user_id', authenticatedUserId)
-      }
+      // Keep the machine-readable OAuth error code in `error` and pass
+      // Google's prose separately.
       return res.status(response.ok ? 400 : response.status).json({
         data: null,
         error: data.error || 'token_request_failed',

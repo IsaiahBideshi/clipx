@@ -52,19 +52,6 @@ Clients (`authenticated`) can only update `status`; `user_id` and `friend_id` ca
 | `friend_id` | `uuid` | Primary |
 | `status` | `text` |  Nullable |
 
-## Table `google_accounts`
-
-Stores google account refresh tokens for users.
-
-### Columns
-
-| Name | Type | Constraints |
-|------|------|-------------|
-| `created_at` | `timestamptz` |  |
-| `refresh_token` | `text` |  |
-| `id` | `uuid` | Primary |
-| `user_id` | `uuid` |  Nullable Unique |
-
 ## RLS Policies
 
 ### `users`
@@ -98,15 +85,6 @@ Stores google account refresh tokens for users.
 | `Users can delete their own friendships` | DELETE | public | PERMISSIVE | `((auth.uid() = user_id) OR (auth.uid() = friend_id))` | — |
 | `Users can send friend request` | INSERT | public | PERMISSIVE | — | `((auth.uid() = user_id) AND (status = 'pending'::text))` |
 | `Users can view their friendships` | SELECT | public | PERMISSIVE | `((auth.uid() = user_id) OR (auth.uid() = friend_id))` | — |
-
-### `google_accounts`
-
-| Policy | Command | Roles | Action | USING | WITH CHECK |
-|--------|---------|-------|--------|-------|------------|
-| `Users can link google account` | INSERT | public | PERMISSIVE | — | `(auth.uid() = user_id)` |
-| `Users can unlink google account` | DELETE | public | PERMISSIVE | `(auth.uid() = user_id)` | — |
-| `Users can update own google account` | UPDATE | public | PERMISSIVE | `(auth.uid() = user_id)` | — |
-| `Users can view own google account` | SELECT | public | PERMISSIVE | `(auth.uid() = user_id)` | — |
 
 ## Functions
 
