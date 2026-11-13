@@ -6,7 +6,6 @@ import ffmpegPath from "ffmpeg-static";
 import { app } from "electron";
 import { rename } from "fs/promises";
 
-import { uploadClipToYoutube } from "./youtubeService.js";
 import { resolveFfmpegPath } from "../utils/ffmpeg.js";
 import { STREAM_COPY_BITRATE, buildStreamBlobName, renderStreamCopy } from "../utils/streamCopy.js";
 import { getIndexedClipData, setIndexedClipMetadata, markIndexedClipMissing, getWatchedRootForPath, upsertIndexedClip, getCachedThumbnailPath, getClipGroup, moveSavedClipOriginal, isIndexedClipNew } from "./clipIndexService.js";

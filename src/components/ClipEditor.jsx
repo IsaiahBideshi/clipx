@@ -580,7 +580,7 @@ export function UploadMenu({clip, group, mix, screen, screens, target, start, en
       game_id: clipData.game?.id ?? null,
       blob_name: clipData.blobName || "",
       thumbnail_blob_name: clipData.thumbnailBlobName || "",
-      youtube_video_id: clipData.youtubeID || "",
+      youtube_video_id: "",
       user_ids: clipData.tags.filter((tag) => tag?.id).map((tag) => tag.id),
       labels: clipData.tags.filter((tag) => typeof tag === "string").map((tag) => tag.trim()),
     });
@@ -612,7 +612,6 @@ export function UploadMenu({clip, group, mix, screen, screens, target, start, en
           tags: tags,
           clip: clip,
           title: displayName,
-          youtubeID: response.videoId,
           blobName: response.blobName,
           thumbnailBlobName: response.thumbnailBlobName,
           visibility: visibility,

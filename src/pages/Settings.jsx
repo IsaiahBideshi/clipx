@@ -1,7 +1,7 @@
 import './settings.css';
 
 import {useEffect, useState} from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import CircularProgress from '@mui/material/CircularProgress';
 import FormGroup from "@mui/material/FormGroup";
 import FormControlLabel from "@mui/material/FormControlLabel";
@@ -10,7 +10,6 @@ import Button from "@mui/material/Button";
 import ArticleOutlinedIcon from "@mui/icons-material/ArticleOutlined";
 import changelog from "../../CHANGELOG.md?raw";
 import ChangelogModal from "../components/ChangelogModal.jsx";
-import { getCurrentUserId, useAuthSession } from "../lib/authSession.js";
 
 
 export async function getOptions() {
@@ -25,63 +24,6 @@ export async function getOptions() {
     console.error("Failed to load options:", err);
     return {};
   }
-}
-
-function googleInfoQueryKey(userId) {
-  return ["settings", "googleInfo", userId || null];
-}
-
-async function getGoogleInfo(userId) {
-  if (!window.clipx?.getGoogleInfo) {
-    return null;
-  }
-
-  try {
-    if (!userId) {
-      return null;
-    }
-    return await window.clipx.getGoogleInfo(userId);
-  }
-  catch (err) {
-    console.error("Failed to get Google account info:", err);
-    return null;
-  }
-}
-
-export async function linkYoutube() {
-    if (!window.clipx?.linkYoutube) {
-      return null;
-    }
-
-    try {
-      const userId = await getCurrentUserId();
-      if (!userId) {
-        throw new Error("No authenticated user found");
-      }
-      return await window.clipx.linkYoutube(userId);
-    }
-    catch (err) {
-      console.error("Failed to link Youtube account:", err);
-      throw err;
-    }
-}
-
-async function unlinkYoutube() {
-    if (!window.clipx?.unlinkYoutube) {
-      return;
-    }
-
-    try {
-      const userId = await getCurrentUserId();
-      if (!userId) {
-        throw new Error("No authenticated user found");
-      }
-      await window.clipx.unlinkYoutube(userId);
-    }
-    catch (err) {
-      console.error("Failed to unlink Youtube account:", err);
-      throw err;
-    }
 }
 
 const UPDATE_BUSY_STATUSES = new Set(["checking", "available", "downloading", "installing"]);
@@ -138,23 +80,8 @@ export default function Settings() {
   const [launchAtStartup, setLaunchAtStartup] = useState(false);
   const [loadingLaunchAtStartup, setLoadingLaunchAtStartup] = useState(true);
   const [savingLaunchAtStartup, setSavingLaunchAtStartup] = useState(false);
-  const [avatarLoadError, setAvatarLoadError] = useState(false);
-  const [confirmUnlink, setConfirmUnlink] = useState(false);
-  const [linking, setLinking] = useState(false);
-  const [youtubeError, setYoutubeError] = useState(null);
   const [showChangelog, setShowChangelog] = useState(false);
-  const { session } = useAuthSession();
-  const userId = session?.user?.id || null;
   const queryClient = useQueryClient();
-  const googleInfoKey = googleInfoQueryKey(userId);
-  const googleInfoQuery = useQuery({
-    queryKey: googleInfoKey,
-    queryFn: () => getGoogleInfo(userId),
-    enabled: Boolean(userId),
-    placeholderData: null,
-  });
-  const googleInfo = googleInfoQuery.data || null;
-  const loadingGoogleInfo = Boolean(userId) && googleInfoQuery.isFetching && !googleInfo;
 
   function updateOption(key, value) {
     setOptions((prevOptions) => ({
@@ -197,39 +124,6 @@ export default function Settings() {
       setLaunchAtStartup(!nextLaunchAtStartup);
     } finally {
       setSavingLaunchAtStartup(false);
-    }
-  }
-
-  const handleLinkYoutube = async () => {
-    setLinking(true);
-    setYoutubeError(null);
-    try {
-      const info = await linkYoutube();
-      const nextUserId = userId || await getCurrentUserId();
-      const nextGoogleInfoKey = googleInfoQueryKey(nextUserId);
-      if (info) {
-        queryClient.setQueryData(nextGoogleInfoKey, info);
-      }
-      await queryClient.invalidateQueries({ queryKey: nextGoogleInfoKey });
-    } catch (err) {
-      setYoutubeError(err?.message || "Failed to link YouTube account.");
-    } finally {
-      setLinking(false);
-    }
-  }
-  const handleUnlinkYoutube = async () => {
-    if (!confirmUnlink) {
-      setConfirmUnlink(true);
-      return;
-    }
-
-    setYoutubeError(null);
-    try {
-      await unlinkYoutube();
-      queryClient.setQueryData(googleInfoKey, null);
-      setConfirmUnlink(false);
-    } catch (err) {
-      setYoutubeError(err?.message || "Failed to unlink YouTube account.");
     }
   }
 
@@ -333,16 +227,6 @@ export default function Settings() {
     });
   }, [queryClient]);
 
-  useEffect(() => {
-    if (!googleInfo) {
-      setConfirmUnlink(false);
-    }
-  }, [googleInfo]);
-
-  useEffect(() => {
-    setAvatarLoadError(false);
-  }, [googleInfo?.picture, googleInfo?.picture_data_url]);
-
   return (
     <>
       <div className={"settings-container settings-page"}>
@@ -420,59 +304,6 @@ export default function Settings() {
               <div className="folder-row">
                 <span className="folder-path">{options.clipsFolder || "Not Set"}</span>
                 <Button id={"pick-folder"} variant={"contained"} onClick={pickFolder}>Choose Folder</Button>
-              </div>
-            </section>
-
-            <section className="settings-card yt-card">
-              <h4>YouTube</h4>
-              <p className="card-copy">Link your YouTube account to upload clips directly from ClipX.</p>
-
-              <div className={"yt"}>
-                <div className="yt-profile" style={{color: "#90caf9"}}>
-                  {googleInfo && (
-                    <>
-                      {(!avatarLoadError && (googleInfo.picture_data_url || googleInfo.picture)) && (
-                        <img
-                          className="yt-avatar"
-                          src={googleInfo.picture_data_url || googleInfo.picture}
-                          alt="Google profile"
-                          referrerPolicy="no-referrer"
-                          onError={() => setAvatarLoadError(true)}
-                        />
-                      )}
-                      <p>{googleInfo.name}</p>
-                    </>
-                  )}
-
-                  {loadingGoogleInfo && (
-                    <div className="loading"><CircularProgress/></div>
-                  )}
-                </div>
-
-                <div className={"yt-btns"}>
-                  {!(loadingGoogleInfo || googleInfo) && (<Button variant={"contained"} disabled={linking} onClick={handleLinkYoutube}>Link</Button>)}
-
-                  {!(loadingGoogleInfo || !googleInfo) && (
-                    !confirmUnlink ? (
-                      <Button variant={"outlined"} onClick={handleUnlinkYoutube}>Unlink</Button>
-                    ) : (
-                      <>
-                        <Button color={"error"} variant={"contained"} onClick={handleUnlinkYoutube}>
-                          Confirm Unlink
-                        </Button>
-                        <Button variant={"text"} onClick={() => setConfirmUnlink(false)}>
-                          Cancel
-                        </Button>
-                      </>
-                    )
-                  )}
-                </div>
-
-                {youtubeError && (
-                  <p className="card-copy" style={{ color: "#ff9b9b", marginTop: 8 }}>
-                    {youtubeError}
-                  </p>
-                )}
               </div>
             </section>
           </div>
