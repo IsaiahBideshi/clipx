@@ -16,7 +16,7 @@ ClipX updates itself when a new version is out.
 - Record all your screens at once, with the main recording following your mouse or the app you're using.
 - Put your mic, your game and apps like Discord on their own audio tracks.
 - ClipX detects the game you're playing and names the clip after it. For apps it doesn't recognize, pick the game yourself.
-- A notification with a sound shows when a clip is saved.
+- A notification with a sound shows when a clip is saved. Games in exclusive fullscreen hide the notification, but you still hear the sound.
 
 **Edit**
 - Trim clips and save them to your PC.

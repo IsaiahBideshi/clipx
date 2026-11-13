@@ -49,7 +49,7 @@ The main process is ESM (`"type": "module"`), and so is `api/`.
 ### Auth
 
 - The renderer uses Supabase auth with a custom storage adapter that persists the session through IPC (`window.clipx.authStorage*`), falling back to `localStorage` outside Electron.
-- API functions use `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` (service role, never exposed to the renderer) and authenticate callers with the user's Supabase access token as a Bearer token.
+- API functions use `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` (service role, never exposed to the renderer). Routes that need a signed-in user authenticate callers with the user's Supabase access token as a Bearer token (`getAuthenticatedUser` in `api-handlers/auth.js`). `/api/keys`, `/api/latest-version`, `/api/users`, `/api/clips?visibility=public` and the `/clip/<id>` share page don't need one.
 - Google OAuth uses a PKCE loopback flow on an OS-assigned `127.0.0.1` port (a fixed port can land in a Windows excluded port range and fail with `EACCES`). The app sends its `redirect_uri` to `/api/google/token`, which falls back to port **51723** for builds up to v1.2.5 that don't send one. YouTube refresh tokens are stored in the OS keychain via keytar.
 
 ### Local clip index
@@ -128,7 +128,7 @@ The editor is `src/components/ClipEditor.jsx`.
 
 ### Rendering and the audio mixer
 
-- Saving a trim or uploading goes through `renderClipSegment` in `electron/services/clipService.js`, which always writes one audio track: track 1 copied while the user hasn't changed a volume, otherwise the user's mix (`buildAudioOutputOptions` in `electron/utils/audioMix.js`: `amix=normalize=0` plus `alimiter`, video still copied).
+- Saving a trim or uploading goes through `renderClipSegment` in `electron/services/clipService.js`, which writes at most one audio track (none when the source has no audio): track 1 copied while the user hasn't changed a volume, otherwise the user's mix (`buildAudioOutputOptions` in `electron/utils/audioMix.js`: `amix=normalize=0` plus `alimiter`, video still copied).
 - The mixer only shows when every track has a `kind`.
 - Its preview extracts each track with `-c copy` to `%TEMP%/clipx/tracks/` (deleted when the editor closes) and plays them through Web Audio gain nodes synced to the video. That's why the `clipx` scheme is `corsEnabled`; without it Web Audio gets silence.
 - The `clipx` handler only serves requests whose referrer is the app's own loopback page, so remote frames (the Library's YouTube embeds) can't read local files through it.
@@ -199,7 +199,7 @@ GitHub skips `pull_request` runs when the PR's head commit message contains `[sk
 - Pushing a version bump alone (no tag) releases as `v{version}`. The `dist/latest.yml` artifact powers in-app auto-updates (electron-updater).
 - `release.yml` stops before building when a release for that tag already exists, so `master` pushes without a version bump leave every release alone. (Before this check, those pushes rebuilt the current version's release files from whatever was on `master`.)
 - To rebuild a release's files from its own tag, run the **Rebuild release** workflow (`rebuild-release.yml`) with the tag. It replaces the installer, blockmap and `latest.yml` (keeping the release's original `releaseDate`; a tag whose build makes no `latest.yml`, like v1.0.2, has it removed) and leaves the notes and dates alone.
-- Release runs for the same tag share a concurrency group (`release-<tag>`, set after a small job resolves the tag), so a run waits for the one before it and then sees the release that run created. Runs for different tags don't wait on each other.
+- Release runs for the same tag share a concurrency group (`release-<tag>`, set after a small job resolves the tag), so only one runs at a time and a waiting run sees the release the one before it created. GitHub keeps at most one waiting run per group: a newer run cancels the one already waiting, which is fine because runs for the same tag do the same work. Runs for different tags don't wait on each other.
 
 ### Pre-releases
 
