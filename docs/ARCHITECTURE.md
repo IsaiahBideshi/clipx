@@ -78,7 +78,7 @@ Each recording is its own OBS process:
 
 `planRecorders` in `electron/utils/recordingPlan.js` decides the set; the renderer imports the same file to preview it.
 
-Each recorder runs from `userData/obs/recorders/<key>/` with junctions to the shared install, so it gets its own `config/` (portable OBS resolves `../../config` from its working folder). Recorders are spawned hidden (`windowsHide` plus `SysTrayEnabled=false` in `user.ini`, so no window or tray icon, though they still show as "OBS Studio" in Task Manager), and driven over obs-websocket on random ports. They aren't spawned `detached`, so Node puts them in its own kill-on-close job object and Windows ends them when ClipX exits.
+Each recorder runs from `userData/obs/recorders/<key>/` with junctions to the shared install, so it gets its own `config/` (portable OBS resolves `../../config` from its working folder). Recorders are spawned hidden (`windowsHide` plus `SysTrayEnabled=false` in `user.ini`, so no window or tray icon, though they still show as "OBS Studio" in Task Manager). `windowsHide` starts OBS with `SW_HIDE` in its startup info, which Windows applies to its first `ShowWindow` call, the main window. Dialogs OBS opens later would still show, which is why OBS upgrades need checking for startup dialogs. Recorders are driven over obs-websocket on random ports. They aren't spawned `detached`, so Node puts them in its own kill-on-close job object and Windows ends them when ClipX exits.
 
 ### Clip folders and `clip.json`
 
