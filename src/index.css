@@ -23,6 +23,10 @@
   --page-orb: radial-gradient(circle at center, rgba(255, 126, 95, 0.25), rgba(255, 126, 95, 0));
 }
 
+img {
+  -webkit-user-drag: none;
+}
+
 html, body {
   height: 100%;
   overflow: hidden;

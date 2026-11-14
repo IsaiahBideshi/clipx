@@ -112,7 +112,7 @@ function renderEmbed(clip, username, pageUrl) {
 function renderClip(clip, owner, username, hasStreamCopy) {
   const originalSrc = hasStreamCopy ? ` data-original-src="/clip/${clip.id}/original"` : ''
   const avatar = isTrustedAvatar(owner?.avatar_url)
-    ? `<img class="clip-owner-avatar" src="${escapeHtml(owner.avatar_url)}" alt="" />`
+    ? `<img draggable="false" class="clip-owner-avatar" src="${escapeHtml(owner.avatar_url)}" alt="" />`
     : `<span class="clip-owner-avatar">${escapeHtml([...username][0].toUpperCase())}</span>`
   const uploadedAt = new Date(clip.created_at).toLocaleDateString('en-US', {
     month: 'long',
