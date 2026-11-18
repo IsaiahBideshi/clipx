@@ -435,16 +435,37 @@ export async function deleteClipBlob({ blobName, thumbnailBlobName }) {
 const TRACK_CACHE_BYTES = 500 * 1024 * 1024;
 
 let tracksJob = Promise.resolve();
-let openTracksDir = null;
+let runningTracks = null;
+let openClipPath = null;
 
-function queueTracksJob(job) {
-  const result = tracksJob.then(job);
+function queueTracksJob(clipPath, job) {
+  const result = tracksJob.then(() => {
+    const running = { clipPath, done: job() };
+    runningTracks = running;
+    return running.done.finally(() => {
+      if (runningTracks === running) {
+        runningTracks = null;
+      }
+    });
+  });
   tracksJob = result.catch(() => {});
   return result;
 }
 
+async function waitForTracksJob(clipPath) {
+  if (runningTracks && path.resolve(runningTracks.clipPath).toLowerCase() === path.resolve(clipPath).toLowerCase()) {
+    await runningTracks.done.catch(() => {});
+  }
+}
+
 function getTracksDir() {
   return path.join(app.getPath("temp"), "clipx", "tracks");
+}
+
+async function getTracksOutputDir(clipPath) {
+  const stat = await fs.promises.stat(clipPath);
+  const key = createHash("sha1").update(`${clipPath}|${stat.size}|${stat.mtimeMs}`).digest("hex").slice(0, 16);
+  return path.join(getTracksDir(), key);
 }
 
 async function findTracks(clipPath) {
@@ -454,9 +475,7 @@ async function findTracks(clipPath) {
     return { tracks, outputDir: null, outputs: [], cached: true };
   }
 
-  const stat = await fs.promises.stat(clipPath);
-  const key = createHash("sha1").update(`${clipPath}|${stat.size}|${stat.mtimeMs}`).digest("hex").slice(0, 16);
-  const outputDir = path.join(getTracksDir(), key);
+  const outputDir = await getTracksOutputDir(clipPath);
   const outputs = tracks.map((track) => ({ index: track.index, path: path.join(outputDir, `${track.index}.m4a`) }));
   const cached = outputs.every((output) => fs.existsSync(output.path));
   if (cached) {
@@ -471,12 +490,9 @@ export async function getCachedClipTracks(clipPath) {
     throw new TypeError("get-cached-clip-tracks: clipPath must be a non-empty string");
   }
 
-  const { outputDir, outputs, cached } = await findTracks(clipPath);
-  if (!cached) {
-    return null;
-  }
-  openTracksDir = outputDir;
-  return outputs;
+  openClipPath = clipPath;
+  const { outputs, cached } = await findTracks(clipPath);
+  return cached ? outputs : null;
 }
 
 export async function extractClipTracks(clipPath, { background = false } = {}) {
@@ -484,14 +500,14 @@ export async function extractClipTracks(clipPath, { background = false } = {}) {
     throw new TypeError("extract-clip-tracks: clipPath must be a non-empty string");
   }
 
-  return queueTracksJob(() => extractTracks(clipPath, background));
+  if (!background) {
+    openClipPath = clipPath;
+  }
+  return queueTracksJob(clipPath, () => extractTracks(clipPath, background));
 }
 
 async function extractTracks(clipPath, background) {
   const { tracks, outputDir, outputs, cached } = await findTracks(clipPath);
-  if (!background) {
-    openTracksDir = outputDir;
-  }
   if (cached) {
     return outputs;
   }
@@ -555,11 +571,12 @@ async function pruneTracksCache(tracksDir) {
         return { dirPath, mtimeMs: stat.mtimeMs, size: await getDirSize(dirPath), partial: entry.name.endsWith(".part") };
       })
   );
+  const openDir = openClipPath ? await getTracksOutputDir(openClipPath).catch(() => null) : null;
   const complete = dirs.filter((dir) => !dir.partial).sort((a, b) => b.mtimeMs - a.mtimeMs);
   let total = 0;
   const stale = complete.filter((dir, index) => {
     total += dir.size;
-    return index > 0 && total > TRACK_CACHE_BYTES && dir.dirPath !== openTracksDir;
+    return index > 0 && total > TRACK_CACHE_BYTES && dir.dirPath !== openDir;
   });
   for (const { dirPath } of [...dirs.filter((dir) => dir.partial), ...stale]) {
     await fs.promises.rm(dirPath, { recursive: true, force: true });
@@ -641,7 +658,7 @@ export async function renameClip(clipPath, newName) {
   const isNew = isIndexedClipNew(clipPath);
 
   try {
-    await tracksJob;
+    await waitForTracksJob(clipPath);
     await rename(clipPath, newClipPath);
     await rename(thumbPath, getThumbnailPath(newClipPath)).catch((error) => {
       if (error.code !== "ENOENT") {
@@ -778,7 +795,7 @@ async function deleteClipFile(clipPath) {
       getThumbnailPath(clipPath),
     ];
 
-    await tracksJob;
+    await waitForTracksJob(clipPath);
     await fs.promises.unlink(clipPath);
 
     for (const thumbPath of thumbnailPaths) {
