@@ -1,6 +1,6 @@
 import { app, ipcMain } from "electron";
 
-import { getClipData, renameClip, saveClip, uploadClip, deleteClip, deleteClipGroup, keepClipScreen, deleteClipBlob, extractClipTracks, releaseClipTracks, ClipServiceError } from "../services/clipService.js";
+import { getClipData, renameClip, saveClip, uploadClip, deleteClip, deleteClipGroup, keepClipScreen, deleteClipBlob, extractClipTracks, ClipServiceError } from "../services/clipService.js";
 
 export function registerClipIpcHandlers() {
   ipcMain.handle("save-clip", async (_event, options) => {
@@ -44,9 +44,5 @@ export function registerClipIpcHandlers() {
 
   ipcMain.handle("clip-tracks:extract", async (_event, clipPath) => {
     return await extractClipTracks(clipPath);
-  });
-
-  ipcMain.handle("clip-tracks:release", async () => {
-    return await releaseClipTracks();
   });
 }

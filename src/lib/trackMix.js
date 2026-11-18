@@ -1,21 +1,21 @@
 import { useEffect, useRef } from "react";
 
 const DRIFT_SECONDS = 0.08;
-const VIDEO_EVENTS = ["play", "pause", "playing", "waiting", "seeking", "ratechange", "timeupdate"];
+const VIDEO_EVENTS = ["emptied", "play", "pause", "playing", "waiting", "seeking", "seeked", "ratechange", "timeupdate"];
 
 export function toClipxUrl(filePath) {
   return `clipx://video?path=${encodeURIComponent(filePath)}`;
 }
 
-export function syncMedia(media, target, playing, rate, force = false) {
+export function syncMedia(media, target, playing, rate, lead = 0) {
   if (media.readyState === 0) {
     return;
   }
 
-  const inRange = target >= 0 && target < media.duration;
-  const time = inRange ? target : Math.max(0, Math.min(target, media.duration));
-  if (force || Math.abs(media.currentTime - time) > DRIFT_SECONDS) {
-    media.currentTime = time;
+  const inRange = target > -DRIFT_SECONDS && target < media.duration;
+  const time = Math.max(0, Math.min(target, media.duration));
+  if (!media.seeking && Math.abs(media.currentTime - time) > DRIFT_SECONDS) {
+    media.currentTime = Math.min(time + (playing ? lead * rate : 0), media.duration);
   }
   media.playbackRate = rate;
   if (playing && inRange && media.paused) {
@@ -26,14 +26,8 @@ export function syncMedia(media, target, playing, rate, force = false) {
 }
 
 export function onVideoSync(video, sync) {
-  const onTick = () => video.readyState > 0 && sync(false);
-  const onSeeked = () => video.readyState > 0 && sync(true);
-  VIDEO_EVENTS.forEach((name) => video.addEventListener(name, onTick));
-  video.addEventListener("seeked", onSeeked);
-  return () => {
-    VIDEO_EVENTS.forEach((name) => video.removeEventListener(name, onTick));
-    video.removeEventListener("seeked", onSeeked);
-  };
+  VIDEO_EVENTS.forEach((name) => video.addEventListener(name, sync));
+  return () => VIDEO_EVENTS.forEach((name) => video.removeEventListener(name, sync));
 }
 
 function createTrackMixer(video) {
@@ -45,18 +39,31 @@ function createTrackMixer(video) {
   limiter.connect(master).connect(context.destination);
 
   let stems = [];
+  let pending = [];
   let settings = { mix: null, offset: 0, external: false, volume: 1, muted: false };
   let closed = false;
 
   const isAudible = () => Boolean(settings.mix || settings.external) && stems.length > 0;
+  const isReady = ({ audio }) => audio.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA && !audio.seeking;
 
-  function sync(force = false) {
-    if (video.readyState === 0) {
+  function sync() {
+    if (video.readyState === 0 || video.seeking) {
+      [...stems, ...pending].forEach(({ audio }) => audio.pause());
       return;
     }
-    const playing = isAudible() && !video.paused && !video.seeking && video.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA;
-    for (const { audio } of stems) {
-      syncMedia(audio, video.currentTime + settings.offset, playing, video.playbackRate, force);
+    const running = !video.paused && video.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA;
+    const target = video.currentTime + settings.offset;
+    for (const { audio, lead } of stems) {
+      syncMedia(audio, target, running && isAudible(), video.playbackRate, lead);
+    }
+    for (const { audio, lead } of pending) {
+      syncMedia(audio, target, running, video.playbackRate, lead);
+    }
+    if (pending.length && pending.every(isReady)) {
+      removeStems(stems);
+      stems = pending;
+      pending = [];
+      apply();
     }
   }
 
@@ -65,7 +72,7 @@ function createTrackMixer(video) {
     master.gain.value = settings.muted ? 0 : settings.volume;
     for (const stem of stems) {
       const mixVolume = settings.mix?.find((track) => track.index === stem.index)?.volume;
-      stem.gain.gain.value = stem.index === 1 ? (settings.mix ? 0 : 1) : (mixVolume ?? 0);
+      stem.gain.gain.value = stem.index === 1 ? (settings.mix && stems.length > 1 ? 0 : 1) : (mixVolume ?? 0);
     }
     if (isAudible()) {
       context.resume().catch(() => {});
@@ -73,13 +80,38 @@ function createTrackMixer(video) {
     sync();
   }
 
-  function clearStems() {
-    for (const { audio } of stems) {
+  function createStem(track) {
+    const audio = new Audio();
+    audio.crossOrigin = "anonymous";
+    audio.preload = "auto";
+    audio.src = toClipxUrl(track.path);
+    const gain = new GainNode(context, { gain: 0 });
+    context.createMediaElementSource(audio).connect(gain).connect(limiter);
+    const stem = { index: track.index, audio, gain, lead: 0, seekStart: 0 };
+    audio.addEventListener("loadedmetadata", sync, { once: true });
+    audio.addEventListener("seeking", () => {
+      stem.seekStart = performance.now();
+    });
+    audio.addEventListener("seeked", () => {
+      stem.lead = (performance.now() - stem.seekStart) / 1000;
+      sync();
+    });
+    return stem;
+  }
+
+  function removeStems(list) {
+    for (const { audio, gain } of list) {
       audio.pause();
       audio.removeAttribute("src");
       audio.load();
+      gain.disconnect();
     }
+  }
+
+  function clearStems() {
+    removeStems([...stems, ...pending]);
     stems = [];
+    pending = [];
     apply();
   }
 
@@ -88,29 +120,16 @@ function createTrackMixer(video) {
   return {
     video,
     setSettings(nextSettings) {
-      const offsetChanged = nextSettings.offset !== settings.offset;
       settings = nextSettings;
       apply();
-      if (offsetChanged) {
-        sync(true);
-      }
     },
     setStems(tracks) {
-      clearStems();
       if (closed) {
         return;
       }
-      stems = tracks.map((track) => {
-        const audio = new Audio();
-        audio.crossOrigin = "anonymous";
-        audio.preload = "auto";
-        audio.src = toClipxUrl(track.path);
-        audio.addEventListener("loadedmetadata", () => sync(true), { once: true });
-        const gain = context.createGain();
-        context.createMediaElementSource(audio).connect(gain).connect(limiter);
-        return { index: track.index, audio, gain };
-      });
-      apply();
+      removeStems(pending);
+      pending = tracks.map(createStem);
+      sync();
     },
     clearStems,
     close() {
@@ -126,10 +145,7 @@ export function useTrackMix(playerRef, clipPath, { mix, offset = 0, external = f
   const mixerRef = useRef(null);
   const stemsRef = useRef(null);
 
-  useEffect(() => () => {
-    mixerRef.current?.close();
-    window.clipx?.releaseClipTracks?.().catch(() => {});
-  }, []);
+  useEffect(() => () => mixerRef.current?.close(), []);
 
   useEffect(() => {
     const video = playerRef.current?.element;
@@ -153,8 +169,13 @@ export function useTrackMix(playerRef, clipPath, { mix, offset = 0, external = f
     }
     mixer.setSettings({ mix, offset, external, volume, muted });
 
-    if ((mix || external) && !stemsRef.current) {
-      const request = { path: clipPath };
+    if (external && !stemsRef.current) {
+      stemsRef.current = { path: clipPath };
+      mixer.setStems([{ index: 1, path: clipPath }]);
+    }
+
+    if ((mix || external) && !stemsRef.current?.extracted) {
+      const request = { path: clipPath, extracted: true };
       stemsRef.current = request;
       window.clipx.extractClipTracks(clipPath)
         .then((tracks) => {
@@ -165,7 +186,7 @@ export function useTrackMix(playerRef, clipPath, { mix, offset = 0, external = f
         .catch((error) => {
           console.error("Failed to load the clip's audio tracks:", error);
           if (stemsRef.current === request) {
-            stemsRef.current = null;
+            stemsRef.current = { path: clipPath };
           }
         });
     }

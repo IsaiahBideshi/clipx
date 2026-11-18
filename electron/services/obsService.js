@@ -38,6 +38,7 @@ import {
 } from "../utils/recordingPlan.js";
 import { CLIP_MANIFEST_NAME, buildClipManifest, describeClip, getAudioTrackNames, getClipName, keepManifestFile } from "../utils/clipManifest.js";
 import { copyScreenAudio } from "../utils/screenAudio.js";
+import { extractClipTracks } from "./clipService.js";
 import { showToast } from "./toastService.js";
 
 const execFileAsync = promisify(execFile);
@@ -743,6 +744,12 @@ async function moveAudioToScreen(clipsFolder, primaryPath, screenFile) {
   }
 }
 
+function prepareClipTracks(primaryPath) {
+  if ((getClipGroup(primaryPath)?.files.length ?? 0) > 1) {
+    extractClipTracks(primaryPath).catch((error) => console.error("ClipX: Failed to extract the clip's audio tracks:", error));
+  }
+}
+
 async function finalizeClip(createdAt, savedFiles, options, duplicate) {
   const replaysDir = path.join(options.clipsFolder, REPLAYS_DIR_NAME);
   const { game, sessionId } = options.clipDetectGame ? getGameForClip(options.clipSeconds) : { game: null, sessionId: null };
@@ -789,8 +796,11 @@ async function finalizeClip(createdAt, savedFiles, options, duplicate) {
   }
 
   const copyIndex = duplicate?.keep === "screen" ? secondaries.findIndex((saved) => saved.recorder.screenId === duplicate.screenId) : -1;
+  const primaryPath = path.join(clipDir, manifest.files[0].file);
   if (copyIndex !== -1) {
-    void moveAudioToScreen(options.clipsFolder, path.join(clipDir, manifest.files[0].file), manifest.files[copyIndex + 1].file);
+    void moveAudioToScreen(options.clipsFolder, primaryPath, manifest.files[copyIndex + 1].file).then(() => prepareClipTracks(primaryPath));
+  } else {
+    prepareClipTracks(primaryPath);
   }
 
   return manifest;
