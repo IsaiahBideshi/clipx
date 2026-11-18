@@ -22,6 +22,7 @@ function ClipGrid({
   hasMore = false,
   onLoadMore,
   scrollElement,
+  groupBySession = true,
 }) {
   const containerRef = useRef(null);
   const [containerWidth, setContainerWidth] = useState(0);
@@ -61,7 +62,8 @@ function ClipGrid({
       return Array.from({ length: Math.ceil(INITIAL_SKELETON_COUNT / columnCount) }, () => ({ type: "skeleton" }));
     }
 
-    return groupClipSessions(clips).flatMap((session, index) => {
+    const sessions = groupBySession ? groupClipSessions(clips) : [{ id: null, clips }];
+    return sessions.flatMap((session, index) => {
       const header = session.id || index > 0 ? [{ type: "header", session }] : [];
       const cardRows = Array.from({ length: Math.ceil(session.clips.length / columnCount) }, (_, rowIndex) => ({
         type: "clips",
@@ -69,7 +71,7 @@ function ClipGrid({
       }));
       return [...header, ...cardRows];
     });
-  }, [clips, columnCount, loading]);
+  }, [clips, columnCount, groupBySession, loading]);
 
   const getRowSize = (index) => (dataRows[index]?.type === "header" ? SESSION_HEADER_HEIGHT : rowHeight);
   const dataRowCount = dataRows.length;
