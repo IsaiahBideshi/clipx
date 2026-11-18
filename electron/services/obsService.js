@@ -682,7 +682,9 @@ function handleObsLost(message) {
 
 function waitForSave(recorder, onRequested) {
   return new Promise((resolve, reject) => {
+    let failed = false;
     const timer = setTimeout(() => {
+      failed = true;
       recorder.saveWaiter = null;
       reject(new Error("OBS took too long to save the clip."));
     }, SAVE_TIMEOUT_MS);
@@ -694,12 +696,17 @@ function waitForSave(recorder, onRequested) {
         resolve(savedPath);
       },
       reject: (error) => {
+        failed = true;
         clearTimeout(timer);
         recorder.saveWaiter = null;
         reject(error);
       },
     };
-    recorderRequest(recorder, "SaveReplayBuffer").then(() => onRequested?.(), (error) => recorder.saveWaiter?.reject(error));
+    recorderRequest(recorder, "SaveReplayBuffer").then(() => {
+      if (!failed) {
+        onRequested?.();
+      }
+    }, (error) => recorder.saveWaiter?.reject(error));
   });
 }
 
