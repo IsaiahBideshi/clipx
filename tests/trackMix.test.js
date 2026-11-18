@@ -58,3 +58,14 @@ test("syncMedia seeks ahead by the last seek's time only while playing", () => {
   syncMedia(paused, 10, false, 1, 0.2);
   assert.equal(paused.currentTime, 10);
 });
+
+test("syncMedia doesn't seek ahead onto the end or restart audio that ended", () => {
+  const nearEnd = fakeMedia();
+  syncMedia(nearEnd, 49.9, true, 1, 0.2);
+  assert.equal(nearEnd.currentTime, 49.9);
+
+  const ended = fakeMedia(50);
+  ended.ended = true;
+  syncMedia(ended, 49.95, true, 1);
+  assert.equal(ended.paused, true);
+});

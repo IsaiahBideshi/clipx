@@ -112,7 +112,9 @@ contextBridge.exposeInMainWorld("clipx", {
   getClipGroup: (clipPath) => ipcRenderer.invoke("local-clips:get-group", clipPath),
   getOriginalClip: (clipPath) => ipcRenderer.invoke("local-clips:get-original", clipPath),
   markLocalClipSeen: (clipPath) => ipcRenderer.invoke("local-clips:mark-seen", clipPath),
-  extractClipTracks: (clipPath) => ipcRenderer.invoke("clip-tracks:extract", clipPath),  onClippingState: (callback) => {
+  extractClipTracks: (clipPath) => ipcRenderer.invoke("clip-tracks:extract", clipPath),
+  getCachedClipTracks: (clipPath) => ipcRenderer.invoke("clip-tracks:cached", clipPath),
+  onClippingState: (callback) => {
     if (typeof callback !== "function") {
       return () => {};
     }

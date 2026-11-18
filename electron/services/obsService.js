@@ -746,7 +746,7 @@ async function moveAudioToScreen(clipsFolder, primaryPath, screenFile) {
 
 function prepareClipTracks(primaryPath) {
   if ((getClipGroup(primaryPath)?.files.length ?? 0) > 1) {
-    extractClipTracks(primaryPath).catch((error) => console.error("ClipX: Failed to extract the clip's audio tracks:", error));
+    extractClipTracks(primaryPath, { background: true }).catch((error) => console.error("ClipX: Failed to extract the clip's audio tracks:", error));
   }
 }
 

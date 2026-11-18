@@ -15,10 +15,11 @@ export function syncMedia(media, target, playing, rate, lead = 0) {
   const inRange = target > -DRIFT_SECONDS && target < media.duration;
   const time = Math.max(0, Math.min(target, media.duration));
   if (!media.seeking && Math.abs(media.currentTime - time) > DRIFT_SECONDS) {
-    media.currentTime = Math.min(time + (playing ? lead * rate : 0), media.duration);
+    const ahead = time + (playing ? lead * rate : 0);
+    media.currentTime = ahead < media.duration ? ahead : time;
   }
   media.playbackRate = rate;
-  if (playing && inRange && media.paused) {
+  if (playing && inRange && media.paused && !media.ended) {
     media.play().catch(() => {});
   } else if ((!playing || !inRange) && !media.paused) {
     media.pause();
@@ -40,10 +41,12 @@ function createTrackMixer(video) {
 
   let stems = [];
   let pending = [];
+  let fallback = null;
   let settings = { mix: null, offset: 0, external: false, volume: 1, muted: false };
   let closed = false;
 
-  const isAudible = () => Boolean(settings.mix || settings.external) && stems.length > 0;
+  const isWanted = () => Boolean(settings.mix || settings.external);
+  const isAudible = () => isWanted() && stems.length > 0;
   const isReady = ({ audio }) => audio.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA && !audio.seeking;
 
   function sync() {
@@ -57,7 +60,7 @@ function createTrackMixer(video) {
       syncMedia(audio, target, running && isAudible(), video.playbackRate, lead);
     }
     for (const { audio, lead } of pending) {
-      syncMedia(audio, target, running, video.playbackRate, lead);
+      syncMedia(audio, target, running && isWanted(), video.playbackRate, lead);
     }
     if (pending.length && pending.every(isReady)) {
       removeStems(stems);
@@ -68,11 +71,14 @@ function createTrackMixer(video) {
   }
 
   function apply() {
+    if (fallback && settings.external && !stems.length && !pending.length) {
+      pending = [createStem({ index: 1, path: fallback, fallback: true })];
+    }
     videoGain.gain.value = isAudible() ? 0 : 1;
     master.gain.value = settings.muted ? 0 : settings.volume;
     for (const stem of stems) {
       const mixVolume = settings.mix?.find((track) => track.index === stem.index)?.volume;
-      stem.gain.gain.value = stem.index === 1 ? (settings.mix && stems.length > 1 ? 0 : 1) : (mixVolume ?? 0);
+      stem.gain.gain.value = stem.fallback ? 1 : stem.index === 1 ? (settings.mix ? 0 : 1) : (mixVolume ?? 0);
     }
     if (isAudible()) {
       context.resume().catch(() => {});
@@ -87,8 +93,19 @@ function createTrackMixer(video) {
     audio.src = toClipxUrl(track.path);
     const gain = new GainNode(context, { gain: 0 });
     context.createMediaElementSource(audio).connect(gain).connect(limiter);
-    const stem = { index: track.index, audio, gain, lead: 0, seekStart: 0 };
+    const stem = { index: track.index, fallback: Boolean(track.fallback), audio, gain, lead: 0, seekStart: 0 };
     audio.addEventListener("loadedmetadata", sync, { once: true });
+    audio.addEventListener("canplay", sync);
+    audio.addEventListener("error", () => {
+      if (stem.fallback) {
+        fallback = null;
+      }
+      if (pending.includes(stem)) {
+        removeStems(pending);
+        pending = [];
+        apply();
+      }
+    });
     audio.addEventListener("seeking", () => {
       stem.seekStart = performance.now();
     });
@@ -112,6 +129,7 @@ function createTrackMixer(video) {
     removeStems([...stems, ...pending]);
     stems = [];
     pending = [];
+    fallback = null;
     apply();
   }
 
@@ -121,6 +139,13 @@ function createTrackMixer(video) {
     video,
     setSettings(nextSettings) {
       settings = nextSettings;
+      apply();
+    },
+    setFallback(path) {
+      if (closed) {
+        return;
+      }
+      fallback = path;
       apply();
     },
     setStems(tracks) {
@@ -169,15 +194,17 @@ export function useTrackMix(playerRef, clipPath, { mix, offset = 0, external = f
     }
     mixer.setSettings({ mix, offset, external, volume, muted });
 
-    if (external && !stemsRef.current) {
-      stemsRef.current = { path: clipPath };
-      mixer.setStems([{ index: 1, path: clipPath }]);
-    }
-
-    if ((mix || external) && !stemsRef.current?.extracted) {
-      const request = { path: clipPath, extracted: true };
+    if ((mix || external) && !stemsRef.current) {
+      const request = { path: clipPath };
       stemsRef.current = request;
-      window.clipx.extractClipTracks(clipPath)
+      window.clipx.getCachedClipTracks(clipPath)
+        .then((tracks) => {
+          if (tracks || stemsRef.current !== request) {
+            return tracks;
+          }
+          mixer.setFallback(clipPath);
+          return window.clipx.extractClipTracks(clipPath);
+        })
         .then((tracks) => {
           if (stemsRef.current === request) {
             mixer.setStems(tracks);
@@ -186,7 +213,7 @@ export function useTrackMix(playerRef, clipPath, { mix, offset = 0, external = f
         .catch((error) => {
           console.error("Failed to load the clip's audio tracks:", error);
           if (stemsRef.current === request) {
-            stemsRef.current = { path: clipPath };
+            stemsRef.current = null;
           }
         });
     }
