@@ -205,13 +205,14 @@ export default function Settings() {
       }
       try {
         await window.clipx.saveOptions(options);
+        queryClient.setQueryData(["localFiles", "options"], options);
       } catch (err) {
         console.error("Failed to save options:", err);
       }
     }
 
     saveOptions();
-  }, [options]);
+  }, [options, queryClient]);
 
   useEffect(() => {
     if (typeof window.clipx?.onOptionsChanged !== "function") {
@@ -294,6 +295,17 @@ export default function Settings() {
                       />
                     }
                     label="Launch at startup"
+                  />
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={options.groupClipsBySession !== false}
+                        onChange={(e) => {
+                          updateOption("groupClipsBySession", e.target.checked);
+                        }}
+                      />
+                    }
+                    label="Group clips by gaming session"
                   />
                 </FormGroup>
               )}

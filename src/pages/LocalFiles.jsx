@@ -718,6 +718,7 @@ export default function LocalFiles({ onSaveQueueEvent, onUploadQueueEvent, uploa
           hasMore={hasMore}
           onLoadMore={loadNextPage}
           scrollElement={scrollElement}
+          groupBySession={options?.groupClipsBySession !== false}
           onContextMenuAction={(clip, rect) => {
             clip ? setContextMenu(clip) : setContextMenu(null);
             setMousePosition({ x: rect.x, y: rect.y });
