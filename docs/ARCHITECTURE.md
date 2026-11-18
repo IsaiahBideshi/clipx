@@ -105,7 +105,7 @@ Clip notifications are ClipX's own overlay, not Windows toasts (Focus Assist hid
 
 - Track 1 is always the full mix (desktop audio, plus the mic when a mic track exists), for normal playback.
 - With any tracks added, the rest split the sound so a mixer can raise, lower or mute each part by summing them instead of track 1: up to 4 sources (`planAudioTracks`), then a last track holding everything else.
-- That last track is `Desktop audio` when only the mic is separated, otherwise `Other apps`: one hidden process capture per other app with a window, re-synced every 5 s. OBS has no "everything except these apps" capture, so sounds from apps without a window are only in track 1.
+- That last track is `Desktop audio` when only the mic is separated, otherwise `Other apps`: one hidden process capture per other app with a window, re-synced every 5 s. The captures OBS restores from its scene are kept on start (moved to the current `Other apps` track) and left to the sync to prune; removing them there left `Other apps` silent until the next sync, so a custom mix of a clip from right after a restart had its first seconds missing. OBS has no "everything except these apps" capture, so sounds from apps without a window are only in track 1.
 - Each capture follows one window per exe name, so when two separate programs share an exe (e.g. two Electron apps), only one of them reaches `Other apps`.
 - OBS captures a process and all its children, so `pickOtherAudioApps` skips explorer.exe, any app with another windowed app under it (e.g. Steam running a game) and anything under a tracked app; otherwise the same sound would land on two tracks.
 - `clip.json` lists each track's `kind`.
