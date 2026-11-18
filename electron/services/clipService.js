@@ -1,4 +1,5 @@
 import fs from "fs";
+import os from "os";
 import path from "path";
 import { createHash, randomUUID } from "node:crypto";
 import ffmpeg from "fluent-ffmpeg";
@@ -431,67 +432,155 @@ export async function deleteClipBlob({ blobName, thumbnailBlobName }) {
   }
 }
 
-let tracksJob = Promise.resolve();
+const TRACK_CACHE_BYTES = 500 * 1024 * 1024;
 
-function queueTracksJob(job) {
-  const result = tracksJob.then(job);
+let tracksJob = Promise.resolve();
+let runningTracks = null;
+let openClipPath = null;
+
+function queueTracksJob(clipPath, job) {
+  const result = tracksJob.then(() => {
+    const running = { clipPath, done: job() };
+    runningTracks = running;
+    return running.done.finally(() => {
+      if (runningTracks === running) {
+        runningTracks = null;
+      }
+    });
+  });
   tracksJob = result.catch(() => {});
   return result;
+}
+
+async function waitForTracksJob(clipPath) {
+  if (runningTracks && path.resolve(runningTracks.clipPath).toLowerCase() === path.resolve(clipPath).toLowerCase()) {
+    await runningTracks.done.catch(() => {});
+  }
 }
 
 function getTracksDir() {
   return path.join(app.getPath("temp"), "clipx", "tracks");
 }
 
-export async function extractClipTracks(clipPath) {
+async function getTracksOutputDir(clipPath) {
+  const stat = await fs.promises.stat(clipPath);
+  const key = createHash("sha1").update(`${clipPath}|${stat.size}|${stat.mtimeMs}`).digest("hex").slice(0, 16);
+  return path.join(getTracksDir(), key);
+}
+
+async function findTracks(clipPath) {
+  const group = getClipGroup(clipPath);
+  const tracks = getManifestFile(group?.manifest, path.basename(clipPath))?.audioTracks || [];
+  if (!tracks.length) {
+    return { tracks, outputDir: null, outputs: [], cached: true };
+  }
+
+  const outputDir = await getTracksOutputDir(clipPath);
+  const outputs = tracks.map((track) => ({ index: track.index, path: path.join(outputDir, `${track.index}.m4a`) }));
+  const cached = outputs.every((output) => fs.existsSync(output.path));
+  if (cached) {
+    const now = new Date();
+    await fs.promises.utimes(outputDir, now, now).catch(() => {});
+  }
+  return { tracks, outputDir, outputs, cached };
+}
+
+export async function getCachedClipTracks(clipPath) {
+  if (typeof clipPath !== "string" || clipPath.length === 0) {
+    throw new TypeError("get-cached-clip-tracks: clipPath must be a non-empty string");
+  }
+
+  openClipPath = clipPath;
+  const { outputs, cached } = await findTracks(clipPath);
+  return cached ? outputs : null;
+}
+
+export async function extractClipTracks(clipPath, { background = false } = {}) {
   if (typeof clipPath !== "string" || clipPath.length === 0) {
     throw new TypeError("extract-clip-tracks: clipPath must be a non-empty string");
   }
 
-  return queueTracksJob(() => extractTracks(clipPath));
+  if (!background) {
+    openClipPath = clipPath;
+  }
+  return queueTracksJob(clipPath, () => extractTracks(clipPath, background));
 }
 
-async function extractTracks(clipPath) {
-  const group = getClipGroup(clipPath);
-  const tracks = getManifestFile(group?.manifest, path.basename(clipPath))?.audioTracks || [];
-  if (!tracks.length) {
-    return [];
-  }
-
-  const stat = await fs.promises.stat(clipPath);
-  const key = createHash("sha1").update(`${clipPath}|${stat.size}|${stat.mtimeMs}`).digest("hex").slice(0, 16);
-  const tracksDir = getTracksDir();
-  const outputDir = path.join(tracksDir, key);
-  for (const name of await fs.promises.readdir(tracksDir).catch(() => [])) {
-    if (name !== key) {
-      await fs.promises.rm(path.join(tracksDir, name), { recursive: true, force: true });
-    }
-  }
-
-  const outputs = tracks.map((track) => ({ index: track.index, path: path.join(outputDir, `${track.index}.m4a`) }));
-  if (outputs.every((output) => fs.existsSync(output.path))) {
+async function extractTracks(clipPath, background) {
+  const { tracks, outputDir, outputs, cached } = await findTracks(clipPath);
+  if (cached) {
     return outputs;
   }
 
-  await fs.promises.mkdir(outputDir, { recursive: true });
+  const partDir = `${outputDir}.part`;
+  await fs.promises.rm(partDir, { recursive: true, force: true });
+  await fs.promises.mkdir(partDir, { recursive: true });
   try {
     await new Promise((resolve, reject) => {
       const command = ffmpeg(clipPath);
-      for (const output of outputs) {
-        command.output(output.path).outputOptions(["-map", `0:a:${output.index - 1}`, "-c", "copy"]);
+      for (const track of tracks) {
+        command.output(path.join(partDir, `${track.index}.m4a`)).outputOptions(["-map", `0:a:${track.index - 1}`, "-c", "copy"]);
+      }
+      if (background) {
+        command.on("start", () => {
+          try {
+            os.setPriority(command.ffmpegProc.pid, os.constants.priority.PRIORITY_BELOW_NORMAL);
+          } catch {}
+        });
       }
       command.on("end", resolve).on("error", reject).run();
     });
-  } catch (error) {
     await fs.promises.rm(outputDir, { recursive: true, force: true });
+    await renameWithRetry(partDir, outputDir);
+  } catch (error) {
+    await fs.promises.rm(partDir, { recursive: true, force: true });
     throw error;
   }
 
+  await pruneTracksCache(path.dirname(outputDir)).catch((error) => console.error("ClipX: Failed to prune the audio track cache:", error));
   return outputs;
 }
 
-export async function releaseClipTracks() {
-  await queueTracksJob(() => fs.promises.rm(getTracksDir(), { recursive: true, force: true }));
+async function renameWithRetry(from, to) {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await fs.promises.rename(from, to);
+    } catch (error) {
+      if (attempt === 10 || !["EPERM", "EACCES", "EBUSY"].includes(error.code)) {
+        throw error;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+  }
+}
+
+async function getDirSize(dirPath) {
+  const names = await fs.promises.readdir(dirPath);
+  const stats = await Promise.all(names.map((name) => fs.promises.stat(path.join(dirPath, name))));
+  return stats.reduce((total, stat) => total + stat.size, 0);
+}
+
+async function pruneTracksCache(tracksDir) {
+  const entries = await fs.promises.readdir(tracksDir, { withFileTypes: true });
+  const dirs = await Promise.all(
+    entries
+      .filter((entry) => entry.isDirectory())
+      .map(async (entry) => {
+        const dirPath = path.join(tracksDir, entry.name);
+        const stat = await fs.promises.stat(dirPath);
+        return { dirPath, mtimeMs: stat.mtimeMs, size: await getDirSize(dirPath), partial: entry.name.endsWith(".part") };
+      })
+  );
+  const openDir = openClipPath ? await getTracksOutputDir(openClipPath).catch(() => null) : null;
+  const complete = dirs.filter((dir) => !dir.partial).sort((a, b) => b.mtimeMs - a.mtimeMs);
+  let total = 0;
+  const stale = complete.filter((dir, index) => {
+    total += dir.size;
+    return index > 0 && total > TRACK_CACHE_BYTES && dir.dirPath !== openDir;
+  });
+  for (const { dirPath } of [...dirs.filter((dir) => dir.partial), ...stale]) {
+    await fs.promises.rm(dirPath, { recursive: true, force: true });
+  }
 }
 
 export async function getClipData(clipPath) {
@@ -569,6 +658,7 @@ export async function renameClip(clipPath, newName) {
   const isNew = isIndexedClipNew(clipPath);
 
   try {
+    await waitForTracksJob(clipPath);
     await rename(clipPath, newClipPath);
     await rename(thumbPath, getThumbnailPath(newClipPath)).catch((error) => {
       if (error.code !== "ENOENT") {
@@ -705,6 +795,7 @@ async function deleteClipFile(clipPath) {
       getThumbnailPath(clipPath),
     ];
 
+    await waitForTracksJob(clipPath);
     await fs.promises.unlink(clipPath);
 
     for (const thumbPath of thumbnailPaths) {

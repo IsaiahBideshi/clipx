@@ -234,7 +234,7 @@ export default function VideoPlayer({
       if (e.key >= "0" && e.key <= "9") {
         e.preventDefault();
         const percentage = e.key === "0" ? 0 : e.key / 10;
-        seek(percentage * duration);
+        seek(Math.min(Math.max(percentage * duration, start), end));
       }
 
       if (e.key === "ArrowUp") {
