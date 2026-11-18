@@ -680,7 +680,7 @@ function handleObsLost(message) {
   }
 }
 
-function waitForSave(recorder) {
+function waitForSave(recorder, onRequested) {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
       recorder.saveWaiter = null;
@@ -699,7 +699,7 @@ function waitForSave(recorder) {
         reject(error);
       },
     };
-    recorderRequest(recorder, "SaveReplayBuffer").catch((error) => recorder.saveWaiter?.reject(error));
+    recorderRequest(recorder, "SaveReplayBuffer").then(() => onRequested?.(), (error) => recorder.saveWaiter?.reject(error));
   });
 }
 
@@ -750,9 +750,8 @@ function prepareClipTracks(primaryPath) {
   }
 }
 
-async function finalizeClip(createdAt, savedFiles, options, duplicate) {
+async function finalizeClip(createdAt, savedFiles, options, duplicate, { game, sessionId }) {
   const replaysDir = path.join(options.clipsFolder, REPLAYS_DIR_NAME);
-  const { game, sessionId } = options.clipDetectGame ? getGameForClip(options.clipSeconds) : { game: null, sessionId: null };
   const folderName = await getUniqueDir(replaysDir, getClipName(createdAt, game?.name));
   const clipDir = path.join(replaysDir, folderName);
   const screens = getScreens();
@@ -827,8 +826,12 @@ async function writeClip(options) {
   const duplicate = getDuplicateScreen(recorders.get("main"), all, getScreens(), clipStartMs);
   const skippedScreenId = duplicate?.keep === "main" ? duplicate.screenId : null;
   try {
+    const clipGame = options.clipDetectGame ? getGameForClip(options.clipSeconds) : { game: null, sessionId: null };
     const active = all.filter((recorder) => recorder.key === "main" || recorder.screenId !== skippedScreenId);
-    const results = await Promise.allSettled(active.map((recorder) => waitForSave(recorder)));
+    const follows = recorders.get("main").plan.screenId === null && skippedScreenId === null;
+    const files = active.map((recorder) => ({ role: recorder.key === "main" ? "primary" : "secondary", follows }));
+    const notifySaved = () => notify("saved", "Clip saved", describeClip({ game: clipGame.game, seconds: options.clipSeconds, files }));
+    const results = await Promise.allSettled(active.map((recorder) => waitForSave(recorder, recorder.key === "main" ? notifySaved : null)));
     const savedFiles = results
       .map((result, index) => (result.status === "fulfilled" ? { recorder: active[index], savedPath: result.value } : null))
       .filter(Boolean);
@@ -837,7 +840,7 @@ async function writeClip(options) {
       throw results[active.findIndex((recorder) => recorder.key === "main")].reason;
     }
 
-    const manifest = await finalizeClip(createdAt, savedFiles, options, duplicate);
+    const manifest = await finalizeClip(createdAt, savedFiles, options, duplicate, clipGame);
     const failedCount = results.length - savedFiles.length;
     results.forEach((result, index) => {
       if (result.status === "rejected") {
@@ -847,8 +850,6 @@ async function writeClip(options) {
 
     if (failedCount) {
       notify("failed", "Clip saved, screen missing", `${describeClip(manifest)} · ${failedCount === 1 ? "1 screen" : `${failedCount} screens`} didn't save`);
-    } else {
-      notify("saved", "Clip saved", describeClip(manifest));
     }
   } catch (error) {
     console.error("ClipX: Failed to save clip:", error);

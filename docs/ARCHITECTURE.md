@@ -98,7 +98,7 @@ The clip hotkey is polled with `GetAsyncKeyState` (`electron/utils/keyState.js`,
 
 Clip notifications are ClipX's own overlay, not Windows toasts (Focus Assist hides those in games). `electron/services/toastService.js` shows `electron/toastWindow.html` as a transparent, click-through, non-focusable, always-on-top window at a top corner of the screen being recorded, and the page synthesizes the chime with Web Audio.
 
-- They fire only after a clip's files are in place, never on the hotkey press.
+- "Clip saved" fires as soon as `main` answers `SaveReplayBuffer`, not when its file is written (OBS takes seconds to write a 1 GB buffer to a hard drive). The buffer's content is fixed by then, so the chime isn't recorded into the clip. A failed save sends a second, red toast. If the first toast is still up, the page swaps its contents and restarts its countdown instead of sliding in again.
 - Borderless and Windows' default fullscreen show them. True exclusive fullscreen doesn't, but the sound still plays.
 
 ### Audio tracks
@@ -164,7 +164,7 @@ The editor is `src/components/ClipEditor.jsx`.
 **Duplicate screens with auto switch.** When `main` stayed on one screen for the whole buffer (`seconds + KEYFRAME_PADDING_SECONDS`, or since recording started), `getDuplicateScreen` drops one copy and the manifest stores the clip as a fixed primary on that screen. It compares `main`'s picture of that screen (letterboxed when the shapes differ) with the screen recorder's output height, fps and bitrate:
 
 - If `main` is at least as good on all three and isn't letterboxed, the screen's recording isn't saved.
-- If the screen's file is at least as good on all three, the clip is first saved with both files so the notification isn't held up (the copy takes ~10 s for a 1 GB clip on a hard drive). Then `moveAudioToScreen` runs in the background: it copies `main`'s audio tracks onto the screen's video (aligned by end) into `<primary>.mp4.part`, which the index ignores, replaces the primary with it, deletes the screen's file and the primary's cached thumbnail, and rewrites `clip.json` as a fixed primary on that screen.
+- If the screen's file is at least as good on all three, the clip is first saved with both files so it reaches the library without waiting (the copy takes ~10 s for a 1 GB clip on a hard drive). Then `moveAudioToScreen` runs in the background: it copies `main`'s audio tracks onto the screen's video (aligned by end) into `<primary>.mp4.part`, which the index ignores, replaces the primary with it, deletes the screen's file and the primary's cached thumbnail, and rewrites `clip.json` as a fixed primary on that screen.
   - The primary keeps its path, so `LocalFiles.jsx` remounts an open editor when the index reports the same path with a new `id`; otherwise it would keep the old file's group, lengths and extracted audio.
   - If a step fails, the clip stays as it was saved, which is a valid clip.
   - ffmpeg keeps both files open while it runs, so deleting or renaming that clip fails until it's done.

@@ -178,12 +178,15 @@
     function showToast(payload) {
       const kind = payload.kind === "failed" ? "failed" : "saved";
       const base = `toast ${payload.corner === "left" ? "left" : "right"} ${kind}`;
+      const isUp = toast.classList.contains("show") && !toast.classList.contains("hide");
       document.getElementById("badge").innerHTML = ICONS[kind];
       document.getElementById("title").textContent = payload.title || "";
       document.getElementById("detail").textContent = payload.detail || "";
 
       clearTimeout(hideTimer);
-      toast.className = base;
+      if (!isUp) {
+        toast.className = base;
+      }
       bar.style.animation = "none";
       void toast.offsetWidth;
       bar.style.animation = "";
