@@ -445,7 +445,12 @@ async function setupAudio(recorder, options, ensureInput, existingInputs) {
   await applyVolumes(recorder, audio);
 
   for (const inputName of existingInputs) {
-    if (inputName.startsWith(OTHER_APP_INPUT_PREFIX)) {
+    if (!inputName.startsWith(OTHER_APP_INPUT_PREFIX)) {
+      continue;
+    }
+    if (audio.otherAppsTrack) {
+      await recorderRequest(recorder, "SetInputAudioTracks", { inputName, inputAudioTracks: toAudioTrackMap(audio.otherAppsTrack) });
+    } else {
       await recorderRequest(recorder, "RemoveInput", { inputName });
       existingInputs.delete(inputName);
     }
