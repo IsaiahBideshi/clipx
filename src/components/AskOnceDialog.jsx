@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import Checkbox from "@mui/material/Checkbox";
 import FormControlLabel from "@mui/material/FormControlLabel";
 import { fetchLocalOptions } from "../lib/localOptions.js";
-import { useBackdropClose, useEscapeKey } from "../lib/modalClose.js";
+import { useBackdropClose } from "../lib/modalClose.js";
 import "./clipgrid.css";
 
 export function useAskOnce() {
@@ -44,8 +44,25 @@ export function useAskOnce() {
 function AskOnceDialog({ message, yesText = "Yes", noText = "No", onAnswer }) {
   const [dontAskAgain, setDontAskAgain] = useState(false);
   const dismiss = () => onAnswer(null);
-  useEscapeKey(dismiss, true);
   const backdropProps = useBackdropClose(dismiss, true);
+
+  useEffect(() => {
+    const root = document.getElementById("root");
+    root.inert = true;
+    return () => {
+      root.inert = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    function onKeyDown(e) {
+      e.stopPropagation();
+      if (e.code === "Escape") dismiss();
+    }
+
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  });
 
   return createPortal(
     <div className="delete-modal" {...backdropProps}>
@@ -58,7 +75,7 @@ function AskOnceDialog({ message, yesText = "Yes", noText = "No", onAnswer }) {
         />
         <div style={{ display: "flex", marginLeft: "auto", marginRight: "auto", marginTop: "12px", width: "fit-content", gap: "12px" }}>
           <button className="cancel-button" onClick={() => onAnswer(false, dontAskAgain)}>{noText}</button>
-          <button className="rename-button" onClick={() => onAnswer(true, dontAskAgain)}>{yesText}</button>
+          <button className="rename-button" autoFocus onClick={() => onAnswer(true, dontAskAgain)}>{yesText}</button>
         </div>
       </div>
     </div>,

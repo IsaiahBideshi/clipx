@@ -175,7 +175,7 @@ The editor is `src/components/ClipEditor.jsx`.
 ### Uploads
 
 - `uploadClip` in `clipService.js` renders the trimmed clip, a thumbnail and (when needed) a stream copy into `%TEMP%/clipx/uploads/`, then uploads each one straight to Azure Blob Storage with an upload URL from `/api/clips`. The renderer then saves the clip row with the `create_clip_with_tags` RPC and deletes the uploaded blobs if that fails.
-- `saveCopyOnUpload` in `options.json` (`true`, `false`, or missing to ask) decides whether Upload also runs the Save flow. The question comes from `useAskOnce` in `src/components/AskOnceDialog.jsx`: `ask(optionKey, prompt)` returns the stored boolean if there is one, otherwise shows a yes/no dialog with "Don't ask again" (which stores the answer under `optionKey`) and resolves `true`, `false`, or `null` when dismissed. Reuse it for other ask-once choices.
+- `saveCopyOnUpload` in `options.json` (`true`, `false`, or missing to ask) decides whether Upload also runs the Save flow. The question comes from `useAskOnce` in `src/components/AskOnceDialog.jsx`: `ask(optionKey, prompt)` returns the stored boolean if there is one, otherwise shows a yes/no dialog with "Don't ask again" (which stores the answer under `optionKey`) and resolves `true`, `false`, or `null` when dismissed. While it's open, `#root` is `inert` and keydowns are stopped at `window` in the capture phase, so the page's shortcuts can't act behind it. Reuse it for other ask-once choices.
 - Visibility is `public`, `friends` or `private`.
 - Clips uploaded before v1.2.0 are unlisted YouTube videos (`youtube_video_id`), which the Library still plays as YouTube embeds.
 

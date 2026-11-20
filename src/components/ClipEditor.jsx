@@ -612,7 +612,7 @@ export function UploadMenu({clip, group, mix, screen, screens, target, start, en
         return;
       }
 
-      if (saveCopy) saveClip(clip, start, end, title, game, tags);
+      if (saveCopy) saveClip(clip, start, end, displayName, game, tags);
 
       const response = await window.clipx.uploadClip({ clip, start, end, title: displayName, game, tags, userId, mix, screen });
       if (response?.status === 200) {
