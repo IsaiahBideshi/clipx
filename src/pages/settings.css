@@ -107,6 +107,11 @@
   flex-wrap: wrap;
 }
 
+.settings-logs-status {
+  color: #d4d7dd;
+  font-size: 0.9rem;
+}
+
 .folder-path {
   font-weight: 700;
   color: #90caf9;

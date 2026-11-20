@@ -17,6 +17,7 @@ import { registerUpdateIpcHandlers } from "./ipc/update.js";
 import { registerWindowControlIpcHandlers } from "./services/menuBarService.js";
 import { registerClippingIpcHandlers } from "./ipc/clipping.js";
 import { applyClippingOptions, stopClipping } from "./services/obsService.js";
+import { startLogging } from "./services/logService.js";
 
 
 
@@ -369,6 +370,7 @@ app.setAppUserModelId("com.isaiah.clipx");
 if (!hasSingleInstanceLock) {
   app.quit();
 } else {
+  startLogging();
   app.on("second-instance", () => {
     if (app.isReady()) {
       showMainWindow();

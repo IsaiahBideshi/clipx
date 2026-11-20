@@ -47,6 +47,7 @@ contextBridge.exposeInMainWorld("clipx", {
   },
   getLaunchAtStartup: () => ipcRenderer.invoke("get-launch-at-startup"),
   setLaunchAtStartup: (enabled) => ipcRenderer.invoke("set-launch-at-startup", enabled),
+  exportLogs: () => ipcRenderer.invoke("logs:export"),
   saveClip: (clipInfo) => ipcRenderer.invoke("save-clip", clipInfo),
   uploadClip: (clipInfo) => ipcRenderer.invoke("upload-clip", clipInfo),
   deleteClipBlob: (options) => ipcRenderer.invoke("delete-clip-blob", options),

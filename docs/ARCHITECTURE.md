@@ -58,6 +58,19 @@ The main process is ESM (`"type": "module"`), and so is `api/`.
 - `better-sqlite3` is a native module and must be rebuilt for Electron's ABI after a fresh `npm install` (`npm.cmd run rebuild:electron`).
 - FFmpeg comes from `ffmpeg-static`, driven through fluent-ffmpeg. The binary must stay unpacked (`asarUnpack`); `electron/utils/ffmpeg.js` rewrites the path to `app.asar.unpacked`.
 
+### Logging
+
+`startLogging` in `electron/services/logService.js` runs once the single-instance lock is held, before the app is ready.
+
+- It wraps the main process's `console.log/info/warn/error`, so every existing `console.*` call (and electron-updater, whose default logger is `console`) also goes to `userData/logs/main.log`. Writes are synchronous so the last lines before a crash aren't lost. Past 5 MB the file is renamed to `main.old.log`, replacing the previous one.
+- Warnings and errors from every window's console (renderer code, preload, uncaught errors, React error boundaries) arrive through `console-message` and are logged as `[renderer]`. They come in as text, so an error object logged there can lose its stack.
+- Uncaught main-process exceptions are caught with `uncaughtExceptionMonitor`, which leaves Electron's error dialog in place. Electron's main process only warns on unhandled rejections, so the `unhandledRejection` listener doesn't change that.
+- It also logs renderer and child process exits (`render-process-gone`, `child-process-gone`), windows that stop responding, a header with versions and hardware, and a line on quit (a log that ends without one means ClipX didn't quit normally). `obsService.js` logs each recorder plan, OBS exit codes, and every clip save with how long it took.
+- `crashReporter.start({ uploadToServer: false })` keeps native crash dumps in `app.getPath("crashDumps")`. Nothing is uploaded.
+- Every line passes through `redactLogText` (`electron/utils/logFormat.js`), which replaces the home folder with `~` and removes JWTs, Google tokens, `Bearer` values, Azure `sig=` signatures, OAuth codes and `*_token`/`client_secret`/`password` values.
+
+**Export logs** in Settings (`logs:export`) copies both logs, `options.json`, the newest 3 OBS logs and newest OBS crash report of each recorder (all redacted), and the newest 3 crash dumps into a temp folder, then zips it into Downloads with Windows' own `tar.exe` and shows it in Explorer. Crash dumps are binary, so they aren't redacted.
+
 ## Recording
 
 In-app clipping lives in `electron/services/obsService.js`, with its settings on the `#/recording` page.

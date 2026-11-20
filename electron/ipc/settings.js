@@ -3,6 +3,7 @@ import fs from "fs";
 import path from "path";
 import { applyClippingOptions } from "../services/obsService.js";
 import { fetchGames } from "../services/gamesApi.js";
+import { exportLogs } from "../services/logService.js";
 
 const STARTUP_MINIMIZED_ARG = "--clipx-startup-minimized";
 
@@ -164,5 +165,14 @@ export function registerSettingsIpcHandlers() {
     const openAtLogin = Boolean(enabled);
     setLaunchAtStartupEnabled(openAtLogin);
     return getLaunchAtStartupEnabled();
+  });
+
+  ipcMain.handle("logs:export", async () => {
+    try {
+      return await exportLogs();
+    } catch (error) {
+      console.error("ClipX: Failed to export logs:", error);
+      throw error;
+    }
   });
 }
