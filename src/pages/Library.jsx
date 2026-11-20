@@ -6,6 +6,7 @@ import { useAuthSession } from "../lib/authSession.js";
 import { loadAccountData } from "../lib/accountApi.js";
 import { listClips, listUploadedGames, getClipShareUrl, getClipTagsError, deleteClip } from "../lib/clipsApi.js";
 import { isTextEntryActive } from '../lib/hotkeys.js';
+import { useBackdropClose, useEscapeKey } from "../lib/modalClose.js";
 import { useNavigate } from "react-router-dom";
 
 import CloseIcon from '@mui/icons-material/Close';
@@ -819,36 +820,6 @@ function UserAvatar({user, className}) {
       {getInitials(user.username)}
     </div>
   );
-}
-
-function useEscapeKey(onEscape, enabled) {
-  useEffect(() => {
-    if (!enabled) return;
-
-    function onKeyDown(e) {
-      if (!isTextEntryActive(e) && e.code === "Escape") {
-        onEscape();
-      }
-    }
-
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [onEscape, enabled]);
-}
-
-function useBackdropClose(onClose, enabled) {
-  const pressedBackdropRef = useRef(false);
-
-  return {
-    onMouseDown: (e) => {
-      pressedBackdropRef.current = e.target === e.currentTarget;
-    },
-    onClick: (e) => {
-      if (enabled && pressedBackdropRef.current && e.target === e.currentTarget) {
-        onClose();
-      }
-    },
-  };
 }
 
 function EditClipDialog({clip, userMap, friendsOptions, onClose, onSaved}) {
