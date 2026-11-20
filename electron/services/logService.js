@@ -1,4 +1,4 @@
-import { app, crashReporter, screen, shell } from "electron";
+import { app, crashReporter, dialog, screen, shell } from "electron";
 import { execFile } from "child_process";
 import fs from "fs";
 import os from "os";
@@ -70,7 +70,10 @@ export function startLogging() {
 
   crashReporter.start({ uploadToServer: false });
 
-  process.on("uncaughtExceptionMonitor", (error) => writeLog("error", "main", ["Uncaught exception:", error]));
+  process.on("uncaughtException", (error) => {
+    writeLog("error", "main", ["Uncaught exception:", error]);
+    dialog.showErrorBox("A JavaScript error occurred in the main process", `Uncaught Exception:\n${error?.stack || error}`);
+  });
   process.on("unhandledRejection", (reason) => writeLog("error", "main", ["Unhandled rejection:", reason]));
 
   app.on("render-process-gone", (_event, contents, details) => console.error("ClipX: A window's renderer stopped:", contents.getURL(), details));

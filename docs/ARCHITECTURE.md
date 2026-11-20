@@ -16,6 +16,7 @@ Supabase is the database and auth provider. Uploaded clips are stored in Azure B
 | Path | What's in it |
 | --- | --- |
 | `electron/main.js` | Main process entry: window, local HTTP server, IPC registration |
+| `electron/startup.js` | Runs before every other import: dev userData, single-instance lock, logging |
 | `electron/preload.js` | The `window.clipx.*` bridge the renderer calls |
 | `electron/ipc/` | IPC handlers, grouped by area |
 | `electron/services/` | Clip index, editing/uploads, OBS recording, game detection, notifications, updates, Google auth |
@@ -60,11 +61,11 @@ The main process is ESM (`"type": "module"`), and so is `api/`.
 
 ### Logging
 
-`startLogging` in `electron/services/logService.js` runs once the single-instance lock is held, before the app is ready.
+`startLogging` in `electron/services/logService.js` is called from `electron/startup.js`, which `main.js` imports first. That module also redirects userData in dev and takes the single-instance lock, and only starts logging when it gets the lock. Because it runs before every other import, a module that fails while loading (e.g. `googleAuthService.js` when `/api/keys` can't be reached) is still logged.
 
 - It wraps the main process's `console.log/info/warn/error`, so every existing `console.*` call (and electron-updater, whose default logger is `console`) also goes to `userData/logs/main.log`. Writes are synchronous so the last lines before a crash aren't lost. Past 5 MB the file is renamed to `main.old.log`, replacing the previous one. If the log folder can't be created, ClipX starts without the file.
 - Warnings and errors from every window's console (renderer code, preload, uncaught errors, React error boundaries) arrive through `console-message` and are logged as `[renderer]`. They come in as text, so an error object logged there can lose its stack.
-- Uncaught main-process exceptions are caught with `uncaughtExceptionMonitor`, which leaves Electron's error dialog in place. Electron's main process only warns on unhandled rejections, so the `unhandledRejection` listener doesn't change that.
+- Uncaught main-process exceptions are logged by an `uncaughtException` listener, which then shows the same error dialog Electron would (Electron skips its own once the app has a listener). Electron reports a module that fails while loading by emitting `uncaughtException` directly, so `uncaughtExceptionMonitor` wouldn't see it. Electron's main process only warns on unhandled rejections, so the `unhandledRejection` listener doesn't change that.
 - It also logs renderer and child process exits (`render-process-gone`, `child-process-gone`), windows that stop responding, a header with versions and hardware, and a line on quit (a log that ends without one means ClipX didn't quit normally). `obsService.js` logs each recorder plan, OBS exit codes, and every clip save with how long it took.
 - `crashReporter.start({ uploadToServer: false })` keeps native crash dumps in `app.getPath("crashDumps")`. Nothing is uploaded.
 - Every line passes through `redactLogText` (`electron/utils/logFormat.js`), which replaces the home folder with `~` and removes JWTs, Google tokens, `Bearer` values, Azure `sig=` signatures, OAuth codes and `*_token`/`client_secret`/`password` values.
