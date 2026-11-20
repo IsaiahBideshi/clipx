@@ -18,6 +18,7 @@ const CRASH_DUMPS_TO_EXPORT = 3;
 
 let logPath = null;
 let logBytes = 0;
+let runningExport = null;
 
 function getLogsDir() {
   return path.join(app.getPath("userData"), "logs");
@@ -50,9 +51,14 @@ async function logSystemInfo() {
 }
 
 export function startLogging() {
-  fs.mkdirSync(getLogsDir(), { recursive: true });
-  logPath = path.join(getLogsDir(), LOG_FILES[0]);
-  logBytes = fs.existsSync(logPath) ? fs.statSync(logPath).size : 0;
+  try {
+    fs.mkdirSync(getLogsDir(), { recursive: true });
+    logPath = path.join(getLogsDir(), LOG_FILES[0]);
+    logBytes = fs.existsSync(logPath) ? fs.statSync(logPath).size : 0;
+  } catch (error) {
+    logPath = null;
+    console.error("ClipX: Failed to open the log file:", error);
+  }
 
   for (const [method, level] of Object.entries(CONSOLE_LEVELS)) {
     const original = console[method].bind(console);
@@ -109,7 +115,14 @@ async function copyRedacted(source, destination) {
   await fs.promises.writeFile(destination, redactLogText(text, os.homedir()), "utf-8");
 }
 
-export async function exportLogs() {
+export function exportLogs() {
+  runningExport ??= writeLogsZip().finally(() => {
+    runningExport = null;
+  });
+  return runningExport;
+}
+
+async function writeLogsZip() {
   const stamp = new Date().toISOString().slice(0, 19).replaceAll(":", "-");
   const zipPath = path.join(app.getPath("downloads"), `ClipX-logs-${stamp}.zip`);
   const stagingDir = path.join(app.getPath("temp"), "clipx", `logs-${stamp}`);
