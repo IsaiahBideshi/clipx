@@ -9,6 +9,8 @@ A Windows app for recording, trimming and sharing game clips with friends.
 
 ClipX updates itself when a new version is out.
 
+If something goes wrong, click **Export logs** in Settings and attach the zip it saves to your Downloads folder to a [bug report](https://github.com/IsaiahBideshi/clipx/issues). Tokens and your Windows user folder are removed from the text logs, but crash dump files can still contain your Windows user name.
+
 ## Features
 
 **Record**

@@ -83,6 +83,8 @@ export default function Settings() {
   const [loadingLaunchAtStartup, setLoadingLaunchAtStartup] = useState(true);
   const [savingLaunchAtStartup, setSavingLaunchAtStartup] = useState(false);
   const [showChangelog, setShowChangelog] = useState(false);
+  const [exportingLogs, setExportingLogs] = useState(false);
+  const [logsMessage, setLogsMessage] = useState(null);
   const queryClient = useQueryClient();
 
   function updateOption(key, value) {
@@ -126,6 +128,20 @@ export default function Settings() {
       setLaunchAtStartup(!nextLaunchAtStartup);
     } finally {
       setSavingLaunchAtStartup(false);
+    }
+  }
+
+  async function handleExportLogs() {
+    setExportingLogs(true);
+    setLogsMessage(null);
+    try {
+      await window.clipx.exportLogs();
+      setLogsMessage("Saved to your Downloads folder.");
+    } catch (err) {
+      console.error("Failed to export logs:", err);
+      setLogsMessage("Couldn't export the logs.");
+    } finally {
+      setExportingLogs(false);
     }
   }
 
@@ -334,6 +350,22 @@ export default function Settings() {
                   <MenuItem value="always">Always</MenuItem>
                   <MenuItem value="never">Never</MenuItem>
                 </Select>
+              </div>
+            </section>
+
+            <section className="settings-card">
+              <h4>Troubleshooting</h4>
+              <div className="folder-row">
+                <span className="settings-logs-status" role="status">
+                  {logsMessage || "Export a zip of ClipX's logs to send with a bug report."}
+                </span>
+                <Button
+                  variant="contained"
+                  disabled={exportingLogs || !window.clipx?.exportLogs}
+                  onClick={handleExportLogs}
+                >
+                  Export logs
+                </Button>
               </div>
             </section>
           </div>

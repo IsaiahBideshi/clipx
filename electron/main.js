@@ -1,3 +1,4 @@
+import { hasSingleInstanceLock, isDev } from "./startup.js";
 import { app, BrowserWindow, Menu, protocol, Tray, ipcMain } from "electron";
 import http from "http";
 import fs from "fs";
@@ -22,10 +23,6 @@ import { applyClippingOptions, stopClipping } from "./services/obsService.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const appIconPath = path.join(__dirname, "assets", "clipx_icon.ico");
-const isDev = !app.isPackaged;
-if (isDev) {
-  app.setPath("userData", path.join(app.getPath("appData"), "clipx-dev"));
-}
 const devServerUrl = process.env.ELECTRON_RENDERER_URL || "http://localhost:5173";
 const distPath = path.join(app.getAppPath(), "dist");
 const STARTUP_MINIMIZED_ARG = "--clipx-startup-minimized";
@@ -35,7 +32,6 @@ let updateWindow = null;
 let tray = null;
 let isQuitting = false;
 let shouldMaximizeOnFirstShow = false;
-const hasSingleInstanceLock = app.requestSingleInstanceLock();
 
 const STATIC_MIME_TYPES = {
   ".html": "text/html; charset=UTF-8",

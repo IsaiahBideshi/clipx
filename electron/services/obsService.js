@@ -155,6 +155,7 @@ async function ensureObsInstalled(signal) {
   const zipPath = path.join(obsDir, "download.zip");
   const extractDir = path.join(obsDir, `tmp-${OBS_VERSION}`);
   await fs.promises.mkdir(obsDir, { recursive: true });
+  console.info(`ClipX: Downloading OBS ${OBS_VERSION}.`);
   emitClippingState({ status: "installing", progress: 0 });
 
   const response = await fetch(OBS_ZIP_URL, { signal });
@@ -297,6 +298,7 @@ function openSocket(recorder, { port, password }) {
     ws.onclose = () => {
       reject(new Error("OBS closed the connection."));
       if (recorder.socket === ws) {
+        console.error(`ClipX: Lost the connection to OBS (${recorder.key}).`);
         handleObsLost("Lost the connection to OBS.");
       }
     };
@@ -574,12 +576,13 @@ async function launchRecorder(recorder, options, encoder, signal) {
   ], { cwd: path.join(getRecorderRoot(recorder.key), "bin", "64bit"), stdio: "ignore", windowsHide: true });
   recorder.process = child;
 
-  const onChildStopped = () => {
+  const onChildStopped = (reason) => {
     if (recorder.process === child) {
+      console.error(`ClipX: OBS (${recorder.key}) stopped unexpectedly:`, reason);
       handleObsLost("OBS stopped unexpectedly.");
     }
   };
-  child.on("exit", onChildStopped);
+  child.on("exit", (code, signal) => onChildStopped({ code, signal }));
   child.on("error", onChildStopped);
 
   await connectRecorder(recorder, connection);
@@ -599,6 +602,12 @@ async function launchRecorders(options, signal) {
   const stagingRoot = path.join(options.clipsFolder, REPLAYS_DIR_NAME, STAGING_DIR_NAME);
   await fs.promises.rm(stagingRoot, { recursive: true, force: true });
   const encoder = await getEncoder();
+  console.info("ClipX: Starting clipping:", {
+    encoder,
+    seconds: options.clipSeconds,
+    audioTracks: options.clipAudioTracks.map((track) => track.kind),
+    recorders: plan.map((recorder) => `${recorder.key} ${recorder.canvas.width}x${recorder.canvas.height} -> ${recorder.output.width}x${recorder.output.height} ${recorder.fps} fps ${recorder.bitrate} kbps`),
+  });
 
   for (const recorderPlan of plan) {
     recorders.set(recorderPlan.key, {
@@ -621,6 +630,7 @@ async function launchRecorders(options, signal) {
   if (recorders.get("main")?.plan.screenId === null) {
     startFollowing();
   }
+  console.info("ClipX: Clipping is ready.");
   emitClippingState({ status: "ready" });
   if (planAudioTracks(options.clipAudioTracks).otherAppsTrack) {
     runOtherAppsSync();
@@ -659,6 +669,9 @@ function stopFollowing() {
 }
 
 function stopObs() {
+  if (recorders.size) {
+    console.info("ClipX: Stopping clipping.");
+  }
   startupController?.abort();
   startupController = null;
   stopFollowing();
@@ -819,6 +832,7 @@ async function finalizeClip(createdAt, savedFiles, options, duplicate, { game, s
 
 async function saveClip() {
   if (latestState.status !== "ready") {
+    console.warn("ClipX: Clip hotkey pressed while clipping is", latestState.status, latestState.message || "");
     notify("failed", "Clipping isn't ready", latestState.message || "OBS is still starting.");
     return;
   }
@@ -853,6 +867,7 @@ async function writeClip(options) {
     }
 
     const manifest = await finalizeClip(createdAt, savedFiles, options, duplicate, clipGame);
+    console.info(`ClipX: Saved a clip in ${Date.now() - createdAt.getTime()} ms (${describeClip(manifest)}, ${savedFiles.length}/${results.length} files).`);
     const failedCount = results.length - savedFiles.length;
     results.forEach((result, index) => {
       if (result.status === "rejected") {
