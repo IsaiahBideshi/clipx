@@ -4,6 +4,7 @@ import EditorTimeline from "./EditorTimeline.jsx";
 import VideoPlayer from "./VideoPlayer";
 import ClipDetailsFields from "./ClipDetailsFields.jsx";
 import AudioMixer from "./AudioMixer.jsx";
+import { useAskOnce } from "./AskOnceDialog.jsx";
 import ScreenStage, { ScreenIcon } from "./ScreenStage.jsx";
 import { toClipxUrl, useTrackMix } from "../lib/trackMix.js";
 import { getHomeView, getScreenViews } from "../lib/screenLayout.js";
@@ -481,6 +482,7 @@ export function UploadMenu({clip, group, mix, screen, screens, target, start, en
   const [storedGamesLabels, setStoredGamesLabels] = useState([]);
   const [visibility, setVisibility] = useState("public");
   const [friendsOptions, setFriendsOptions] = useState([]);
+  const { ask, dialog } = useAskOnce();
   const userId = session?.user?.id;
   const emptyRange = Boolean(screen) && timelineLoaded && end <= start;
 
@@ -592,6 +594,13 @@ export function UploadMenu({clip, group, mix, screen, screens, target, start, en
       return;
     }
 
+    const saveCopy = await ask("saveCopyOnUpload", {
+      message: "Also save a copy of this clip to your computer?",
+      yesText: "Save a copy",
+      noText: "Upload only",
+    });
+    if (saveCopy === null) return;
+
     const uploadId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
     const displayName = title?.trim() || getEditableClipName(clip?.name) || "Untitled Clip";
     onUploadQueueEvent?.({ type: "started", id: uploadId, name: displayName, path: clip?.path });
@@ -602,6 +611,8 @@ export function UploadMenu({clip, group, mix, screen, screens, target, start, en
         onUploadQueueEvent?.({ type: "failed", id: uploadId, error: tagsError });
         return;
       }
+
+      if (saveCopy) saveClip(clip, start, end, displayName, game, tags);
 
       const response = await window.clipx.uploadClip({ clip, start, end, title: displayName, game, tags, userId, mix, screen });
       if (response?.status === 200) {
@@ -694,6 +705,7 @@ export function UploadMenu({clip, group, mix, screen, screens, target, start, en
         </Button>
       </div>
       {emptyRange && <p className="upload-menu-note">This screen has no video in the trimmed part. Move the trim later or pick another screen.</p>}
+      {dialog}
       {screens && (
         <Menu anchorEl={deleteAnchor} open={Boolean(deleteAnchor)} onClose={() => setDeleteAnchor(null)}>
           {screens.map((view) => (

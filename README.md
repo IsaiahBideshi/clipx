@@ -28,6 +28,7 @@ If something goes wrong, click **Export logs** in Settings and attach the zip it
 
 **Share**
 - Upload clips with a title, game and tags for the people in them. Each clip is public, friends only or private.
+- Save a copy to your PC when you upload. ClipX asks the first time; pick Always or Never in Settings to stop it asking.
 - Add friends and browse their clips in the Library. Search by tag, person or game.
 - Public clips get a share link anyone can watch in their browser, no ClipX needed. Links show a playable preview in Discord.
 

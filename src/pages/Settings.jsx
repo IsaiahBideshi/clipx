@@ -5,7 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import CircularProgress from '@mui/material/CircularProgress';
 import FormGroup from "@mui/material/FormGroup";
 import FormControlLabel from "@mui/material/FormControlLabel";
-import {Checkbox, Switch} from "@mui/material";
+import {Checkbox, MenuItem, Select, Switch} from "@mui/material";
 import Button from "@mui/material/Button";
 import ArticleOutlinedIcon from "@mui/icons-material/ArticleOutlined";
 import changelog from "../../CHANGELOG.md?raw";
@@ -26,7 +26,9 @@ export async function getOptions() {
   }
 }
 
-const UPDATE_BUSY_STATUSES = new Set(["checking", "available", "downloading", "installing"]);
+const SAVE_COPY_VALUES = new Map([[true, "always"], [false, "never"]]);
+
+const UPDATE_BUSY_STATUSES =new Set(["checking", "available", "downloading", "installing"]);
 
 const UPDATE_STATUS_MESSAGES = {
   checking: "Checking for updates...",
@@ -332,6 +334,22 @@ export default function Settings() {
               <div className="folder-row">
                 <span className="folder-path">{options.clipsFolder || "Not Set"}</span>
                 <Button id={"pick-folder"} variant={"contained"} onClick={pickFolder}>Choose Folder</Button>
+              </div>
+            </section>
+
+            <section className="settings-card">
+              <h4>Uploads</h4>
+              <div className="folder-row">
+                <span>Save a copy when uploading</span>
+                <Select
+                  size="small"
+                  value={SAVE_COPY_VALUES.get(options.saveCopyOnUpload) || "ask"}
+                  onChange={(e) => updateOption("saveCopyOnUpload", { always: true, never: false }[e.target.value])}
+                >
+                  <MenuItem value="ask">Ask every time</MenuItem>
+                  <MenuItem value="always">Always</MenuItem>
+                  <MenuItem value="never">Never</MenuItem>
+                </Select>
               </div>
             </section>
 
