@@ -314,17 +314,6 @@ export default function Settings() {
                     }
                     label="Launch at startup"
                   />
-                  <FormControlLabel
-                    control={
-                      <Checkbox
-                        checked={options.groupClipsBySession !== false}
-                        onChange={(e) => {
-                          updateOption("groupClipsBySession", e.target.checked);
-                        }}
-                      />
-                    }
-                    label="Group clips by gaming session"
-                  />
                 </FormGroup>
               )}
             </section>
