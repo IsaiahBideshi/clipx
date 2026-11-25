@@ -463,6 +463,13 @@ export default function LocalFiles({ onSaveQueueEvent, onUploadQueueEvent, uploa
     setRefreshTick((tick) => tick + 1);
   };
 
+  const setGroupBySession = (enabled) => {
+    const nextOptions = { ...options, groupClipsBySession: enabled };
+    queryClient.setQueryData(["localFiles", "options"], nextOptions);
+    window.clipx?.saveOptions?.(nextOptions)
+      .catch((error) => console.error("Failed to save options:", error));
+  };
+
   const showNewClips = () => {
     setNewClipPaths([]);
     scrollToTop();
@@ -665,6 +672,17 @@ export default function LocalFiles({ onSaveQueueEvent, onUploadQueueEvent, uploa
               setShowSavedFiles(e.target.checked);
             }}
           />
+          {!showSavedFiles && (
+            <>
+              <span className="local-files-toggle-label local-files-group-label">Group by session</span>
+              <Switch
+                className="local-files-toggle"
+                checked={options?.groupClipsBySession !== false}
+                disabled={!options}
+                onChange={(e) => setGroupBySession(e.target.checked)}
+              />
+            </>
+          )}
         </div>
       )}
 
