@@ -196,6 +196,26 @@ export function planAudioTracks(tracks = []) {
     micTrack: used.find((track) => track.kind === "mic")?.index ?? null,
     desktopTrack: hasAppTracks ? null : restTrack,
     otherAppsTrack: hasAppTracks ? restTrack : null,
+    mixFromTracks: used.some((track) => track.kind !== "mic" && Number(track.volume ?? 100) < 100),
+  };
+}
+
+export function routeAudioTracks(audio, gameExe = "") {
+  const mixTrack = audio.mixFromTracks ? 1 : null;
+  const mixedExes = new Set();
+  const apps = {};
+  for (const track of audio.tracks) {
+    if (track.kind === "mic") {
+      continue;
+    }
+    const exe = (track.kind === "game" ? gameExe : track.exe || "").toLowerCase();
+    apps[track.index] = toAudioTrackMap(mixedExes.has(exe) ? null : mixTrack, track.index);
+    mixedExes.add(exe);
+  }
+  return {
+    desktop: toAudioTrackMap(audio.mixFromTracks ? null : 1, audio.desktopTrack),
+    apps,
+    otherApps: audio.otherAppsTrack ? toAudioTrackMap(mixTrack, audio.otherAppsTrack) : null,
   };
 }
 

@@ -34,6 +34,7 @@ import {
   pickOtherAudioApps,
   planAudioTracks,
   planRecorders,
+  routeAudioTracks,
   toAudioTrackMap,
 } from "../utils/recordingPlan.js";
 import { CLIP_MANIFEST_NAME, buildClipManifest, describeClip, getAudioTrackNames, getClipName, keepManifestFile } from "../utils/clipManifest.js";
@@ -419,7 +420,6 @@ async function setupAudio(recorder, options, ensureInput, existingInputs) {
   const audio = planAudioTracks(options.clipAudioTracks);
 
   await ensureInput(DESKTOP_AUDIO_INPUT_NAME, "wasapi_output_capture");
-  await recorderRequest(recorder, "SetInputAudioTracks", { inputName: DESKTOP_AUDIO_INPUT_NAME, inputAudioTracks: toAudioTrackMap(1, audio.desktopTrack) });
 
   await ensureInput(MIC_INPUT_NAME, "wasapi_input_capture");
   await recorderRequest(recorder, "SetInputMute", { inputName: MIC_INPUT_NAME, inputMuted: !audio.micTrack });
@@ -441,22 +441,16 @@ async function setupAudio(recorder, options, ensureInput, existingInputs) {
 
     const exe = track.kind === "game" ? getGameTrackExe() : track.exe;
     await ensureInput(inputName, "wasapi_process_output_capture", { window: toWindowMatch(exe), priority: 2 });
-    await recorderRequest(recorder, "SetInputAudioTracks", { inputName, inputAudioTracks: toAudioTrackMap(index) });
   }
 
-  await applyVolumes(recorder, audio);
-
   for (const inputName of existingInputs) {
-    if (!inputName.startsWith(OTHER_APP_INPUT_PREFIX)) {
-      continue;
-    }
-    if (audio.otherAppsTrack) {
-      await recorderRequest(recorder, "SetInputAudioTracks", { inputName, inputAudioTracks: toAudioTrackMap(audio.otherAppsTrack) });
-    } else {
+    if (inputName.startsWith(OTHER_APP_INPUT_PREFIX) && !audio.otherAppsTrack) {
       await recorderRequest(recorder, "RemoveInput", { inputName });
       existingInputs.delete(inputName);
     }
   }
+
+  await applyMix(recorder, audio);
 }
 
 async function syncOtherApps(recorder, options) {
@@ -490,7 +484,8 @@ async function syncOtherApps(recorder, options) {
       inputKind: "wasapi_process_output_capture",
       inputSettings: { window: toWindowMatch(exe), priority: 2 },
     });
-    await recorderRequest(recorder, "SetInputAudioTracks", { inputName, inputAudioTracks: toAudioTrackMap(audio.otherAppsTrack) });
+    const { otherApps } = routeAudioTracks(planAudioTracks(appliedOptions.clipAudioTracks));
+    await recorderRequest(recorder, "SetInputAudioTracks", { inputName, inputAudioTracks: otherApps });
   }
 }
 
@@ -508,11 +503,25 @@ function runOtherAppsSync() {
     });
 }
 
-async function applyVolumes(recorder, audio) {
+async function applyMix(recorder, audio) {
+  const routing = routeAudioTracks(audio, getGameTrackExe());
+  await recorderRequest(recorder, "SetInputAudioTracks", { inputName: DESKTOP_AUDIO_INPUT_NAME, inputAudioTracks: routing.desktop });
   for (const track of audio.tracks) {
     const inputName = track.kind === "mic" ? MIC_INPUT_NAME : `ClipX Track ${track.index}`;
     const volume = Math.min(Math.max(Number(track.volume ?? 100), 0), 100);
     await recorderRequest(recorder, "SetInputVolume", { inputName, inputVolumeMul: volume / 100 });
+    if (track.kind !== "mic") {
+      await recorderRequest(recorder, "SetInputAudioTracks", { inputName, inputAudioTracks: routing.apps[track.index] });
+    }
+  }
+  if (!routing.otherApps) {
+    return;
+  }
+  const { inputs } = await recorderRequest(recorder, "GetInputList");
+  for (const { inputName } of inputs) {
+    if (inputName.startsWith(OTHER_APP_INPUT_PREFIX)) {
+      await recorderRequest(recorder, "SetInputAudioTracks", { inputName, inputAudioTracks: routing.otherApps }).catch(() => {});
+    }
   }
 }
 
@@ -921,6 +930,8 @@ async function onGameChange() {
     inputName: `ClipX Track ${gameTrack.index}`,
     inputSettings: { window: toWindowMatch(getGameTrackExe()), priority: 2 },
   }).catch((error) => console.error("ClipX: Failed to point the game track at the new game:", error));
+  await applyMix(main, planAudioTracks(appliedOptions.clipAudioTracks))
+    .catch((error) => console.error("ClipX: Failed to update the full mix for the new game:", error));
   runOtherAppsSync();
 }
 
@@ -1013,7 +1024,7 @@ async function applyOptions(next) {
       throw error;
     }
   } else {
-    await applyVolumes(recorders.get("main"), planAudioTracks(next.clipAudioTracks));
+    await applyMix(recorders.get("main"), planAudioTracks(next.clipAudioTracks));
   }
 }
 
