@@ -15,6 +15,7 @@ function ClipGrid({
   baseFolder,
   onSelect,
   onDelete,
+  onRename,
   onContextMenuAction,
   contextMenuRef,
   loading = false,
@@ -176,6 +177,7 @@ function ClipGrid({
                         baseFolder={baseFolder}
                         onClick={() => onSelect(clip)}
                         onDelete={onDelete}
+                        onRename={onRename}
                         onContextMenuAction={onContextMenuAction}
                       />
                     );

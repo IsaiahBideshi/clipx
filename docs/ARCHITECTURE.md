@@ -154,7 +154,8 @@ The editor is `src/components/ClipEditor.jsx`.
 ### Saved clips and originals
 
 - Saving a trim writes it to `ClipX Videos/` inside the clip's folder and stores the original's path as `originalPath` in the saved clip's metadata (`saved_metadata_json`).
-- `listLocalClips` hides any clip that a saved clip which still exists points to, so the original leaves the grid and comes back when its saved clips are deleted. The editor's "View original" button (`local-clips:get-original`) opens it again.
+- `listLocalClips` hides any clip that a saved clip which still exists points to, so the original leaves the grid and comes back when its saved clips are deleted. The editor's "View original" button (`local-clips:get-original`) opens it again, and on the original a "View saved" button (`local-clips:get-saved`) opens its newest saved clip.
+- A saved clip always opens in the viewer (game, date, rename and delete) rather than the trim editor, in either grid. Deleting the open saved clip moves to its original instead of the next clip.
 - `renameClip` and `keepClipScreen` call `moveSavedClipOriginal` so the link follows the original's file. That only updates the index, so `upsertIndexedClip` reads the legacy `clipsData.json` only for a saved clip the index has no metadata for; otherwise a refresh would put the old `originalPath` back.
 - Saves made before this (originals renamed to `[ORIGINAL] <name>`) have no `originalPath`, so those originals stay in the grid.
 

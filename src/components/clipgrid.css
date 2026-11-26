@@ -272,6 +272,13 @@
   background: rgba(0, 0, 0, 0.7);
   color: var(--accent);
 }
+.clip-card-actions {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: flex;
+  gap: 6px;
+}
 .clip-editor-title-row {
   display: flex;
   align-items: center;

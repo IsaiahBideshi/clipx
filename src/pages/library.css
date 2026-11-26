@@ -396,7 +396,7 @@
   gap: 6px;
 }
 
-.library .clip-card-action {
+.clip-card-action {
   display: grid;
   place-items: center;
   width: 28px;
@@ -412,20 +412,20 @@
   transition: opacity 0.15s, border-color 0.15s;
 }
 
-.library .clip-card:hover .clip-card-action,
-.library .clip-card-action:focus-visible {
+.clip-card:hover .clip-card-action,
+.clip-card-action:focus-visible {
   opacity: 1;
 }
 
-.library .clip-card-action:hover {
+.clip-card-action:hover {
   border-color: rgba(144, 202, 249, 0.6);
 }
 
-.library .clip-card-action.danger:hover {
+.clip-card-action.danger:hover {
   border-color: rgba(255, 125, 125, 0.65);
 }
 
-.library .clip-card-action svg {
+.clip-card-action svg {
   font-size: 16px;
 }
 
