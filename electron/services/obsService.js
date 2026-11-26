@@ -34,6 +34,7 @@ import {
   pickOtherAudioApps,
   planAudioTracks,
   planRecorders,
+  routeAudioTracks,
   toAudioTrackMap,
 } from "../utils/recordingPlan.js";
 import { CLIP_MANIFEST_NAME, buildClipManifest, describeClip, getAudioTrackNames, getClipName, keepManifestFile } from "../utils/clipManifest.js";
@@ -182,6 +183,7 @@ async function ensureObsInstalled(signal) {
   const zipPath = path.join(obsDir, "download.zip");
   const extractDir = path.join(obsDir, `tmp-${OBS_VERSION}`);
   await fs.promises.mkdir(obsDir, { recursive: true });
+  console.info(`ClipX: Downloading OBS ${OBS_VERSION}.`);
   emitClippingState({ status: "installing", progress: 0 });
 
   const response = await fetch(OBS_ZIP_URL, { signal });
@@ -324,6 +326,7 @@ function openSocket(recorder, { port, password }) {
     ws.onclose = () => {
       reject(new Error("OBS closed the connection."));
       if (recorder.socket === ws) {
+        console.error(`ClipX: Lost the connection to OBS (${recorder.key}).`);
         handleObsLost("Lost the connection to OBS.");
       }
     };
@@ -444,7 +447,6 @@ async function setupAudio(recorder, options, ensureInput, existingInputs) {
   const audio = planAudioTracks(options.clipAudioTracks);
 
   await ensureInput(DESKTOP_AUDIO_INPUT_NAME, "wasapi_output_capture");
-  await recorderRequest(recorder, "SetInputAudioTracks", { inputName: DESKTOP_AUDIO_INPUT_NAME, inputAudioTracks: toAudioTrackMap(1, audio.desktopTrack) });
 
   await ensureInput(MIC_INPUT_NAME, "wasapi_input_capture");
   await recorderRequest(recorder, "SetInputMute", { inputName: MIC_INPUT_NAME, inputMuted: !audio.micTrack });
@@ -466,22 +468,16 @@ async function setupAudio(recorder, options, ensureInput, existingInputs) {
 
     const exe = track.kind === "game" ? getGameTrackExe() : track.exe;
     await ensureInput(inputName, "wasapi_process_output_capture", { window: toWindowMatch(exe), priority: 2 });
-    await recorderRequest(recorder, "SetInputAudioTracks", { inputName, inputAudioTracks: toAudioTrackMap(index) });
   }
 
-  await applyVolumes(recorder, audio);
-
   for (const inputName of existingInputs) {
-    if (!inputName.startsWith(OTHER_APP_INPUT_PREFIX)) {
-      continue;
-    }
-    if (audio.otherAppsTrack) {
-      await recorderRequest(recorder, "SetInputAudioTracks", { inputName, inputAudioTracks: toAudioTrackMap(audio.otherAppsTrack) });
-    } else {
+    if (inputName.startsWith(OTHER_APP_INPUT_PREFIX) && !audio.otherAppsTrack) {
       await recorderRequest(recorder, "RemoveInput", { inputName });
       existingInputs.delete(inputName);
     }
   }
+
+  await applyMix(recorder, audio);
 }
 
 async function syncOtherApps(recorder, options) {
@@ -515,7 +511,8 @@ async function syncOtherApps(recorder, options) {
       inputKind: "wasapi_process_output_capture",
       inputSettings: { window: toWindowMatch(exe), priority: 2 },
     });
-    await recorderRequest(recorder, "SetInputAudioTracks", { inputName, inputAudioTracks: toAudioTrackMap(audio.otherAppsTrack) });
+    const { otherApps } = routeAudioTracks(planAudioTracks(appliedOptions.clipAudioTracks));
+    await recorderRequest(recorder, "SetInputAudioTracks", { inputName, inputAudioTracks: otherApps });
   }
 }
 
@@ -533,11 +530,25 @@ function runOtherAppsSync() {
     });
 }
 
-async function applyVolumes(recorder, audio) {
+async function applyMix(recorder, audio) {
+  const routing = routeAudioTracks(audio, getGameTrackExe());
+  await recorderRequest(recorder, "SetInputAudioTracks", { inputName: DESKTOP_AUDIO_INPUT_NAME, inputAudioTracks: routing.desktop });
   for (const track of audio.tracks) {
     const inputName = track.kind === "mic" ? MIC_INPUT_NAME : `ClipX Track ${track.index}`;
     const volume = Math.min(Math.max(Number(track.volume ?? 100), 0), 100);
     await recorderRequest(recorder, "SetInputVolume", { inputName, inputVolumeMul: volume / 100 });
+    if (track.kind !== "mic") {
+      await recorderRequest(recorder, "SetInputAudioTracks", { inputName, inputAudioTracks: routing.apps[track.index] });
+    }
+  }
+  if (!routing.otherApps) {
+    return;
+  }
+  const { inputs } = await recorderRequest(recorder, "GetInputList");
+  for (const { inputName } of inputs) {
+    if (inputName.startsWith(OTHER_APP_INPUT_PREFIX)) {
+      await recorderRequest(recorder, "SetInputAudioTracks", { inputName, inputAudioTracks: routing.otherApps }).catch(() => {});
+    }
   }
 }
 
@@ -601,12 +612,13 @@ async function launchRecorder(recorder, options, encoder, signal) {
   ], { cwd: path.join(getRecorderRoot(recorder.key), "bin", "64bit"), stdio: "ignore", windowsHide: true });
   recorder.process = child;
 
-  const onChildStopped = () => {
+  const onChildStopped = (reason) => {
     if (recorder.process === child) {
+      console.error(`ClipX: OBS (${recorder.key}) stopped unexpectedly:`, reason);
       handleObsLost("OBS stopped unexpectedly.");
     }
   };
-  child.on("exit", onChildStopped);
+  child.on("exit", (code, signal) => onChildStopped({ code, signal }));
   child.on("error", onChildStopped);
 
   await connectRecorder(recorder, connection);
@@ -626,6 +638,12 @@ async function launchRecorders(options, signal) {
   const stagingRoot = path.join(options.clipsFolder, REPLAYS_DIR_NAME, STAGING_DIR_NAME);
   await fs.promises.rm(stagingRoot, { recursive: true, force: true });
   const encoder = await getEncoder();
+  console.info("ClipX: Starting clipping:", {
+    encoder,
+    seconds: options.clipSeconds,
+    audioTracks: options.clipAudioTracks.map((track) => track.kind),
+    recorders: plan.map((recorder) => `${recorder.key} ${recorder.canvas.width}x${recorder.canvas.height} -> ${recorder.output.width}x${recorder.output.height} ${recorder.fps} fps ${recorder.bitrate} kbps`),
+  });
 
   for (const recorderPlan of plan) {
     recorders.set(recorderPlan.key, {
@@ -648,6 +666,7 @@ async function launchRecorders(options, signal) {
   if (recorders.get("main")?.plan.screenId === null) {
     startFollowing();
   }
+  console.info("ClipX: Clipping is ready.");
   emitClippingState({ status: "ready" });
   void checkClipsDrive(options.clipsFolder);
   if (planAudioTracks(options.clipAudioTracks).otherAppsTrack) {
@@ -687,6 +706,9 @@ function stopFollowing() {
 }
 
 function stopObs() {
+  if (recorders.size) {
+    console.info("ClipX: Stopping clipping.");
+  }
   startupController?.abort();
   startupController = null;
   stopFollowing();
@@ -847,6 +869,7 @@ async function finalizeClip(createdAt, savedFiles, options, duplicate, { game, s
 
 async function saveClip() {
   if (latestState.status !== "ready") {
+    console.warn("ClipX: Clip hotkey pressed while clipping is", latestState.status, latestState.message || "");
     notify("failed", "Clipping isn't ready", latestState.message || "OBS is still starting.");
     return;
   }
@@ -881,6 +904,7 @@ async function writeClip(options) {
     }
 
     const manifest = await finalizeClip(createdAt, savedFiles, options, duplicate, clipGame);
+    console.info(`ClipX: Saved a clip in ${Date.now() - createdAt.getTime()} ms (${describeClip(manifest)}, ${savedFiles.length}/${results.length} files).`);
     const failedCount = results.length - savedFiles.length;
     results.forEach((result, index) => {
       if (result.status === "rejected") {
@@ -935,6 +959,8 @@ async function onGameChange() {
     inputName: `ClipX Track ${gameTrack.index}`,
     inputSettings: { window: toWindowMatch(getGameTrackExe()), priority: 2 },
   }).catch((error) => console.error("ClipX: Failed to point the game track at the new game:", error));
+  await applyMix(main, planAudioTracks(appliedOptions.clipAudioTracks))
+    .catch((error) => console.error("ClipX: Failed to update the full mix for the new game:", error));
   runOtherAppsSync();
 }
 
@@ -1027,7 +1053,7 @@ async function applyOptions(next) {
       throw error;
     }
   } else {
-    await applyVolumes(recorders.get("main"), planAudioTracks(next.clipAudioTracks));
+    await applyMix(recorders.get("main"), planAudioTracks(next.clipAudioTracks));
   }
 }
 

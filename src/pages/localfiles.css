@@ -44,6 +44,10 @@
   line-height: 1;
 }
 
+.local-files-group-label {
+  margin-left: auto;
+}
+
 .local-files-toggle {
   margin: 0;
   vertical-align: middle;

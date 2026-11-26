@@ -5,7 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import CircularProgress from '@mui/material/CircularProgress';
 import FormGroup from "@mui/material/FormGroup";
 import FormControlLabel from "@mui/material/FormControlLabel";
-import {Checkbox, Switch} from "@mui/material";
+import {Checkbox, MenuItem, Select, Switch} from "@mui/material";
 import Button from "@mui/material/Button";
 import ArticleOutlinedIcon from "@mui/icons-material/ArticleOutlined";
 import changelog from "../../CHANGELOG.md?raw";
@@ -26,7 +26,9 @@ export async function getOptions() {
   }
 }
 
-const UPDATE_BUSY_STATUSES = new Set(["checking", "available", "downloading", "installing"]);
+const SAVE_COPY_VALUES = new Map([[true, "always"], [false, "never"]]);
+
+const UPDATE_BUSY_STATUSES =new Set(["checking", "available", "downloading", "installing"]);
 
 const UPDATE_STATUS_MESSAGES = {
   checking: "Checking for updates...",
@@ -81,6 +83,8 @@ export default function Settings() {
   const [loadingLaunchAtStartup, setLoadingLaunchAtStartup] = useState(true);
   const [savingLaunchAtStartup, setSavingLaunchAtStartup] = useState(false);
   const [showChangelog, setShowChangelog] = useState(false);
+  const [exportingLogs, setExportingLogs] = useState(false);
+  const [logsMessage, setLogsMessage] = useState(null);
   const queryClient = useQueryClient();
 
   function updateOption(key, value) {
@@ -124,6 +128,20 @@ export default function Settings() {
       setLaunchAtStartup(!nextLaunchAtStartup);
     } finally {
       setSavingLaunchAtStartup(false);
+    }
+  }
+
+  async function handleExportLogs() {
+    setExportingLogs(true);
+    setLogsMessage(null);
+    try {
+      await window.clipx.exportLogs();
+      setLogsMessage("Saved to your Downloads folder.");
+    } catch (err) {
+      console.error("Failed to export logs:", err);
+      setLogsMessage("Couldn't export the logs.");
+    } finally {
+      setExportingLogs(false);
     }
   }
 
@@ -296,17 +314,6 @@ export default function Settings() {
                     }
                     label="Launch at startup"
                   />
-                  <FormControlLabel
-                    control={
-                      <Checkbox
-                        checked={options.groupClipsBySession !== false}
-                        onChange={(e) => {
-                          updateOption("groupClipsBySession", e.target.checked);
-                        }}
-                      />
-                    }
-                    label="Group clips by gaming session"
-                  />
                 </FormGroup>
               )}
             </section>
@@ -316,6 +323,38 @@ export default function Settings() {
               <div className="folder-row">
                 <span className="folder-path">{options.clipsFolder || "Not Set"}</span>
                 <Button id={"pick-folder"} variant={"contained"} onClick={pickFolder}>Choose Folder</Button>
+              </div>
+            </section>
+
+            <section className="settings-card">
+              <h4>Uploads</h4>
+              <div className="folder-row">
+                <span>Save a copy when uploading</span>
+                <Select
+                  size="small"
+                  value={SAVE_COPY_VALUES.get(options.saveCopyOnUpload) || "ask"}
+                  onChange={(e) => updateOption("saveCopyOnUpload", { always: true, never: false }[e.target.value])}
+                >
+                  <MenuItem value="ask">Ask every time</MenuItem>
+                  <MenuItem value="always">Always</MenuItem>
+                  <MenuItem value="never">Never</MenuItem>
+                </Select>
+              </div>
+            </section>
+
+            <section className="settings-card">
+              <h4>Troubleshooting</h4>
+              <div className="folder-row">
+                <span className="settings-logs-status" role="status">
+                  {logsMessage || "Export a zip of ClipX's logs to send with a bug report."}
+                </span>
+                <Button
+                  variant="contained"
+                  disabled={exportingLogs || !window.clipx?.exportLogs}
+                  onClick={handleExportLogs}
+                >
+                  Export logs
+                </Button>
               </div>
             </section>
           </div>

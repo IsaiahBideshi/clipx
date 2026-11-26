@@ -292,6 +292,18 @@ export function getOriginalClip(clipPath) {
   return row && !row.missing ? rowToClip(row) : null;
 }
 
+export function getSavedClip(originalPath) {
+  const row = getDb()
+    .prepare(`
+      SELECT * FROM clips
+      WHERE missing = 0 AND json_extract(saved_metadata_json, '$.originalPath') = ?
+      ORDER BY created_at_ms DESC, id DESC
+      LIMIT 1
+    `)
+    .get(normalizeStoredPath(originalPath));
+  return rowToClip(row);
+}
+
 export function moveSavedClipOriginal(oldPath, newPath) {
   getDb()
     .prepare(`

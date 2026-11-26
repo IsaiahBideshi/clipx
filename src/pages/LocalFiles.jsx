@@ -463,6 +463,16 @@ export default function LocalFiles({ onSaveQueueEvent, onUploadQueueEvent, uploa
     setRefreshTick((tick) => tick + 1);
   };
 
+  const setGroupBySession = async (enabled) => {
+    try {
+      const nextOptions = { ...(await fetchLocalOptions()), groupClipsBySession: enabled };
+      queryClient.setQueryData(["localFiles", "options"], nextOptions);
+      await window.clipx.saveOptions(nextOptions);
+    } catch (error) {
+      console.error("Failed to save options:", error);
+    }
+  };
+
   const showNewClips = () => {
     setNewClipPaths([]);
     scrollToTop();
@@ -555,6 +565,9 @@ export default function LocalFiles({ onSaveQueueEvent, onUploadQueueEvent, uploa
     setIsDeletingClip(true);
     const closesOpenClip = !keepScreen && clip?.path === clipToDelete.path && (deleteAll || !screenToDelete);
     const deletedIndex = findClipIndex(clipsRef.current, clipToDelete);
+    const original = closesOpenClip && clipToDelete.collection === "saved"
+      ? await window.clipx.getOriginalClip(clipToDelete.path).catch(() => null)
+      : null;
     try {
       if (keepScreen) {
         const kept = await window.clipx.keepClipScreen(clipToDelete.path, keepScreen.screen);
@@ -569,7 +582,7 @@ export default function LocalFiles({ onSaveQueueEvent, onUploadQueueEvent, uploa
       queryClient.invalidateQueries({ queryKey: ["localFiles", "clips", rootPath, collection] });
       if (closesOpenClip) {
         const remainingClips = clipsRef.current.filter((item) => item.path !== clipToDelete.path);
-        setClip(remainingClips[Math.max(0, Math.min(deletedIndex, remainingClips.length - 1))] || null);
+        setClip(original || remainingClips[Math.max(0, Math.min(deletedIndex, remainingClips.length - 1))] || null);
       }
       setClipToDelete(null);
     } catch (error) {
@@ -602,6 +615,13 @@ export default function LocalFiles({ onSaveQueueEvent, onUploadQueueEvent, uploa
     return name.replace(/\.(mp4|webm|mov)$/i, "");
   }
 
+  function openRenameModal(targetClip) {
+    setClipToRename(targetClip);
+    setRenameModalOpen(true);
+    setRenameValue(getEditableClipName(targetClip.name || ""));
+    setRenameError("");
+  }
+
   function handleRenameClip() {
     if (!renameValue.trim()) {
       return;
@@ -631,6 +651,7 @@ export default function LocalFiles({ onSaveQueueEvent, onUploadQueueEvent, uploa
           setRenameError(result.message || "Failed to rename clip.");
           return;
         }
+        setClip((current) => (current?.path === clipToRename.path ? { ...current, path: result.path, name: result.name, thumbnailPath: null } : current));
         setRenameModalOpen(false);
         setRenameError("");
       })
@@ -665,6 +686,18 @@ export default function LocalFiles({ onSaveQueueEvent, onUploadQueueEvent, uploa
               setShowSavedFiles(e.target.checked);
             }}
           />
+          {!showSavedFiles && (
+            <>
+              <span className="local-files-toggle-label local-files-group-label">Group by session</span>
+              <Switch
+                className="local-files-toggle"
+                inputProps={{ "aria-label": "Group by session" }}
+                checked={options?.groupClipsBySession !== false}
+                disabled={!options}
+                onChange={(e) => setGroupBySession(e.target.checked)}
+              />
+            </>
+          )}
         </div>
       )}
 
@@ -695,14 +728,14 @@ export default function LocalFiles({ onSaveQueueEvent, onUploadQueueEvent, uploa
           authSession={session}
           onSaveQueueEvent={onSaveQueueEvent}
           onUploadQueueEvent={onUploadQueueEvent}
-          isSavedClipsView={showSavedFiles && clip.collection === "saved"}
           onClose={() => setClip(null)}
           baseFolder={folderPath}
           onDelete={openDeleteModal}
           onNextClip={() => moveSelectedClip(1)}
           onPrevClip={() => moveSelectedClip(-1)}
           triggerClipIndexRefresh={() => refreshFiles()}
-          onViewOriginal={(original) => setClip({ ...original, savedPath: clip.path })}
+          onViewLinked={(linked) => setClip(clip.collection === "saved" ? { ...linked, savedPath: clip.path } : linked)}
+          onRename={openRenameModal}
           uploading={uploadingPaths.includes(clip.path)}
           saving={savingPaths.includes(clip.path)}
         />
@@ -724,6 +757,7 @@ export default function LocalFiles({ onSaveQueueEvent, onUploadQueueEvent, uploa
             setMousePosition({ x: rect.x, y: rect.y });
           }}
           onDelete={(clip) => openDeleteModal(clip)}
+          onRename={openRenameModal}
         />
       )}
 
@@ -815,11 +849,8 @@ export default function LocalFiles({ onSaveQueueEvent, onUploadQueueEvent, uploa
             openDeleteModal(contextMenu);
             setContextMenu(null);
           }}
-          onRename={() => { 
-            setClipToRename(contextMenu);
-            setRenameModalOpen(true);
-            setRenameValue(getEditableClipName(contextMenu.name || ""));
-            setRenameError("");
+          onRename={() => {
+            openRenameModal(contextMenu);
             setContextMenu(null);
           }}
           onOpenInExplorer={async () => {

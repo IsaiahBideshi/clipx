@@ -4,6 +4,7 @@ import EditorTimeline from "./EditorTimeline.jsx";
 import VideoPlayer from "./VideoPlayer";
 import ClipDetailsFields from "./ClipDetailsFields.jsx";
 import AudioMixer from "./AudioMixer.jsx";
+import { useAskOnce } from "./AskOnceDialog.jsx";
 import ScreenStage, { ScreenIcon } from "./ScreenStage.jsx";
 import { toClipxUrl, useTrackMix } from "../lib/trackMix.js";
 import { getHomeView, getScreenViews } from "../lib/screenLayout.js";
@@ -12,8 +13,11 @@ import { getManifestFile } from "../../electron/utils/clipManifest.js";
 import Button from '@mui/material/Button';
 import { supabase } from "../lib/supabase.js";
 import { getClipTagsError, getClipShareUrl } from "../lib/clipsApi.js";
-import { Divider, Menu, MenuItem, Typography } from '@mui/material';
+import { Divider, Menu, MenuItem, Tooltip, Typography } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
+import BookmarkIcon from "@mui/icons-material/Bookmark";
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import DeleteSweepIcon from "@mui/icons-material/DeleteSweep";
 import CenterFocusStrongIcon from "@mui/icons-material/CenterFocusStrong";
@@ -84,11 +88,11 @@ export default function ClipEditor({
   onSaveQueueEvent, 
   onUploadQueueEvent, 
   onDelete, 
-  isSavedClipsView = false, 
   onClose, 
   baseFolder,
   triggerClipIndexRefresh,
-  onViewOriginal,
+  onViewLinked,
+  onRename,
   authSession,
   uploading,
   saving
@@ -107,7 +111,8 @@ export default function ClipEditor({
   const { volume, muted: isMuted, setVolume, setMuted: setIsMuted } = usePlayerPrefs();
 
   const [clipData, setClipData] = useState(null);
-  const [original, setOriginal] = useState(null);
+  const [linkedClip, setLinkedClip] = useState(null);
+  const isSavedClip = clip.collection === "saved";
 
   const [isEdittingClipName, setIsEdittingClipName] = useState(false);
   const [clipName, setClipName] = useState(null);
@@ -122,8 +127,8 @@ export default function ClipEditor({
   const [frontPath, setFrontPath] = useState(clip.path);
   const switchingRef = useRef(false);
   const views = useMemo(
-    () => (group && !isSavedClipsView && group.files.some((file) => file.path === clip.path) ? getScreenViews(group.files) : []),
-    [group, isSavedClipsView, clip.path]
+    () => (group && !isSavedClip && group.files.some((file) => file.path === clip.path) ? getScreenViews(group.files) : []),
+    [group, isSavedClip, clip.path]
   );
   const homeView = useMemo(() => getHomeView(views, clip.path), [views, clip.path]);
   const hasViews = views.length > 0;
@@ -144,7 +149,7 @@ export default function ClipEditor({
   useTrackMix(
     playerRef,
     clip.path,
-    { mix: isSavedClipsView ? null : mix, offset, external: activePath !== clip.path },
+    { mix: isSavedClip ? null : mix, offset, external: activePath !== clip.path },
     volume,
     isMuted
   );
@@ -332,23 +337,39 @@ export default function ClipEditor({
     loadClipData();
   }, [clip]);
 
+  function getLinkedClip() {
+    const request = isSavedClip ? window.clipx?.getOriginalClip?.(clip.path) : window.clipx?.getSavedClip?.(clip.path);
+    return Promise.resolve(request).catch((error) => {
+      console.error(`Failed to load the ${isSavedClip ? "original" : "saved"} clip:`, error);
+      return null;
+    });
+  }
+
   useEffect(() => {
     let cancelled = false;
-    setOriginal(null);
-    if (clip.collection === "saved") {
-      window.clipx?.getOriginalClip?.(clip.path)
-        .then((originalClip) => {
-          if (!cancelled) {
-            setOriginal(originalClip);
-          }
-        })
-        .catch((error) => console.error("Failed to load the original clip:", error));
-    }
+    setLinkedClip(null);
+    getLinkedClip().then((nextClip) => {
+      if (!cancelled) {
+        setLinkedClip(nextClip);
+      }
+    });
 
     return () => {
       cancelled = true;
     };
   }, [clip.path, clip.collection]);
+
+  useEffect(() => {
+    if (isSavedClip || typeof window.clipx?.onLocalClipIndexChanged !== "function") {
+      return undefined;
+    }
+
+    return window.clipx.onLocalClipIndexChanged((event) => {
+      if (event?.type !== "removed" && event?.clip?.savedMetadata?.originalPath === clip.path) {
+        setLinkedClip(event.clip);
+      }
+    });
+  }, [isSavedClip, clip.path]);
 
   return (
     <div className="clip-editor-container">
@@ -398,27 +419,40 @@ export default function ClipEditor({
           >
             {clipName || "Untitled Clip"}
           </Typography>
-          {original && (
-            <Button
-              variant="outlined"
-              size="small"
-              startIcon={<HistoryIcon />}
-              sx={{ flexShrink: 0 }}
-              onClick={async () => {
-                const originalClip = await window.clipx.getOriginalClip(clip.path).catch((error) => {
-                  console.error("Failed to load the original clip:", error);
-                  return null;
-                });
-                originalClip ? onViewOriginal(originalClip) : setOriginal(null);
-              }}
-            >
-              View original
-            </Button>
-          )}
+          <div className="video-title-actions">
+            {linkedClip && (
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={isSavedClip ? <HistoryIcon /> : <BookmarkIcon />}
+                sx={{ flexShrink: 0 }}
+                onClick={async () => {
+                  const nextClip = await getLinkedClip();
+                  nextClip ? onViewLinked(nextClip) : setLinkedClip(null);
+                }}
+              >
+                {isSavedClip ? "View original" : "View saved"}
+              </Button>
+            )}
+            {isSavedClip && (
+              <>
+                <Tooltip title="Rename clip">
+                  <button type="button" className="video-action-button" aria-label="Rename clip" onClick={() => onRename(clip)}>
+                    <EditIcon />
+                  </button>
+                </Tooltip>
+                <Tooltip title="Delete clip">
+                  <button type="button" className="video-action-button danger" aria-label="Delete clip" onClick={() => onDelete(clip)}>
+                    <DeleteIcon />
+                  </button>
+                </Tooltip>
+              </>
+            )}
+          </div>
         </div>
 
 
-        {isSavedClipsView && clipData && (
+        {isSavedClip && clipData && (
           <div className={"clip-info"}>
             <div className="clip-info-game-row">
               <img className="clip-info-game-image" src={`https:${clipData?.game?.image}`} />
@@ -428,7 +462,7 @@ export default function ClipEditor({
           </div>
         )}
 
-        {!isSavedClipsView && (
+        {!isSavedClip && (
           <EditorTimeline
             duration={timelineDuration}
             currentTime={currentTime}
@@ -440,12 +474,12 @@ export default function ClipEditor({
           />
         )}
 
-        {!isSavedClipsView && mixTracks.length > 0 && (
+        {!isSavedClip && mixTracks.length > 0 && (
           <AudioMixer tracks={mixTracks} levels={trackLevels} game={group?.manifest?.game} onChange={setTrackLevels} />
         )}
       </div>
 
-      {!isSavedClipsView && (
+      {!isSavedClip && (
         <div className="upload-container" ref={uploadMenuRef}>
           <UploadMenu
             clip={clip}
@@ -481,6 +515,7 @@ export function UploadMenu({clip, group, mix, screen, screens, target, start, en
   const [storedGamesLabels, setStoredGamesLabels] = useState([]);
   const [visibility, setVisibility] = useState("public");
   const [friendsOptions, setFriendsOptions] = useState([]);
+  const { ask, dialog } = useAskOnce();
   const userId = session?.user?.id;
   const emptyRange = Boolean(screen) && timelineLoaded && end <= start;
 
@@ -592,6 +627,13 @@ export function UploadMenu({clip, group, mix, screen, screens, target, start, en
       return;
     }
 
+    const saveCopy = await ask("saveCopyOnUpload", {
+      message: "Also save a copy of this clip to your computer?",
+      yesText: "Save a copy",
+      noText: "Upload only",
+    });
+    if (saveCopy === null) return;
+
     const uploadId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
     const displayName = title?.trim() || getEditableClipName(clip?.name) || "Untitled Clip";
     onUploadQueueEvent?.({ type: "started", id: uploadId, name: displayName, path: clip?.path });
@@ -602,6 +644,8 @@ export function UploadMenu({clip, group, mix, screen, screens, target, start, en
         onUploadQueueEvent?.({ type: "failed", id: uploadId, error: tagsError });
         return;
       }
+
+      if (saveCopy) saveClip(clip, start, end, displayName, game, tags);
 
       const response = await window.clipx.uploadClip({ clip, start, end, title: displayName, game, tags, userId, mix, screen });
       if (response?.status === 200) {
@@ -704,6 +748,7 @@ export function UploadMenu({clip, group, mix, screen, screens, target, start, en
         </Button>
       </div>
       {emptyRange && <p className="upload-menu-note">This screen has no video in the trimmed part. Move the trim later or pick another screen.</p>}
+      {dialog}
       {screens && (
         <Menu anchorEl={deleteAnchor} open={Boolean(deleteAnchor)} onClose={() => setDeleteAnchor(null)}>
           {screens.map((view) => (

@@ -9,6 +9,8 @@ A Windows app for recording, trimming and sharing game clips with friends.
 
 ClipX updates itself when a new version is out.
 
+If something goes wrong, click **Export logs** in Settings and attach the zip it saves to your Downloads folder to a [bug report](https://github.com/IsaiahBideshi/clipx/issues). Tokens and your Windows user folder are removed from the text logs, but crash dump files can still contain your Windows user name.
+
 ## Features
 
 **Record**
@@ -16,7 +18,6 @@ ClipX updates itself when a new version is out.
 - Record all your screens at once, with the main recording following your mouse or the app you're using.
 - Put your mic, your game and apps like Discord on their own audio tracks.
 - ClipX detects the game you're playing and names the clip after it. For apps it doesn't recognize, pick the game yourself.
-- Local Files groups your clips by gaming session. Turn this off in Settings to see them in one list.
 - A notification with a sound shows as soon as you press the clip hotkey. If the clip then fails to save, a red notification tells you. Games in exclusive fullscreen hide the notification, but you still hear the sound.
 
 **Edit**
@@ -26,6 +27,7 @@ ClipX updates itself when a new version is out.
 
 **Share**
 - Upload clips with a title, game and tags for the people in them. Each clip is public, friends only or private.
+- Save a copy to your PC when you upload. ClipX asks the first time; pick Always or Never in Settings to stop it asking.
 - Add friends and browse their clips in the Library. Search by tag, person or game.
 - Public clips get a share link anyone can watch in their browser, no ClipX needed. Links show a playable preview in Discord.
 

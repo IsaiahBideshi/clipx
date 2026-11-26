@@ -16,6 +16,7 @@ Supabase is the database and auth provider. Uploaded clips are stored in Azure B
 | Path | What's in it |
 | --- | --- |
 | `electron/main.js` | Main process entry: window, local HTTP server, IPC registration |
+| `electron/startup.js` | Runs before every other import: dev userData, single-instance lock, logging |
 | `electron/preload.js` | The `window.clipx.*` bridge the renderer calls |
 | `electron/ipc/` | IPC handlers, grouped by area |
 | `electron/services/` | Clip index, editing/uploads, OBS recording, game detection, notifications, updates, Google auth |
@@ -57,6 +58,19 @@ The main process is ESM (`"type": "module"`), and so is `api/`.
 - Clip metadata lives in SQLite at `%APPDATA%/clipx/clip-index.sqlite` (WAL mode, with chokidar watching the clip folders), plus a legacy `clipsData.json` in `%APPDATA%/`. In dev, userData is redirected to `%APPDATA%/clipx-dev`.
 - `better-sqlite3` is a native module and must be rebuilt for Electron's ABI after a fresh `npm install` (`npm.cmd run rebuild:electron`).
 - FFmpeg comes from `ffmpeg-static`, driven through fluent-ffmpeg. The binary must stay unpacked (`asarUnpack`); `electron/utils/ffmpeg.js` rewrites the path to `app.asar.unpacked`.
+
+### Logging
+
+`startLogging` in `electron/services/logService.js` is called from `electron/startup.js`, which `main.js` imports first. That module also redirects userData in dev and takes the single-instance lock, and only starts logging when it gets the lock. Because it runs before every other import, a module that fails while loading (e.g. `googleAuthService.js` when `/api/keys` can't be reached) is still logged.
+
+- It wraps the main process's `console.log/info/warn/error`, so every existing `console.*` call (and electron-updater, whose default logger is `console`) also goes to `userData/logs/main.log`. Writes are synchronous so the last lines before a crash aren't lost. Past 5 MB the file is renamed to `main.old.log`, replacing the previous one. If the log folder can't be created, ClipX starts without the file.
+- Warnings and errors from every window's console (renderer code, preload, uncaught errors, React error boundaries) arrive through `console-message` and are logged as `[renderer]`. They come in as text, so an error object logged there can lose its stack.
+- Uncaught main-process exceptions are logged by an `uncaughtException` listener, which then shows the same error dialog Electron would (Electron skips its own once the app has a listener). Electron reports a module that fails while loading by emitting `uncaughtException` directly, so `uncaughtExceptionMonitor` wouldn't see it. Electron's main process only warns on unhandled rejections, so the `unhandledRejection` listener doesn't change that.
+- It also logs renderer and child process exits (`render-process-gone`, `child-process-gone`), windows that stop responding, a header with versions and hardware, and a line on quit (a log that ends without one means ClipX didn't quit normally). `obsService.js` logs each recorder plan, OBS exit codes, and every clip save with how long it took.
+- `crashReporter.start({ uploadToServer: false })` keeps native crash dumps in `app.getPath("crashDumps")`. Nothing is uploaded.
+- Every line passes through `redactLogText` (`electron/utils/logFormat.js`), which replaces the home folder with `~` and removes JWTs, Google tokens, `Bearer` values, Azure `sig=` signatures, OAuth codes and `*_token`/`client_secret`/`password` values.
+
+**Export logs** in Settings (`logs:export`) copies both logs, `options.json`, the newest 3 OBS logs and newest OBS crash report of each recorder (all redacted), and the newest 3 crash dumps into a temp folder, then zips it into Downloads with Windows' own `tar.exe` and shows it in Explorer. An export asked for while one is running gets that one's zip. Crash dumps are binary, so they aren't redacted.
 
 ## Recording
 
@@ -103,13 +117,13 @@ Clip notifications are ClipX's own overlay, not Windows toasts (Focus Assist hid
 
 ### Audio tracks
 
-- Track 1 is always the full mix (desktop audio, plus the mic when a mic track exists), for normal playback.
+- Track 1 is always the full mix (desktop audio, plus the mic when a mic track exists), for normal playback. The exception is an app turned down on the Recording page (below).
 - With any tracks added, the rest split the sound so a mixer can raise, lower or mute each part by summing them instead of track 1: up to 4 sources (`planAudioTracks`), then a last track holding everything else.
 - That last track is `Desktop audio` when only the mic is separated, otherwise `Other apps`: one hidden process capture per other app with a window, re-synced every 5 s. The captures OBS restores from its scene are kept on start (moved to the current `Other apps` track) and left to the sync to prune; removing them there left `Other apps` silent until the next sync, so a custom mix of a clip from right after a restart had its first seconds missing. OBS has no "everything except these apps" capture, so sounds from apps without a window are only in track 1.
 - Each capture follows one window per exe name, so when two separate programs share an exe (e.g. two Electron apps), only one of them reaches `Other apps`.
 - OBS captures a process and all its children, so `pickOtherAudioApps` skips explorer.exe, any app with another windowed app under it (e.g. Steam running a game) and anything under a tracked app; otherwise the same sound would land on two tracks.
 - `clip.json` lists each track's `kind`.
-- The sliders on the Recording page apply while recording. The app sliders only change that app's own track, not track 1, so the split tracks only add up to track 1 when those sliders were at 100%.
+- The sliders on the Recording page apply while recording (`applyMix`). Desktop audio can't leave one app out, so while any app slider is below 100% (`mixFromTracks`) track 1 is built from the split tracks instead of desktop audio, and sounds from apps without a window drop out of it. When the game track and an app track capture the same exe, only the first goes to track 1, so a game change re-runs `applyMix`. Which source goes to which track is decided by `routeAudioTracks`.
 - When mixing them with ffmpeg, `amix` divides by the number of inputs unless you pass `normalize=0`.
 
 ### Game detection
@@ -140,7 +154,8 @@ The editor is `src/components/ClipEditor.jsx`.
 ### Saved clips and originals
 
 - Saving a trim writes it to `ClipX Videos/` inside the clip's folder and stores the original's path as `originalPath` in the saved clip's metadata (`saved_metadata_json`).
-- `listLocalClips` hides any clip that a saved clip which still exists points to, so the original leaves the grid and comes back when its saved clips are deleted. The editor's "View original" button (`local-clips:get-original`) opens it again.
+- `listLocalClips` hides any clip that a saved clip which still exists points to, so the original leaves the grid and comes back when its saved clips are deleted. The editor's "View original" button (`local-clips:get-original`) opens it again, and on the original a "View saved" button (`local-clips:get-saved`) opens its newest saved clip.
+- A saved clip always opens in the viewer (game, date, rename and delete) rather than the trim editor, in either grid. Deleting the open saved clip moves to its original instead of the next clip.
 - `renameClip` and `keepClipScreen` call `moveSavedClipOriginal` so the link follows the original's file. That only updates the index, so `upsertIndexedClip` reads the legacy `clipsData.json` only for a saved clip the index has no metadata for; otherwise a refresh would put the old `originalPath` back.
 - Saves made before this (originals renamed to `[ORIGINAL] <name>`) have no `originalPath`, so those originals stay in the grid.
 
@@ -175,6 +190,7 @@ The editor is `src/components/ClipEditor.jsx`.
 ### Uploads
 
 - `uploadClip` in `clipService.js` renders the trimmed clip, a thumbnail and (when needed) a stream copy into `%TEMP%/clipx/uploads/`, then uploads each one straight to Azure Blob Storage with an upload URL from `/api/clips`. The renderer then saves the clip row with the `create_clip_with_tags` RPC and deletes the uploaded blobs if that fails.
+- `saveCopyOnUpload` in `options.json` (`true`, `false`, or missing to ask) decides whether Upload also runs the Save flow. The question comes from `useAskOnce` in `src/components/AskOnceDialog.jsx`: `ask(optionKey, prompt)` returns the stored boolean if there is one, otherwise shows a yes/no dialog with "Don't ask again" (which stores the answer under `optionKey`) and resolves `true`, `false`, or `null` when dismissed. While it's open, `#root` is `inert` and keydowns are stopped at `window` in the capture phase, so the page's shortcuts can't act behind it. Reuse it for other ask-once choices.
 - Visibility is `public`, `friends` or `private`.
 - Clips uploaded before v1.2.0 are unlisted YouTube videos (`youtube_video_id`), which the Library still plays as YouTube embeds.
 
