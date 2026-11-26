@@ -123,7 +123,7 @@ Clip notifications are ClipX's own overlay, not Windows toasts (Focus Assist hid
 - Each capture follows one window per exe name, so when two separate programs share an exe (e.g. two Electron apps), only one of them reaches `Other apps`.
 - OBS captures a process and all its children, so `pickOtherAudioApps` skips explorer.exe, any app with another windowed app under it (e.g. Steam running a game) and anything under a tracked app; otherwise the same sound would land on two tracks.
 - `clip.json` lists each track's `kind`.
-- The sliders on the Recording page apply while recording (`applyMix`). Desktop audio can't leave one app out, so while any app slider is below 100% (`mixFromTracks`) track 1 is built from the split tracks instead of desktop audio, and sounds from apps without a window drop out of it. When the game track and an app track capture the same exe, only the first goes to track 1, so a game change re-runs `applyMix`.
+- The sliders on the Recording page apply while recording (`applyMix`). Desktop audio can't leave one app out, so while any app slider is below 100% (`mixFromTracks`) track 1 is built from the split tracks instead of desktop audio, and sounds from apps without a window drop out of it. When the game track and an app track capture the same exe, only the first goes to track 1, so a game change re-runs `applyMix`. Which source goes to which track is decided by `routeAudioTracks`.
 - When mixing them with ffmpeg, `amix` divides by the number of inputs unless you pass `normalize=0`.
 
 ### Game detection

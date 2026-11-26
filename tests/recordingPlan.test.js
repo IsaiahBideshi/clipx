@@ -14,6 +14,7 @@ import {
   pickOtherAudioApps,
   planAudioTracks,
   planRecorders,
+  routeAudioTracks,
   toAudioTrackMap,
   toOutputSize,
 } from "../electron/utils/recordingPlan.js";
@@ -135,6 +136,32 @@ test("builds the full mix from the app tracks once an app is turned down", () =>
   assert.equal(planAudioTracks([{ kind: "app", exe: "Spotify.exe", volume: 100 }]).mixFromTracks, false);
   assert.equal(planAudioTracks([{ kind: "mic", volume: 20 }]).mixFromTracks, false);
   assert.equal(planAudioTracks([{ kind: "mic" }, { kind: "app", exe: "Spotify.exe", volume: 0 }]).mixFromTracks, true);
+});
+
+test("routes track 1 to desktop audio until an app is turned down", () => {
+  const full = routeAudioTracks(planAudioTracks([{ kind: "mic" }, { kind: "app", exe: "Spotify.exe" }]));
+  assert.deepEqual(full.desktop, toAudioTrackMap(1));
+  assert.deepEqual(full.apps, { 3: toAudioTrackMap(3) });
+  assert.deepEqual(full.otherApps, toAudioTrackMap(4));
+
+  const down = routeAudioTracks(planAudioTracks([{ kind: "mic" }, { kind: "app", exe: "Spotify.exe", volume: 0 }]));
+  assert.deepEqual(down.desktop, toAudioTrackMap());
+  assert.deepEqual(down.apps, { 3: toAudioTrackMap(1, 3) });
+  assert.deepEqual(down.otherApps, toAudioTrackMap(1, 4));
+
+  const micOnly = routeAudioTracks(planAudioTracks([{ kind: "mic", volume: 0 }]));
+  assert.deepEqual(micOnly.desktop, toAudioTrackMap(1, 3));
+  assert.equal(micOnly.otherApps, null);
+});
+
+test("sends a program captured by two tracks to track 1 once", () => {
+  const audio = planAudioTracks([{ kind: "game" }, { kind: "app", exe: "Game.exe", volume: 50 }, { kind: "app", exe: "Spotify.exe" }]);
+  assert.deepEqual(routeAudioTracks(audio, "game.exe").apps, {
+    2: toAudioTrackMap(1, 2),
+    3: toAudioTrackMap(3),
+    4: toAudioTrackMap(1, 4),
+  });
+  assert.deepEqual(routeAudioTracks(audio, "Other.exe").apps[3], toAudioTrackMap(1, 3));
 });
 
 test("records only the full mix when no tracks are added", () => {
