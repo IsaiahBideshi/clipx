@@ -195,7 +195,7 @@ Public clips have a share page at `/clip/<id>` (`api-handlers/clips/share.js`), 
 The bell in the navbar (`src/components/NotificationsMenu.jsx`) opens a MUI `Popover` with two kinds of items. They're separate from the in-game clip overlay (see [Notifications](#notifications) under Recording).
 
 - Saves and uploads from this session, kept in `App.jsx` state and never stored. While one is running, the bell shows a spinner ring and is raised above the clip editor's backdrop (`.is-running`, `z-index: 9`; the editor's is 8), so the ring shows while the editor is open. Otherwise it sits under the backdrop like the rest of the navbar.
-- Rows from the `notifications` table. Only database functions write them (types and the trigger are in [SCHEMA.md](../SCHEMA.md#table-notifications)). Friend notifications come from the `notify_friendship_change` trigger, so they're created however the friendship changes (Profile page, the popup, another device).
+- Rows from the `notifications` table. Only database functions write them (types and the trigger are in [SCHEMA.md](../SCHEMA.md#table-notifications)). Friend notifications come from the `notify_friendship_change` trigger, so they're created however the friendship changes (Profile page, the popup, another device). Clip notifications (`clip_tag`, `friend_clip`) are written inside `create_clip_with_tags` and `update_clip_with_tags`, which compare the clip's visibility and tags before and after a save. A trigger on `clip_tags` can't do it, because every save deletes and reinserts the tags.
 
 How the list stays current:
 
@@ -207,6 +207,7 @@ Seen and dismissed:
 
 - The badge counts rows newer than the newest `created_at` the user had when they last opened or closed the popup (server time, so the PC's clock doesn't matter), saved per user as `clipx:notificationsSeenAt:<userId>` in auth storage. Finished saves and uploads count until the popup is opened.
 - Dismissing deletes the row. Clicking a card that links somewhere (its second line names where, e.g. "View in Profile") opens it and dismisses it. Pending friend requests have Accept and Decline instead of a dismiss button and stay until answered; "Clear all" leaves them too.
+- Clip cards link to `#/library?clip=<id>`. The Library removes the parameter, loads that one clip through the library feed's `clipId` filter (`/api/clips?scope=library&clipId=…`, which keeps the feed's visibility rules) and opens it in the preview. A clip the user can no longer see just doesn't open.
 
 ## CI
 

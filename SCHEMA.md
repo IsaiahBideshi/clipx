@@ -54,13 +54,17 @@ Clients (`authenticated`) can only update `status`; `user_id` and `friend_id` ca
 
 ## Table `notifications`
 
-What the navbar's notifications popup lists. Rows are only inserted and changed by database functions (`notify_friendship_change`), so clients can only read and delete their own. `type` has no check constraint: adding a type is a change to the functions that write it, and the app skips types it doesn't know, so older versions ignore new ones.
+What the navbar's notifications popup lists. Rows are only inserted and changed by database functions (`notify_friendship_change`, `create_clip_with_tags`, `update_clip_with_tags`), so clients can only read and delete their own. `type` has no check constraint: adding a type is a change to the functions that write it, and the app skips types it doesn't know, so older versions ignore new ones.
 
 | `type` | Sent to | `actor_id` | Shown as |
 |--------|---------|------------|----------|
 | `friend_request` | The person a request was sent to | The sender | "Alex sent you a friend request", with Accept and Decline |
 | `friend_accepted` | Both people, when a request is accepted | The other person | "You are now friends with Alex". The accepter's `friend_request` row is changed into this one. |
 | `friend_removed` | The person who was removed | The person who removed them | "Alex removed you as a friend" |
+| `clip_tag` | Each user tagged in a clip that isn't private (when it's uploaded, when they're added to it, or when it stops being private) | The clip's owner | "Alex tagged you in Clutch", opens the clip |
+| `friend_clip` | The owner's other friends, when a clip that isn't private is uploaded or stops being private | The clip's owner | "Alex uploaded Clutch", opens the clip |
+
+The `clip_tag` and `friend_clip` rows have a `clip_id` and are deleted with their clip, when the clip is made private, and (for `clip_tag`) when that user is untagged.
 
 ### Columns
 
@@ -69,6 +73,7 @@ What the navbar's notifications popup lists. Rows are only inserted and changed 
 | `id` | `uuid` | Primary |
 | `user_id` | `uuid` | Recipient, references `users` (cascade) |
 | `actor_id` | `uuid` | Nullable, references `users` (cascade) |
+| `clip_id` | `uuid` | Nullable, references `clips` (cascade) |
 | `type` | `text` |  |
 | `created_at` | `timestamptz` |  |
 
@@ -117,7 +122,7 @@ What the navbar's notifications popup lists. Rows are only inserted and changed 
 
 ### `create_clip_with_tags`
 
-Called by the upload flow (`supabase.rpc`). Inserts a clip owned by the caller and its tags in one transaction, so any error leaves neither behind. Tagged users must be accepted friends, labels are trimmed and at most 50 characters, duplicate tags are skipped, and a clip can have at most 20 tags. The renderer checks the same limits before uploading (`getClipTagsError` in `src/lib/clipsApi.js`).
+Called by the upload flow (`supabase.rpc`). Inserts a clip owned by the caller and its tags in one transaction, so any error leaves neither behind. Tagged users must be accepted friends, labels are trimmed and at most 50 characters, duplicate tags are skipped, and a clip can have at most 20 tags. The renderer checks the same limits before uploading (`getClipTagsError` in `src/lib/clipsApi.js`). A clip that isn't private sends notifications through `notify_clip_shared`.
 
 ```sql
 create or replace function public.create_clip_with_tags(
@@ -176,6 +181,10 @@ begin
     raise exception 'A clip can have at most 20 tags';
   end if;
 
+  if create_clip_with_tags.visibility <> 'private' then
+    perform public.notify_clip_shared(new_clip_id, caller_id, user_ids);
+  end if;
+
   return new_clip_id;
 end;
 $$;
@@ -187,6 +196,8 @@ grant execute on function public.create_clip_with_tags(text, text, bigint, text,
 ### `update_clip_with_tags`
 
 Called by the Library's edit dialog (`supabase.rpc`). Updates the title, visibility and game of a clip the caller owns and replaces its tags in one transaction. It locks the clip row first, so two saves of the same clip run one after the other and the last one wins. It checks the same rules as `create_clip_with_tags`, except users who are already tagged stay allowed after they stop being friends. Returns the clip's new `clip_tags` rows.
+
+Its notifications compare the clip before and after the save: making it private deletes all of the clip's notifications, making a private clip shared sends them like a new upload (`notify_clip_shared`), and otherwise only newly tagged users get a `clip_tag` and untagged users lose theirs. Tags are deleted and reinserted on every save, so this can't be a trigger on `clip_tags`.
 
 ```sql
 create or replace function public.update_clip_with_tags(
@@ -204,12 +215,14 @@ set search_path = ''
 as $$
 declare
   caller_id uuid := auth.uid();
+  old_visibility text;
+  old_user_ids uuid[];
 begin
   if caller_id is null then
     raise exception 'Not authenticated';
   end if;
 
-  perform 1 from public.clips c
+  select c.visibility into old_visibility from public.clips c
   where c.id = update_clip_with_tags.clip_id and c.owner_id = caller_id
   for update;
   if not found then
@@ -244,6 +257,9 @@ begin
     raise exception 'You can only tag your friends';
   end if;
 
+  select coalesce(array_agg(ct.user_id), '{}') into old_user_ids from public.clip_tags ct
+  where ct.clip_id = update_clip_with_tags.clip_id and ct.user_id is not null;
+
   update public.clips c
   set title = btrim(update_clip_with_tags.title),
       visibility = update_clip_with_tags.visibility,
@@ -265,12 +281,57 @@ begin
     raise exception 'A clip can have at most 20 tags';
   end if;
 
+  if update_clip_with_tags.visibility = 'private' then
+    delete from public.notifications n where n.clip_id = update_clip_with_tags.clip_id;
+  elsif old_visibility = 'private' then
+    perform public.notify_clip_shared(update_clip_with_tags.clip_id, caller_id, user_ids);
+  else
+    delete from public.notifications n
+    where n.clip_id = update_clip_with_tags.clip_id and n.type = 'clip_tag'
+      and not (n.user_id = any(coalesce(user_ids, '{}')));
+
+    insert into public.notifications (user_id, actor_id, type, clip_id)
+    select distinct t.user_id, caller_id, 'clip_tag', update_clip_with_tags.clip_id
+    from unnest(user_ids) as t(user_id)
+    where not (t.user_id = any(old_user_ids));
+  end if;
+
   return query select * from public.clip_tags ct where ct.clip_id = update_clip_with_tags.clip_id;
 end;
 $$;
 
 revoke execute on function public.update_clip_with_tags(uuid, text, text, bigint, uuid[], text[]) from public, anon;
 grant execute on function public.update_clip_with_tags(uuid, text, text, bigint, uuid[], text[]) to authenticated;
+```
+
+### `notify_clip_shared`
+
+Called by `create_clip_with_tags` and `update_clip_with_tags` when a clip is shared (uploaded or made not private). Sends each tagged user a `clip_tag` and the owner's other accepted friends a `friend_clip`, so nobody gets both for the same clip. Clients can't call it.
+
+```sql
+create or replace function public.notify_clip_shared(shared_clip_id uuid, owner_id uuid, tagged_ids uuid[])
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  insert into public.notifications (user_id, actor_id, type, clip_id)
+  select distinct t.user_id, owner_id, 'clip_tag', shared_clip_id
+  from unnest(tagged_ids) as t(user_id);
+
+  insert into public.notifications (user_id, actor_id, type, clip_id)
+  select f.friend, owner_id, 'friend_clip', shared_clip_id
+  from (
+    select case when fs.user_id = owner_id then fs.friend_id else fs.user_id end as friend
+    from public.friendships fs
+    where fs.status = 'accepted' and (fs.user_id = owner_id or fs.friend_id = owner_id)
+  ) as f
+  where not (f.friend = any(coalesce(tagged_ids, '{}')));
+end;
+$$;
+
+revoke execute on function public.notify_clip_shared(uuid, uuid, uuid[]) from public, anon, authenticated;
 ```
 
 ### `notify_friendship_change`

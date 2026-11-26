@@ -20,6 +20,18 @@ test("skips types this version doesn't know", () => {
   assert.equal(getNotificationContent(null), null);
 });
 
+test("writes clip notifications with the clip's title and links to it", () => {
+  const actor = { username: "Alex" };
+  const tagged = getNotificationContent({ type: "clip_tag", actor, clip_id: "c1", clip: { title: "Clutch" } });
+  assert.equal(text(tagged) + tagged.title, "Alex tagged you in Clutch");
+  assert.equal(tagged.link, "/library?clip=c1");
+  assert.equal(tagged.linkLabel, "View in Library");
+
+  const uploaded = getNotificationContent({ type: "friend_clip", actor, clip_id: "c2", clip: null });
+  assert.equal(text(uploaded) + uploaded.title, "Alex uploaded a clip");
+  assert.equal(uploaded.link, "/library?clip=c2");
+});
+
 test("only links notifications that have somewhere to go", () => {
   assert.equal(getNotificationContent({ type: "friend_accepted" }).link, "/profile");
   assert.equal(getNotificationContent({ type: "friend_removed" }).link, undefined);

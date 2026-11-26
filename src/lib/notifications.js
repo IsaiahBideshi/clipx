@@ -9,7 +9,7 @@ const NOTIFICATIONS_LIMIT = 50;
 async function fetchNotifications() {
   const { data, error } = await supabase
     .from("notifications")
-    .select("id, type, actor_id, created_at, actor:users!actor_id(username, avatar_url)")
+    .select("id, type, actor_id, clip_id, created_at, actor:users!actor_id(username, avatar_url), clip:clips(title)")
     .order("created_at", { ascending: false })
     .limit(NOTIFICATIONS_LIMIT);
 

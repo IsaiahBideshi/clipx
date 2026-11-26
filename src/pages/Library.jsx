@@ -6,7 +6,7 @@ import { useAuthSession } from "../lib/authSession.js";
 import { loadAccountData } from "../lib/accountApi.js";
 import { listClips, listUploadedGames, getClipShareUrl, getClipTagsError, deleteClip } from "../lib/clipsApi.js";
 import { isTextEntryActive } from '../lib/hotkeys.js';
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 import CloseIcon from '@mui/icons-material/Close';
 import EditIcon from '@mui/icons-material/Edit';
@@ -61,6 +61,9 @@ async function fetchLibraryClips(session, filters, offset = 0) {
   }
   if (filters.owner?.id) {
     query.ownerId = filters.owner.id;
+  }
+  if (filters.clipId) {
+    query.clipId = filters.clipId;
   }
   if (filters.tags?.length) {
     query.tagIds = filters.tags.filter((tag) => tag?.id).map((tag) => tag.id).join(",");
@@ -197,6 +200,7 @@ export default function Library() {
   const { session, loading: loadingSession } = useAuthSession();
 
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const userId = session?.user?.id;
   const clipsQuery = useInfiniteQuery({
     queryKey: libraryClipsKey(userId, filters),
@@ -337,6 +341,22 @@ export default function Library() {
       navigate("/login", { replace: true });
     }
   }, [loadingSession, navigate, session]);
+
+  useEffect(() => {
+    const clipId = searchParams.get("clip");
+    if (!clipId || !session) return;
+
+    setSearchParams((params) => {
+      params.delete("clip");
+      return params;
+    }, { replace: true });
+    fetchLibraryClips(session, { clipId })
+      .then(({ clips: linked }) => {
+        const clip = linked.find((item) => item.id === clipId);
+        if (clip) setSelectedClip(clip);
+      })
+      .catch((error) => console.error("Failed to open the linked clip:", error));
+  }, [searchParams, session]);
 
   function applyFilters() {
     setFilters({

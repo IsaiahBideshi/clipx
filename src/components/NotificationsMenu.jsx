@@ -98,7 +98,7 @@ export default function NotificationsMenu({ session, localItems, setLocalItems }
           </span>
           <span className="notification-body">
             <span className="notification-text">
-              {content.before}<strong>{content.name}</strong>{content.after}
+              {content.before}<strong>{content.name}</strong>{content.after}{content.title && <strong>{content.title}</strong>}
             </span>
             <span className="notification-detail">
               {content.linkLabel && <span className="notification-link-label">{content.linkLabel} · </span>}
