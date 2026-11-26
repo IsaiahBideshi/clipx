@@ -196,6 +196,7 @@ export function planAudioTracks(tracks = []) {
     micTrack: used.find((track) => track.kind === "mic")?.index ?? null,
     desktopTrack: hasAppTracks ? null : restTrack,
     otherAppsTrack: hasAppTracks ? restTrack : null,
+    mixFromTracks: used.some((track) => track.kind !== "mic" && Number(track.volume ?? 100) < 100),
   };
 }
 

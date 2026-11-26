@@ -419,7 +419,6 @@ async function setupAudio(recorder, options, ensureInput, existingInputs) {
   const audio = planAudioTracks(options.clipAudioTracks);
 
   await ensureInput(DESKTOP_AUDIO_INPUT_NAME, "wasapi_output_capture");
-  await recorderRequest(recorder, "SetInputAudioTracks", { inputName: DESKTOP_AUDIO_INPUT_NAME, inputAudioTracks: toAudioTrackMap(1, audio.desktopTrack) });
 
   await ensureInput(MIC_INPUT_NAME, "wasapi_input_capture");
   await recorderRequest(recorder, "SetInputMute", { inputName: MIC_INPUT_NAME, inputMuted: !audio.micTrack });
@@ -441,22 +440,20 @@ async function setupAudio(recorder, options, ensureInput, existingInputs) {
 
     const exe = track.kind === "game" ? getGameTrackExe() : track.exe;
     await ensureInput(inputName, "wasapi_process_output_capture", { window: toWindowMatch(exe), priority: 2 });
-    await recorderRequest(recorder, "SetInputAudioTracks", { inputName, inputAudioTracks: toAudioTrackMap(index) });
   }
 
-  await applyVolumes(recorder, audio);
-
   for (const inputName of existingInputs) {
-    if (!inputName.startsWith(OTHER_APP_INPUT_PREFIX)) {
-      continue;
-    }
-    if (audio.otherAppsTrack) {
-      await recorderRequest(recorder, "SetInputAudioTracks", { inputName, inputAudioTracks: toAudioTrackMap(audio.otherAppsTrack) });
-    } else {
+    if (inputName.startsWith(OTHER_APP_INPUT_PREFIX) && !audio.otherAppsTrack) {
       await recorderRequest(recorder, "RemoveInput", { inputName });
       existingInputs.delete(inputName);
     }
   }
+
+  await applyMix(recorder, audio);
+}
+
+function toAppTrackMap(audio, index) {
+  return toAudioTrackMap(audio.mixFromTracks ? 1 : null, index);
 }
 
 async function syncOtherApps(recorder, options) {
@@ -490,7 +487,7 @@ async function syncOtherApps(recorder, options) {
       inputKind: "wasapi_process_output_capture",
       inputSettings: { window: toWindowMatch(exe), priority: 2 },
     });
-    await recorderRequest(recorder, "SetInputAudioTracks", { inputName, inputAudioTracks: toAudioTrackMap(audio.otherAppsTrack) });
+    await recorderRequest(recorder, "SetInputAudioTracks", { inputName, inputAudioTracks: toAppTrackMap(audio, audio.otherAppsTrack) });
   }
 }
 
@@ -508,11 +505,27 @@ function runOtherAppsSync() {
     });
 }
 
-async function applyVolumes(recorder, audio) {
+async function applyMix(recorder, audio) {
+  await recorderRequest(recorder, "SetInputAudioTracks", {
+    inputName: DESKTOP_AUDIO_INPUT_NAME,
+    inputAudioTracks: toAudioTrackMap(audio.mixFromTracks ? null : 1, audio.desktopTrack),
+  });
   for (const track of audio.tracks) {
     const inputName = track.kind === "mic" ? MIC_INPUT_NAME : `ClipX Track ${track.index}`;
     const volume = Math.min(Math.max(Number(track.volume ?? 100), 0), 100);
     await recorderRequest(recorder, "SetInputVolume", { inputName, inputVolumeMul: volume / 100 });
+    if (track.kind !== "mic") {
+      await recorderRequest(recorder, "SetInputAudioTracks", { inputName, inputAudioTracks: toAppTrackMap(audio, track.index) });
+    }
+  }
+  if (!audio.otherAppsTrack) {
+    return;
+  }
+  const { inputs } = await recorderRequest(recorder, "GetInputList");
+  for (const { inputName } of inputs) {
+    if (inputName.startsWith(OTHER_APP_INPUT_PREFIX)) {
+      await recorderRequest(recorder, "SetInputAudioTracks", { inputName, inputAudioTracks: toAppTrackMap(audio, audio.otherAppsTrack) }).catch(() => {});
+    }
   }
 }
 
@@ -1013,7 +1026,7 @@ async function applyOptions(next) {
       throw error;
     }
   } else {
-    await applyVolumes(recorders.get("main"), planAudioTracks(next.clipAudioTracks));
+    await applyMix(recorders.get("main"), planAudioTracks(next.clipAudioTracks));
   }
 }
 

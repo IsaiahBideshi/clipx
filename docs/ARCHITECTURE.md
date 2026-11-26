@@ -117,13 +117,13 @@ Clip notifications are ClipX's own overlay, not Windows toasts (Focus Assist hid
 
 ### Audio tracks
 
-- Track 1 is always the full mix (desktop audio, plus the mic when a mic track exists), for normal playback.
+- Track 1 is always the full mix (desktop audio, plus the mic when a mic track exists), for normal playback. The exception is an app turned down on the Recording page (below).
 - With any tracks added, the rest split the sound so a mixer can raise, lower or mute each part by summing them instead of track 1: up to 4 sources (`planAudioTracks`), then a last track holding everything else.
 - That last track is `Desktop audio` when only the mic is separated, otherwise `Other apps`: one hidden process capture per other app with a window, re-synced every 5 s. The captures OBS restores from its scene are kept on start (moved to the current `Other apps` track) and left to the sync to prune; removing them there left `Other apps` silent until the next sync, so a custom mix of a clip from right after a restart had its first seconds missing. OBS has no "everything except these apps" capture, so sounds from apps without a window are only in track 1.
 - Each capture follows one window per exe name, so when two separate programs share an exe (e.g. two Electron apps), only one of them reaches `Other apps`.
 - OBS captures a process and all its children, so `pickOtherAudioApps` skips explorer.exe, any app with another windowed app under it (e.g. Steam running a game) and anything under a tracked app; otherwise the same sound would land on two tracks.
 - `clip.json` lists each track's `kind`.
-- The sliders on the Recording page apply while recording. The app sliders only change that app's own track, not track 1, so the split tracks only add up to track 1 when those sliders were at 100%.
+- The sliders on the Recording page apply while recording (`applyMix`). Desktop audio can't leave one app out, so while any app slider is below 100% (`mixFromTracks`) track 1 is built from the split tracks instead of desktop audio, and sounds from apps without a window drop out of it.
 - When mixing them with ffmpeg, `amix` divides by the number of inputs unless you pass `normalize=0`.
 
 ### Game detection

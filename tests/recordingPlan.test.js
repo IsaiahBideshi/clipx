@@ -130,6 +130,13 @@ test("lays out audio tracks after the full mix", () => {
   assert.deepEqual(toAudioTrackMap(1, 3), { 1: true, 2: false, 3: true, 4: false, 5: false, 6: false });
 });
 
+test("builds the full mix from the app tracks once an app is turned down", () => {
+  assert.equal(planAudioTracks([{ kind: "app", exe: "Spotify.exe" }]).mixFromTracks, false);
+  assert.equal(planAudioTracks([{ kind: "app", exe: "Spotify.exe", volume: 100 }]).mixFromTracks, false);
+  assert.equal(planAudioTracks([{ kind: "mic", volume: 20 }]).mixFromTracks, false);
+  assert.equal(planAudioTracks([{ kind: "mic" }, { kind: "app", exe: "Spotify.exe", volume: 0 }]).mixFromTracks, true);
+});
+
 test("records only the full mix when no tracks are added", () => {
   const plan = planAudioTracks([]);
   assert.equal(plan.recTracks, 1);
