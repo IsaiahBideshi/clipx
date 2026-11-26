@@ -31,7 +31,7 @@ PowerShell here has execution-policy disabled, so `npm` fails; always use `npm.c
 
 ## Docs
 
-- Update `README.md` in the same change whenever it stops being true: a user-facing feature added, changed or removed, download or install steps, dev setup, commands or the tech stack. The README is for people using or setting up ClipX, so keep internals out of it.
+- Update `README.md` in the same change whenever it stops being true: a main feature added, changed or removed, download or install steps, dev setup, commands or the tech stack. The README is for people using or setting up ClipX: it lists the main features only, so don't add every smaller feature or improvement to it, and keep internals out of it.
 - Update `docs/ARCHITECTURE.md` when you change how something it describes works, or add a part it doesn't cover. Architecture goes there, not here; keep this file to rules and commands.
 - Before writing Electron code, read:
   - https://www.electron.build/docs/features/auto-update/

@@ -129,6 +129,21 @@ contextBridge.exposeInMainWorld("clipx", {
     ipcRenderer.on("clipping:state", listener);
     return () => ipcRenderer.removeListener("clipping:state", listener);
   },
+  onClippingProblem: (callback) => {
+    if (typeof callback !== "function") {
+      return () => {};
+    }
+
+    const listener = (_event, problem) => {
+      try {
+        callback(problem);
+      } catch (error) {
+        console.error("ClipX: Clipping problem callback failed:", error);
+      }
+    };
+    ipcRenderer.on("clipping:problem", listener);
+    return () => ipcRenderer.removeListener("clipping:problem", listener);
+  },
   previewToast: () => ipcRenderer.invoke("clipping:preview-toast"),
   onToast: (callback) => {
     if (typeof callback !== "function") {

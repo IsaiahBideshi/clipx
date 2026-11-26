@@ -60,7 +60,10 @@ const HOTKEY_POLL_MS = 25;
 const IDENTIFY_DURATION_MS = 2500;
 const OUTPUTS_EVENT_SUBSCRIPTION = 1 << 6;
 
+const LOW_DISK_BYTES = 5 * 1024 ** 3;
+
 let latestState = { status: "off" };
+let clipsDriveLow = false;
 let hotkeyError = null;
 let hotkeyTimer = null;
 let appliedOptions = null;
@@ -101,18 +104,42 @@ function getSnapshot() {
   };
 }
 
-function emitClippingState(state) {
-  latestState = state;
-  const snapshot = getSnapshot();
-
+function sendToWindows(channel, payload) {
   for (const window of BrowserWindow.getAllWindows()) {
     if (!window.isDestroyed()) {
-      window.webContents.send("clipping:state", snapshot);
+      window.webContents.send(channel, payload);
     }
   }
 }
 
+function emitClippingState(state) {
+  latestState = state;
+  sendToWindows("clipping:state", getSnapshot());
+}
+
+async function checkClipsDrive(folder) {
+  try {
+    const { bavail, bsize } = await fs.promises.statfs(folder);
+    const free = bavail * bsize;
+    const low = free < LOW_DISK_BYTES;
+    if (low && !clipsDriveLow) {
+      sendToWindows("clipping:problem", {
+        id: "disk",
+        title: "Your clips drive is almost full",
+        detail: `${(free / 1024 ** 3).toFixed(1)} GB left, so new clips may fail to save.`,
+      });
+    }
+    clipsDriveLow = low;
+  } catch (error) {
+    console.error("ClipX: Failed to check the clips drive's free space:", error);
+  }
+}
+
 function notify(kind, title, detail) {
+  if (kind === "failed") {
+    sendToWindows("clipping:problem", { id: title, title, detail });
+  }
+
   const options = requestedOptions || getRecordingOptions({});
   const screenId = recorders.get("main")?.screenId;
   const display = screen.getAllDisplays().find((candidate) => candidate.id === screenId)
@@ -622,6 +649,7 @@ async function launchRecorders(options, signal) {
     startFollowing();
   }
   emitClippingState({ status: "ready" });
+  void checkClipsDrive(options.clipsFolder);
   if (planAudioTracks(options.clipAudioTracks).otherAppsTrack) {
     runOtherAppsSync();
     otherAppsTimer = setInterval(runOtherAppsSync, OTHER_APPS_SYNC_INTERVAL_MS);
@@ -867,6 +895,7 @@ async function writeClip(options) {
     console.error("ClipX: Failed to save clip:", error);
     notify("failed", "Clip failed", error?.message || "The clip could not be saved.");
   }
+  void checkClipsDrive(options.clipsFolder);
 }
 
 function stopHotkey() {

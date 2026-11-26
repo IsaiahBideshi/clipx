@@ -63,8 +63,14 @@ export default function NotificationsMenu({ session, localItems, setLocalItems }
     handleClose();
     navigate(content.link);
     if (notification.type !== "friend_request") {
-      dismiss(notification.id);
+      dismiss(notification);
     }
+  }
+
+  function handleOpenProblem(item) {
+    handleClose();
+    navigate("/recording");
+    dismissLocal(item.key);
   }
 
   async function handleCopyLink(item) {
@@ -116,7 +122,31 @@ export default function NotificationsMenu({ session, localItems, setLocalItems }
                 <CloseIcon />
               </button>
             </>
-          ) : renderDismiss(() => dismiss(item.id))}
+          ) : renderDismiss(() => dismiss(item))}
+        </div>
+      </li>
+    );
+  }
+
+  function renderProblem(item) {
+    return (
+      <li key={item.key} className="notification-item is-link">
+        <button type="button" className="notification-main" onClick={() => handleOpenProblem(item)}>
+          <span className={`notification-status ${item.resolved ? "saved" : "failed"}`}>
+            {item.resolved ? <CheckIcon /> : <ErrorOutlineIcon />}
+          </span>
+          <span className="notification-body">
+            <span className="notification-text">
+              <strong>{item.title}</strong>{item.detail && `. ${item.detail}`}
+            </span>
+            <span className="notification-detail">
+              <span className="notification-link-label">View in Recording · </span>
+              {formatDate(item.createdAt)}
+            </span>
+          </span>
+        </button>
+        <div className="notification-actions">
+          {renderDismiss(() => dismissLocal(item.key))}
         </div>
       </li>
     );
@@ -202,7 +232,11 @@ export default function NotificationsMenu({ session, localItems, setLocalItems }
         </div>
         {items.length ? (
           <ul className="notifications-list">
-            {items.map((item) => (item.kind === "notification" ? renderNotification(item) : renderLocalItem(item)))}
+            {items.map((item) => {
+              if (item.kind === "notification") return renderNotification(item);
+              if (item.kind === "recording") return renderProblem(item);
+              return renderLocalItem(item);
+            })}
           </ul>
         ) : (
           <p className="notifications-empty">You're all caught up.</p>

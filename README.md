@@ -27,7 +27,6 @@ ClipX updates itself when a new version is out.
 **Share**
 - Upload clips with a title, game and tags for the people in them. Each clip is public, friends only or private.
 - Add friends and browse their clips in the Library. Search by tag, person or game.
-- The bell in the top bar shows your saves and uploads, friend requests (accept or decline them right there), when someone accepts your request or removes you as a friend, new clips from friends and clips you're tagged in. Click a clip to open it in the Library.
 - Public clips get a share link anyone can watch in their browser, no ClipX needed. Links show a playable preview in Discord.
 
 You need a ClipX account to upload clips and use the Library.

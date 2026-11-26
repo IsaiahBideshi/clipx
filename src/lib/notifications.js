@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "./supabase.js";
 import { acceptFriendRequest, declineFriendRequest } from "./friendsApi.js";
-import { countUnseen, getNewestTime, getNotificationContent } from "./notificationItems.js";
+import { countUnseen, getNewestTime, getNotificationContent, groupNotifications } from "./notificationItems.js";
 
 const NOTIFICATIONS_LIMIT = 50;
 
@@ -34,7 +34,7 @@ export function useNotifications(session) {
     refetchOnMount: true,
     refetchOnWindowFocus: true,
   });
-  const notifications = userId ? (data || []).filter(getNotificationContent) : [];
+  const notifications = userId ? groupNotifications((data || []).filter(getNotificationContent)) : [];
 
   useEffect(() => {
     setSeenAt(undefined);
@@ -118,8 +118,8 @@ export function useNotifications(session) {
     notifications,
     unseenCount: countUnseen(notifications, seenAt),
     markSeen,
-    dismiss: (id) => remove([id]),
-    dismissAll: () => remove(notifications.filter((item) => item.type !== "friend_request").map((item) => item.id)),
+    dismiss: (item) => remove(item.ids),
+    dismissAll: () => remove(notifications.filter((item) => item.type !== "friend_request").flatMap((item) => item.ids)),
     respond,
   };
 }

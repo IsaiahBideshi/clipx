@@ -19,6 +19,7 @@ import ChangelogModal from "./components/ChangelogModal.jsx";
 import changelog from "../CHANGELOG.md?raw";
 import announcements from "../ANNOUNCEMENTS.md?raw";
 import { getNewAnnouncements } from "./lib/announcements.js";
+import { useRecordingProblems } from "./lib/recordingProblems.js";
 
 const LAST_SEEN_CHANGELOG_KEY = "clipx:lastSeenChangelogVersion";
 
@@ -44,6 +45,7 @@ export default function App() {
   const [updateChangelog, setUpdateChangelog] = useState(null);
   const showUpdateButton = hasNavUpdate(updateState);
   const [localNotifications, setLocalNotifications] = useState([]);
+  useRecordingProblems(setLocalNotifications);
   const savingPaths = localNotifications.filter((item) => item.status === "saving").map((item) => item.path);
   const uploadingPaths = localNotifications.filter((item) => item.status === "uploading").map((item) => item.path);
   const queryClient = useQueryClient();
