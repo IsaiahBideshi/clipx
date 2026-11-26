@@ -44,6 +44,8 @@ Each row tags either a ClipX account (`user_id`) or custom text (`label`), never
 
 Clients (`authenticated`) can only update `status`; `user_id` and `friend_id` can't be changed after a request is sent.
 
+There's at most one row per pair of users, in either direction (unique index `friendships_pair_key` on `least(user_id, friend_id), greatest(user_id, friend_id)`), so sending a request to someone who already sent you one fails instead of creating a second row.
+
 ### Columns
 
 | Name | Type | Constraints |
@@ -64,7 +66,7 @@ What the navbar's notifications popup lists. Rows are only inserted and changed 
 | `clip_tag` | Each user tagged in a clip that isn't private (when it's uploaded, when they're added to it, or when it stops being private) | The clip's owner | "Alex tagged you in Clutch", opens the clip |
 | `friend_clip` | The owner's other friends, when a clip that isn't private is uploaded or stops being private | The clip's owner | "Alex uploaded Clutch", opens the clip |
 
-The `clip_tag` and `friend_clip` rows have a `clip_id` and are deleted with their clip, when the clip is made private, and (for `clip_tag`) when that user is untagged.
+The `clip_tag` and `friend_clip` rows have a `clip_id` and are deleted with their clip, when the clip is made private, when a friends-only clip's owner and the recipient stop being friends, and (for `clip_tag`) when that user is untagged. A user tagged after the upload gets a `clip_tag` that replaces their `friend_clip`.
 
 ### Columns
 
@@ -197,7 +199,7 @@ grant execute on function public.create_clip_with_tags(text, text, bigint, text,
 
 Called by the Library's edit dialog (`supabase.rpc`). Updates the title, visibility and game of a clip the caller owns and replaces its tags in one transaction. It locks the clip row first, so two saves of the same clip run one after the other and the last one wins. It checks the same rules as `create_clip_with_tags`, except users who are already tagged stay allowed after they stop being friends. Returns the clip's new `clip_tags` rows.
 
-Its notifications compare the clip before and after the save: making it private deletes all of the clip's notifications, making a private clip shared sends them like a new upload (`notify_clip_shared`), and otherwise only newly tagged users get a `clip_tag` and untagged users lose theirs. Tags are deleted and reinserted on every save, so this can't be a trigger on `clip_tags`.
+Its notifications compare the clip before and after the save: making it private deletes all of the clip's notifications, making a private clip shared sends them like a new upload (`notify_clip_shared`), and otherwise only newly tagged users get a `clip_tag` (replacing their `friend_clip` for it) and untagged users lose theirs. Tags are deleted and reinserted on every save, so this can't be a trigger on `clip_tags`.
 
 ```sql
 create or replace function public.update_clip_with_tags(
@@ -287,8 +289,9 @@ begin
     perform public.notify_clip_shared(update_clip_with_tags.clip_id, caller_id, user_ids);
   else
     delete from public.notifications n
-    where n.clip_id = update_clip_with_tags.clip_id and n.type = 'clip_tag'
-      and not (n.user_id = any(coalesce(user_ids, '{}')));
+    where n.clip_id = update_clip_with_tags.clip_id
+      and ((n.type = 'clip_tag' and not (n.user_id = any(coalesce(user_ids, '{}'))))
+        or (n.type = 'friend_clip' and n.user_id = any(coalesce(user_ids, '{}'))));
 
     insert into public.notifications (user_id, actor_id, type, clip_id)
     select distinct t.user_id, caller_id, 'clip_tag', update_clip_with_tags.clip_id
@@ -340,7 +343,7 @@ Trigger on `friendships` (after insert, update or delete, for each row) that wri
 
 - A new pending request sends the recipient a `friend_request`.
 - Accepting changes the accepter's `friend_request` into a `friend_accepted` (so accepting on the Profile page or in the popup updates the same card) and sends the sender a `friend_accepted`.
-- Deleting a friendship (declined, cancelled or removed) deletes the pair's `friend_request` and `friend_accepted` rows. Removing an accepted friend also sends the other person a `friend_removed`, with the remover from `auth.uid()`. Deletes without a signed-in caller (service role, account deletion) send nothing.
+- Deleting a friendship (declined, cancelled or removed) deletes the pair's `friend_request` and `friend_accepted` rows. Ending an accepted friendship also deletes each person's `clip_tag` and `friend_clip` rows for the other's friends-only clips, which they can't see anymore. Removing an accepted friend also sends the other person a `friend_removed`, with the remover from `auth.uid()`. Deletes without a signed-in caller (service role, account deletion) send nothing.
 
 ```sql
 create or replace function public.notify_friendship_change()
@@ -372,9 +375,17 @@ begin
       and ((n.user_id = old.user_id and n.actor_id = old.friend_id)
         or (n.user_id = old.friend_id and n.actor_id = old.user_id));
 
-    if old.status = 'accepted' and caller_id in (old.user_id, old.friend_id) then
-      insert into public.notifications (user_id, actor_id, type)
-      values (case when caller_id = old.user_id then old.friend_id else old.user_id end, caller_id, 'friend_removed');
+    if old.status = 'accepted' then
+      delete from public.notifications n
+      using public.clips c
+      where n.clip_id = c.id and c.visibility = 'friends'
+        and ((n.user_id = old.user_id and c.owner_id = old.friend_id)
+          or (n.user_id = old.friend_id and c.owner_id = old.user_id));
+
+      if caller_id in (old.user_id, old.friend_id) then
+        insert into public.notifications (user_id, actor_id, type)
+        values (case when caller_id = old.user_id then old.friend_id else old.user_id end, caller_id, 'friend_removed');
+      end if;
     end if;
   end if;
 

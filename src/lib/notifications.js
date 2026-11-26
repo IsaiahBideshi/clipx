@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "./supabase.js";
-import { acceptFriendRequest, declineFriendRequest } from "./friendsApi.js";
+import { acceptFriendRequest, declineFriendRequest, refreshFriendQueries } from "./friendsApi.js";
 import { countUnseen, getNewestTime, getNotificationContent, groupNotifications } from "./notificationItems.js";
 
 const NOTIFICATIONS_LIMIT = 50;
+const FRIEND_TYPES = ["friend_request", "friend_accepted", "friend_removed"];
 
 async function fetchNotifications() {
   const { data, error } = await supabase
@@ -61,7 +62,9 @@ export function useNotifications(session) {
       return undefined;
     }
 
-    const refresh = () => queryClient.invalidateQueries({ queryKey: ["notifications", userId] });
+    const refresh = (payload) => (FRIEND_TYPES.includes(payload.new?.type)
+      ? refreshFriendQueries(userId)
+      : queryClient.invalidateQueries({ queryKey: ["notifications", userId] }));
     const filter = `user_id=eq.${userId}`;
     const channel = supabase
       .channel(`notifications:${userId}`)
@@ -69,7 +72,7 @@ export function useNotifications(session) {
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "notifications", filter }, refresh)
       .subscribe((status) => {
         if (status === "SUBSCRIBED") {
-          refresh();
+          refreshFriendQueries(userId);
         }
       });
 

@@ -1,7 +1,7 @@
 import { supabase } from "./supabase.js";
 import { queryClient } from "./queryClient.js";
 
-function refreshFriendQueries(userId) {
+export function refreshFriendQueries(userId) {
   queryClient.invalidateQueries({ queryKey: ["profile", "friendships", userId], refetchType: "all" });
   queryClient.invalidateQueries({ queryKey: ["notifications", userId] });
   queryClient.invalidateQueries({ queryKey: ["library", "friendsOptions", userId], refetchType: "all" });

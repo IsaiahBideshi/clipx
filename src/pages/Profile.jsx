@@ -365,9 +365,8 @@ export default function Profile() {
 
     if (error) {
       console.error("Error sending friend request:", error);
-    } else {
-      getFriendships();
     }
+    getFriendships();
   }
 
   function handleOpenRemoveConfirm(friendshipId, friendDisplayName) {

@@ -168,7 +168,7 @@ export function formatDate(dateStr) {
   const diff = Math.floor((now - date) / 1000); // in seconds
 
   if (diff < 60) {
-    return `${diff} seconds ago`;
+    return "just now";
   }
   if (diff < 3600) {
     const time = Math.floor(diff / 60);
