@@ -359,6 +359,18 @@ export default function ClipEditor({
     };
   }, [clip.path, clip.collection]);
 
+  useEffect(() => {
+    if (isSavedClip || typeof window.clipx?.onLocalClipIndexChanged !== "function") {
+      return undefined;
+    }
+
+    return window.clipx.onLocalClipIndexChanged((event) => {
+      if (event?.type !== "removed" && event?.clip?.savedMetadata?.originalPath === clip.path) {
+        setLinkedClip(event.clip);
+      }
+    });
+  }, [isSavedClip, clip.path]);
+
   return (
     <div className="clip-editor-container">
       
