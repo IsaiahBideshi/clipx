@@ -487,7 +487,8 @@ async function syncOtherApps(recorder, options) {
       inputKind: "wasapi_process_output_capture",
       inputSettings: { window: toWindowMatch(exe), priority: 2 },
     });
-    await recorderRequest(recorder, "SetInputAudioTracks", { inputName, inputAudioTracks: toAppTrackMap(audio, audio.otherAppsTrack) });
+    const latest = planAudioTracks(appliedOptions.clipAudioTracks);
+    await recorderRequest(recorder, "SetInputAudioTracks", { inputName, inputAudioTracks: toAppTrackMap(latest, latest.otherAppsTrack) });
   }
 }
 
@@ -510,12 +511,16 @@ async function applyMix(recorder, audio) {
     inputName: DESKTOP_AUDIO_INPUT_NAME,
     inputAudioTracks: toAudioTrackMap(audio.mixFromTracks ? null : 1, audio.desktopTrack),
   });
+  const mixedExes = new Set();
   for (const track of audio.tracks) {
     const inputName = track.kind === "mic" ? MIC_INPUT_NAME : `ClipX Track ${track.index}`;
     const volume = Math.min(Math.max(Number(track.volume ?? 100), 0), 100);
     await recorderRequest(recorder, "SetInputVolume", { inputName, inputVolumeMul: volume / 100 });
     if (track.kind !== "mic") {
-      await recorderRequest(recorder, "SetInputAudioTracks", { inputName, inputAudioTracks: toAppTrackMap(audio, track.index) });
+      const exe = (track.kind === "game" ? getGameTrackExe() : track.exe || "").toLowerCase();
+      const mixTrack = audio.mixFromTracks && !mixedExes.has(exe) ? 1 : null;
+      mixedExes.add(exe);
+      await recorderRequest(recorder, "SetInputAudioTracks", { inputName, inputAudioTracks: toAudioTrackMap(mixTrack, track.index) });
     }
   }
   if (!audio.otherAppsTrack) {
@@ -934,6 +939,8 @@ async function onGameChange() {
     inputName: `ClipX Track ${gameTrack.index}`,
     inputSettings: { window: toWindowMatch(getGameTrackExe()), priority: 2 },
   }).catch((error) => console.error("ClipX: Failed to point the game track at the new game:", error));
+  await applyMix(main, planAudioTracks(appliedOptions.clipAudioTracks))
+    .catch((error) => console.error("ClipX: Failed to update the full mix for the new game:", error));
   runOtherAppsSync();
 }
 
