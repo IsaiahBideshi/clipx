@@ -52,6 +52,26 @@ Clients (`authenticated`) can only update `status`; `user_id` and `friend_id` ca
 | `friend_id` | `uuid` | Primary |
 | `status` | `text` |  Nullable |
 
+## Table `notifications`
+
+What the navbar's notifications popup lists. Rows are only inserted and changed by database functions (`notify_friendship_change`), so clients can only read and delete their own. `type` has no check constraint: adding a type is a change to the functions that write it, and the app skips types it doesn't know, so older versions ignore new ones.
+
+| `type` | Sent to | `actor_id` | Shown as |
+|--------|---------|------------|----------|
+| `friend_request` | The person a request was sent to | The sender | "Alex sent you a friend request", with Accept and Decline |
+| `friend_accepted` | Both people, when a request is accepted | The other person | "You are now friends with Alex". The accepter's `friend_request` row is changed into this one. |
+| `friend_removed` | The person who was removed | The person who removed them | "Alex removed you as a friend" |
+
+### Columns
+
+| Name | Type | Constraints |
+|------|------|-------------|
+| `id` | `uuid` | Primary |
+| `user_id` | `uuid` | Recipient, references `users` (cascade) |
+| `actor_id` | `uuid` | Nullable, references `users` (cascade) |
+| `type` | `text` |  |
+| `created_at` | `timestamptz` |  |
+
 ## RLS Policies
 
 ### `users`
@@ -85,6 +105,13 @@ Clients (`authenticated`) can only update `status`; `user_id` and `friend_id` ca
 | `Users can delete their own friendships` | DELETE | public | PERMISSIVE | `((auth.uid() = user_id) OR (auth.uid() = friend_id))` | — |
 | `Users can send friend request` | INSERT | public | PERMISSIVE | — | `((auth.uid() = user_id) AND (status = 'pending'::text))` |
 | `Users can view their friendships` | SELECT | public | PERMISSIVE | `((auth.uid() = user_id) OR (auth.uid() = friend_id))` | — |
+
+### `notifications`
+
+| Policy | Command | Roles | Action | USING | WITH CHECK |
+|--------|---------|-------|--------|-------|------------|
+| `Users can delete their notifications` | DELETE | public | PERMISSIVE | `(auth.uid() = user_id)` | — |
+| `Users can view their notifications` | SELECT | public | PERMISSIVE | `(auth.uid() = user_id)` | — |
 
 ## Functions
 
@@ -244,4 +271,57 @@ $$;
 
 revoke execute on function public.update_clip_with_tags(uuid, text, text, bigint, uuid[], text[]) from public, anon;
 grant execute on function public.update_clip_with_tags(uuid, text, text, bigint, uuid[], text[]) to authenticated;
+```
+
+### `notify_friendship_change`
+
+Trigger on `friendships` (after insert, update or delete, for each row) that writes the friend notifications:
+
+- A new pending request sends the recipient a `friend_request`.
+- Accepting changes the accepter's `friend_request` into a `friend_accepted` (so accepting on the Profile page or in the popup updates the same card) and sends the sender a `friend_accepted`.
+- Deleting a friendship (declined, cancelled or removed) deletes the pair's `friend_request` and `friend_accepted` rows. Removing an accepted friend also sends the other person a `friend_removed`, with the remover from `auth.uid()`. Deletes without a signed-in caller (service role, account deletion) send nothing.
+
+```sql
+create or replace function public.notify_friendship_change()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  caller_id uuid := auth.uid();
+begin
+  if tg_op = 'INSERT' then
+    if new.status = 'pending' then
+      insert into public.notifications (user_id, actor_id, type)
+      values (new.friend_id, new.user_id, 'friend_request');
+    end if;
+  elsif tg_op = 'UPDATE' then
+    if old.status = 'pending' and new.status = 'accepted' then
+      update public.notifications n
+      set type = 'friend_accepted'
+      where n.user_id = new.friend_id and n.actor_id = new.user_id and n.type = 'friend_request';
+
+      insert into public.notifications (user_id, actor_id, type)
+      values (new.user_id, new.friend_id, 'friend_accepted');
+    end if;
+  else
+    delete from public.notifications n
+    where n.type in ('friend_request', 'friend_accepted')
+      and ((n.user_id = old.user_id and n.actor_id = old.friend_id)
+        or (n.user_id = old.friend_id and n.actor_id = old.user_id));
+
+    if old.status = 'accepted' and caller_id in (old.user_id, old.friend_id) then
+      insert into public.notifications (user_id, actor_id, type)
+      values (case when caller_id = old.user_id then old.friend_id else old.user_id end, caller_id, 'friend_removed');
+    end if;
+  end if;
+
+  return null;
+end;
+$$;
+
+create trigger notify_friendship_change
+after insert or update or delete on public.friendships
+for each row execute function public.notify_friendship_change();
 ```

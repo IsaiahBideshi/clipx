@@ -190,6 +190,24 @@ Uploads above ~10 Mbps also get a 1080p, ~8 Mbps stream copy stored next to the 
 
 Public clips have a share page at `/clip/<id>` (`api-handlers/clips/share.js`), which plays the clip in any browser. Its player is `VideoPlayer` bundled by `npm.cmd run build:player` into `public/clip-player/`. Vercel has no build step, so that output is committed and has to be rebuilt after changing `VideoPlayer.jsx`, `player.css` or `playerPrefs.js`.
 
+## In-app notifications
+
+The bell in the navbar (`src/components/NotificationsMenu.jsx`) opens a MUI `Popover` with two kinds of items. They're separate from the in-game clip overlay (see [Notifications](#notifications) under Recording).
+
+- Saves and uploads from this session, kept in `App.jsx` state and never stored. While one is running, the bell shows a spinner ring and is raised above the clip editor's backdrop (`.is-running`, `z-index: 9`; the editor's is 8), so the ring shows while the editor is open. Otherwise it sits under the backdrop like the rest of the navbar.
+- Rows from the `notifications` table. Only database functions write them (types and the trigger are in [SCHEMA.md](../SCHEMA.md#table-notifications)). Friend notifications come from the `notify_friendship_change` trigger, so they're created however the friendship changes (Profile page, the popup, another device).
+
+How the list stays current:
+
+- `useNotifications` (`src/lib/notifications.js`) loads the newest 50 rows and listens to Realtime `INSERT` and `UPDATE` events on the user's rows. Realtime sends deletes without applying RLS, so it doesn't listen for them. It refetches when the window gets focus and whenever the channel (re)subscribes instead.
+- Accepting a request changes the accepter's `friend_request` row into `friend_accepted` in the database, so the card turns into "You are now friends with …" whether the request was accepted on the Profile page or in the popup. `src/lib/friendsApi.js` holds the accept and decline calls both use.
+- Types the app doesn't know are skipped (`getNotificationContent` in `src/lib/notificationItems.js` returns `null`), so older versions ignore types added later. That's why `type` has no check constraint.
+
+Seen and dismissed:
+
+- The badge counts rows newer than the newest `created_at` the user had when they last opened or closed the popup (server time, so the PC's clock doesn't matter), saved per user as `clipx:notificationsSeenAt:<userId>` in auth storage. Finished saves and uploads count until the popup is opened.
+- Dismissing deletes the row. Clicking a card that links somewhere (its second line names where, e.g. "View in Profile") opens it and dismisses it. Pending friend requests have Accept and Decline instead of a dismiss button and stay until answered; "Clear all" leaves them too.
+
 ## CI
 
 Pull requests to `master` run `ci.yml` on `windows-latest`: `npm ci`, a `node --check` syntax pass over `api/`, `api-handlers/`, `electron/` and `scripts/`, then `npm test` and `build:react`. Last, it rebuilds the share player and fails if `public/clip-player/` differs from what's committed.
