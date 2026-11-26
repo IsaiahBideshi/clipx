@@ -2,11 +2,14 @@ import fallBackThumb from "../assets/thumbnail.svg";
 import { useState, useEffect } from "react";
 
 import MoreVertIcon from '@mui/icons-material/MoreVert';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
+import Tooltip from '@mui/material/Tooltip';
 import DesktopWindowsIcon from "@mui/icons-material/DesktopWindows";
 import BookmarkIcon from "@mui/icons-material/Bookmark";
 import { getScreenCount } from "../../electron/utils/clipManifest.js";
 
-function ClipCard({ clip, baseFolder, onClick, onContextMenuAction }) {
+function ClipCard({ clip, baseFolder, onClick, onContextMenuAction, onDelete, onRename }) {
   const [thumbSrc, setThumbSrc] = useState(() => getThumbUrl(clip.thumbnailPath) || fallBackThumb);
   const [hasThumb, setHasThumb] = useState(Boolean(clip.thumbnailPath));
   const [screenCount, setScreenCount] = useState(1);
@@ -97,9 +100,39 @@ function ClipCard({ clip, baseFolder, onClick, onContextMenuAction }) {
         )}
         {clip.isNew && <span className="clip-new-badge">New</span>}
         {clip.collection === "saved" && (
-          <span className="clip-saved-badge" title="Saved clip">
-            <BookmarkIcon sx={{ fontSize: 16 }} />
-          </span>
+          <>
+            <span className="clip-saved-badge" title="Saved clip">
+              <BookmarkIcon sx={{ fontSize: 16 }} />
+            </span>
+            <div className="clip-card-actions">
+              <Tooltip title="Rename clip">
+                <button
+                  type="button"
+                  className="clip-card-action"
+                  aria-label="Rename clip"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRename(clip);
+                  }}
+                >
+                  <EditIcon />
+                </button>
+              </Tooltip>
+              <Tooltip title="Delete clip">
+                <button
+                  type="button"
+                  className="clip-card-action danger"
+                  aria-label="Delete clip"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDelete(clip);
+                  }}
+                >
+                  <DeleteIcon />
+                </button>
+              </Tooltip>
+            </div>
+          </>
         )}
         {screenCount > 1 && (
           <span className="clip-screens-badge" title={`${screenCount} screens`}>

@@ -112,6 +112,7 @@ contextBridge.exposeInMainWorld("clipx", {
   removeGameAssignment: (exe) => ipcRenderer.invoke("clipping:remove-game-assignment", exe),
   getClipGroup: (clipPath) => ipcRenderer.invoke("local-clips:get-group", clipPath),
   getOriginalClip: (clipPath) => ipcRenderer.invoke("local-clips:get-original", clipPath),
+  getSavedClip: (clipPath) => ipcRenderer.invoke("local-clips:get-saved", clipPath),
   markLocalClipSeen: (clipPath) => ipcRenderer.invoke("local-clips:mark-seen", clipPath),
   extractClipTracks: (clipPath) => ipcRenderer.invoke("clip-tracks:extract", clipPath),
   getCachedClipTracks: (clipPath) => ipcRenderer.invoke("clip-tracks:cached", clipPath),
