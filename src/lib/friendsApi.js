@@ -4,6 +4,8 @@ import { queryClient } from "./queryClient.js";
 function refreshFriendQueries(userId) {
   queryClient.invalidateQueries({ queryKey: ["profile", "friendships", userId], refetchType: "all" });
   queryClient.invalidateQueries({ queryKey: ["notifications", userId] });
+  queryClient.invalidateQueries({ queryKey: ["library", "friendsOptions", userId], refetchType: "all" });
+  queryClient.invalidateQueries({ queryKey: ["library", "clips", "feed"] });
 }
 
 export async function acceptFriendRequest(userId, requesterId) {

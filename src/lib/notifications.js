@@ -93,15 +93,17 @@ export function useNotifications(session) {
       return;
     }
 
+    await queryClient.cancelQueries({ queryKey });
     queryClient.setQueryData(queryKey, (list) => list?.filter((notification) => !ids.includes(notification.id)));
     const { error } = await supabase.from("notifications").delete().in("id", ids);
     if (error) {
       console.error("Failed to dismiss notifications:", error);
-      queryClient.invalidateQueries({ queryKey });
     }
+    queryClient.invalidateQueries({ queryKey });
   }
 
   async function respond(notification, accept) {
+    await queryClient.cancelQueries({ queryKey });
     queryClient.setQueryData(queryKey, (list) => accept
       ? list?.map((item) => (item.id === notification.id ? { ...item, type: "friend_accepted" } : item))
       : list?.filter((item) => item.id !== notification.id));

@@ -185,6 +185,7 @@ function mergeOptions(...lists) {
 
 export default function Library() {
   const [selectedClip, setSelectedClip] = useState(null);
+  const [failedClipId, setFailedClipId] = useState(null);
   const [editingClip, setEditingClip] = useState(null);
   const [clipToDelete, setClipToDelete] = useState(null);
   const [contextMenu, setContextMenu] = useState(null);
@@ -347,6 +348,7 @@ export default function Library() {
     const clipId = searchParams.get("clip");
     if (!clipId || !session) return;
 
+    setFailedClipId(null);
     setSearchParams((params) => {
       params.delete("clip");
       return params;
@@ -356,7 +358,10 @@ export default function Library() {
         const clip = linked.find((item) => item.id === clipId);
         if (clip) setSelectedClip(clip);
       })
-      .catch((error) => console.error("Failed to open the linked clip:", error));
+      .catch((error) => {
+        console.error("Failed to open the linked clip:", error);
+        setFailedClipId(clipId);
+      });
   }, [searchParams, session]);
 
   function applyFilters() {
@@ -552,6 +557,12 @@ export default function Library() {
         </div>
         {clipsQuery.isError && (
           <p className="search-error" role="alert">{String(clipsQuery.error?.message ?? clipsQuery.error)}</p>
+        )}
+        {failedClipId && (
+          <p className="search-error" role="alert">
+            Couldn't open the clip.{" "}
+            <Button size="small" onClick={() => setSearchParams({ clip: failedClipId }, { replace: true })}>Try again</Button>
+          </p>
         )}
       </section>
 
