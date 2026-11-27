@@ -309,12 +309,20 @@ export async function uploadClip(app, options) {
   }
 }
 
-async function uploadBlobToAzure({ token, name, contentType, filePath, container = AZURE_CLIPS_CONTAINER }) {
+async function requireAccessToken() {
+  const token = await getSupabaseAccessToken();
+  if (!token) {
+    throw new Error("Not authenticated. Please log in first.");
+  }
+  return token;
+}
+
+async function uploadBlobToAzure({ name, contentType, filePath, container = AZURE_CLIPS_CONTAINER }) {
   const sasRes = await fetch(`${API_BASE}/api/clips`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
+      Authorization: `Bearer ${await requireAccessToken()}`,
     },
     body: JSON.stringify({ name, contentType, container }),
   });
@@ -339,8 +347,8 @@ async function uploadBlobToAzure({ token, name, contentType, filePath, container
 }
 
 async function uploadClipToAzureBlobStorage({ videoPath, streamPath, thumbnailPath, title, userId }) {
-  const token = await getSupabaseAccessToken();
-  if (!token || !userId) {
+  await requireAccessToken();
+  if (!userId) {
     throw new Error("Not authenticated. Please log in first.");
   }
 
@@ -348,7 +356,6 @@ async function uploadClipToAzureBlobStorage({ videoPath, streamPath, thumbnailPa
   const videoBlobName = `${blobPrefix}${randomUUID()}-${buildClipOutputName(title)}`;
 
   await uploadBlobToAzure({
-    token,
     name: videoBlobName,
     contentType: "video/mp4",
     filePath: videoPath,
@@ -357,7 +364,6 @@ async function uploadClipToAzureBlobStorage({ videoPath, streamPath, thumbnailPa
   if (streamPath) {
     try {
       await uploadBlobToAzure({
-        token,
         name: buildStreamBlobName(videoBlobName),
         contentType: "video/mp4",
         filePath: streamPath,
@@ -372,7 +378,6 @@ async function uploadClipToAzureBlobStorage({ videoPath, streamPath, thumbnailPa
     try {
       thumbnailBlobName = `${blobPrefix}${randomUUID()}-${buildThumbnailOutputName(title)}`;
       await uploadBlobToAzure({
-        token,
         name: thumbnailBlobName,
         contentType: "image/jpeg",
         filePath: thumbnailPath,
@@ -381,7 +386,7 @@ async function uploadClipToAzureBlobStorage({ videoPath, streamPath, thumbnailPa
     } catch (thumbnailError) {
       console.error("ClipX: Failed to upload thumbnail:", thumbnailError);
       try {
-        await uploadClipToBlobStorageDelete({ token, name: thumbnailBlobName, container: AZURE_THUMBS_CONTAINER });
+        await uploadClipToBlobStorageDelete({ name: thumbnailBlobName, container: AZURE_THUMBS_CONTAINER });
       } catch (cleanupError) {
         console.error("ClipX: Failed to clean up thumbnail blob after upload failure:", cleanupError);
       }
@@ -392,12 +397,12 @@ async function uploadClipToAzureBlobStorage({ videoPath, streamPath, thumbnailPa
   return { blobName: videoBlobName, thumbnailBlobName };
 }
 
-async function uploadClipToBlobStorageDelete({ token, name, container }) {
+async function uploadClipToBlobStorageDelete({ name, container }) {
   const res = await fetch(`${API_BASE}/api/clips`, {
     method: "DELETE",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
+      Authorization: `Bearer ${await requireAccessToken()}`,
     },
     body: JSON.stringify({ name, container }),
   });
@@ -409,10 +414,7 @@ async function uploadClipToBlobStorageDelete({ token, name, container }) {
 }
 
 export async function deleteClipBlob({ blobName, thumbnailBlobName }) {
-  const token = await getSupabaseAccessToken();
-  if (!token) {
-    throw new Error("Not authenticated. Please log in first.");
-  }
+  await requireAccessToken();
 
   const names = [];
   if (blobName) {
@@ -428,7 +430,7 @@ export async function deleteClipBlob({ blobName, thumbnailBlobName }) {
   }
 
   for (const { name, container } of names) {
-    await uploadClipToBlobStorageDelete({ token, name, container });
+    await uploadClipToBlobStorageDelete({ name, container });
   }
 }
 
