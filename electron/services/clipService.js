@@ -1,14 +1,15 @@
 import fs from "fs";
 import os from "os";
 import path from "path";
-import { createHash, randomUUID } from "node:crypto";
+import { createHash } from "node:crypto";
 import ffmpeg from "fluent-ffmpeg";
 import ffmpegPath from "ffmpeg-static";
 import { app } from "electron";
 import { rename } from "fs/promises";
 
 import { resolveFfmpegPath } from "../utils/ffmpeg.js";
-import { STREAM_COPY_BITRATE, buildStreamBlobName, renderStreamCopy } from "../utils/streamCopy.js";
+import { STREAM_COPY_BITRATE, renderStreamCopy } from "../utils/streamCopy.js";
+import { uploadClipFiles, deleteClipBlobs } from "../utils/clipUpload.js";
 import { getIndexedClipData, setIndexedClipMetadata, markIndexedClipMissing, getWatchedRootForPath, upsertIndexedClip, getCachedThumbnailPath, getClipGroup, moveSavedClipOriginal, isIndexedClipNew } from "./clipIndexService.js";
 import { CLIP_MANIFEST_NAME, getManifestFile, keepManifestFile, removeManifestFile, renameManifestFile } from "../utils/clipManifest.js";
 import { buildAudioOutputOptions } from "../utils/audioMix.js";
@@ -26,11 +27,10 @@ export class ClipServiceError extends Error {
 }
 
 const CLIPS_DATA_FILE = "clipsData.json";
-const API_BASE = (process.env.VITE_DATABASE_URL || "https://clipx.bideshi.tech").replace(/\/+$/, "");
-const AZURE_CLIPS_CONTAINER = "clips";
-const AZURE_THUMBS_CONTAINER = "clip-thumbnails";
-const UPLOAD_BLOCK_BYTES = 8 * 1024 * 1024;
-const UPLOAD_CONCURRENCY = 8;
+const uploadApi = {
+  base: (process.env.VITE_DATABASE_URL || "https://clipx.bideshi.tech").replace(/\/+$/, ""),
+  getToken: getSupabaseAccessToken,
+};
 
 function stripVideoExtension(fileName) {
   return String(fileName || "").replace(/\.(mp4|webm|mov)$/i, "");
@@ -288,11 +288,12 @@ export async function uploadClip(app, options) {
       });
     renders.push(streamRender, thumbnailRender);
 
-    const result = await uploadClipToAzureBlobStorage({
+    const result = await uploadClipFiles(uploadApi, {
       videoPath: tempPath,
       streamRender,
       thumbnailRender,
-      title: clipTitle,
+      videoName: buildClipOutputName(clipTitle),
+      thumbnailName: buildThumbnailOutputName(clipTitle),
       userId,
     });
     console.info(`ClipX: Uploaded a clip in ${Date.now() - startedAt} ms (${Math.round(size / 1e6)} MB).`);
@@ -310,132 +311,8 @@ export async function uploadClip(app, options) {
   }
 }
 
-async function requireAccessToken() {
-  const token = await getSupabaseAccessToken();
-  if (!token) {
-    throw new Error("Not authenticated. Please log in first.");
-  }
-  return token;
-}
-
-async function uploadBlobToAzure({ name, contentType, filePath, container = AZURE_CLIPS_CONTAINER }) {
-  const sasRes = await fetch(`${API_BASE}/api/clips`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${await requireAccessToken()}`,
-    },
-    body: JSON.stringify({ name, contentType, container }),
-  });
-
-  if (!sasRes.ok) {
-    const err = await sasRes.json().catch(() => null);
-    throw new Error(err?.error || `Failed to get upload URL (${sasRes.status})`);
-  }
-
-  const { data } = await sasRes.json();
-  const { BlockBlobClient } = await import("@azure/storage-blob");
-  try {
-    await new BlockBlobClient(data.url).uploadFile(filePath, {
-      blobHTTPHeaders: { blobContentType: contentType },
-      blockSize: UPLOAD_BLOCK_BYTES,
-      maxSingleShotSize: UPLOAD_BLOCK_BYTES,
-      concurrency: UPLOAD_CONCURRENCY,
-    });
-  } catch (error) {
-    console.error("ClipX: Azure upload failed:", error);
-    throw new Error(`Azure upload failed (${error?.statusCode || error?.code || "network error"})`);
-  }
-}
-
-async function uploadClipToAzureBlobStorage({ videoPath, streamRender, thumbnailRender, title, userId }) {
-  await requireAccessToken();
-  if (!userId) {
-    throw new Error("Not authenticated. Please log in first.");
-  }
-
-  const blobPrefix = `${userId}/`;
-  const videoBlobName = `${blobPrefix}${randomUUID()}-${buildClipOutputName(title)}`;
-
-  await uploadBlobToAzure({
-    name: videoBlobName,
-    contentType: "video/mp4",
-    filePath: videoPath,
-  });
-
-  const streamPath = await streamRender;
-  if (streamPath) {
-    try {
-      await uploadBlobToAzure({
-        name: buildStreamBlobName(videoBlobName),
-        contentType: "video/mp4",
-        filePath: streamPath,
-      });
-    } catch (streamError) {
-      console.error("ClipX: Failed to upload stream copy:", streamError);
-    }
-  }
-
-  let thumbnailBlobName = null;
-  const thumbnailPath = await thumbnailRender;
-  if (thumbnailPath) {
-    try {
-      thumbnailBlobName = `${blobPrefix}${randomUUID()}-${buildThumbnailOutputName(title)}`;
-      await uploadBlobToAzure({
-        name: thumbnailBlobName,
-        contentType: "image/jpeg",
-        filePath: thumbnailPath,
-        container: AZURE_THUMBS_CONTAINER,
-      });
-    } catch (thumbnailError) {
-      console.error("ClipX: Failed to upload thumbnail:", thumbnailError);
-      try {
-        await uploadClipToBlobStorageDelete({ name: thumbnailBlobName, container: AZURE_THUMBS_CONTAINER });
-      } catch (cleanupError) {
-        console.error("ClipX: Failed to clean up thumbnail blob after upload failure:", cleanupError);
-      }
-      thumbnailBlobName = null;
-    }
-  }
-
-  return { blobName: videoBlobName, thumbnailBlobName };
-}
-
-async function uploadClipToBlobStorageDelete({ name, container }) {
-  const res = await fetch(`${API_BASE}/api/clips`, {
-    method: "DELETE",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${await requireAccessToken()}`,
-    },
-    body: JSON.stringify({ name, container }),
-  });
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => null);
-    throw new Error(err?.error || `Failed to delete blob (${res.status})`);
-  }
-}
-
-export async function deleteClipBlob({ blobName, thumbnailBlobName }) {
-  await requireAccessToken();
-
-  const names = [];
-  if (blobName) {
-    names.push({ name: blobName, container: AZURE_CLIPS_CONTAINER });
-    names.push({ name: buildStreamBlobName(blobName), container: AZURE_CLIPS_CONTAINER });
-  }
-  if (thumbnailBlobName) {
-    names.push({ name: thumbnailBlobName, container: AZURE_THUMBS_CONTAINER });
-  }
-
-  if (names.length === 0) {
-    return;
-  }
-
-  for (const { name, container } of names) {
-    await uploadClipToBlobStorageDelete({ name, container });
-  }
+export async function deleteClipBlob(blobs) {
+  await deleteClipBlobs(uploadApi, blobs);
 }
 
 const TRACK_CACHE_BYTES = 500 * 1024 * 1024;
