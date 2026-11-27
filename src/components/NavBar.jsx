@@ -10,6 +10,7 @@ import { getAccountInitials, loadAccountData } from "../lib/accountApi.js";
 import { fetchLocalOptions } from "../lib/localOptions.js";
 import { useNewLibraryClips } from "../lib/newLibraryClips.js";
 import { getClippingStatusLabel, useClippingState } from "../lib/clippingState.js";
+import NotificationsMenu from "./NotificationsMenu.jsx";
 
 import SettingsIcon from '@mui/icons-material/Settings';
 import VideocamIcon from '@mui/icons-material/Videocam';
@@ -27,7 +28,7 @@ const CLIP_TABS = [
   { path: "/library", label: "Library", Icon: VideoLibraryIcon },
 ];
 
-export default function NavBar({ showUpdateButton = true, updateStatus = null, updateErrorMessage = null, onUpdateClick }) {
+export default function NavBar({ showUpdateButton = true, updateStatus = null, updateErrorMessage = null, onUpdateClick, localNotifications, setLocalNotifications }) {
   const isDownloading = updateStatus === "downloading";
   const { pathname } = useLocation();
   const { data: options } = useQuery({
@@ -155,6 +156,8 @@ export default function NavBar({ showUpdateButton = true, updateStatus = null, u
             </Tooltip>
           )
         )}
+
+        <NotificationsMenu session={session} localItems={localNotifications} setLocalItems={setLocalNotifications} />
 
         <NavLink to="/recording" className="nav-link nav-link--icon" aria-label={recordingTitle} title={recordingTitle}>
           <span className="nav-record-icon">

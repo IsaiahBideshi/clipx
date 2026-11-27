@@ -222,7 +222,7 @@ export default function ClipEditor({
           !editorRef.current.contains(event.target) && 
           uploadMenuRef.current && 
           !uploadMenuRef.current.contains(event.target) &&
-          !event.target.closest?.(".MuiPopover-root, .MuiPopper-root, .clip-widgets, .delete-modal")
+          !event.target.closest?.(".MuiPopover-root, .MuiPopper-root, .nav-notifications, .delete-modal")
       ) {
         onClose();
       }
@@ -723,10 +723,20 @@ export function UploadMenu({clip, group, mix, screen, screens, target, start, en
               variant={"contained"}
               onClick={() => {uploadClip(clip, start, end, clipTitle, game, tags)}}
               disabled={uploading || saving || emptyRange}
+              loading={uploading}
+              loadingPosition="start"
             >
-            Upload
+            {uploading ? "Uploading…" : "Upload"}
           </Button>)}
-        <Button variant={session ? "outlined" : "contained"} onClick={() => {saveClip(clip, start, end, clipTitle, game, tags)}} disabled={uploading || saving || emptyRange} >Save</Button>
+        <Button
+          variant={session ? "outlined" : "contained"}
+          onClick={() => {saveClip(clip, start, end, clipTitle, game, tags)}}
+          disabled={uploading || saving || emptyRange}
+          loading={saving}
+          loadingPosition="start"
+        >
+          {saving ? "Saving…" : "Save"}
+        </Button>
         <Button
           variant={"contained"}
           color={"error"}

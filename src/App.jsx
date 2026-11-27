@@ -16,11 +16,10 @@ import Login from "./pages/login.jsx";
 import NavBar from "./components/NavBar.jsx";
 import MenuBar from "./components/MenuBar.jsx";
 import ChangelogModal from "./components/ChangelogModal.jsx";
-import SavingClipsWidget from "./components/SavingClipsWidget.jsx";
-import UploadingClipsWidget from "./components/UploadingClipsWidget.jsx";
 import changelog from "../CHANGELOG.md?raw";
 import announcements from "../ANNOUNCEMENTS.md?raw";
 import { getNewAnnouncements } from "./lib/announcements.js";
+import { useRecordingProblems } from "./lib/recordingProblems.js";
 
 const LAST_SEEN_CHANGELOG_KEY = "clipx:lastSeenChangelogVersion";
 
@@ -45,12 +44,10 @@ export default function App() {
   const [updateState, setUpdateState] = useState(null);
   const [updateChangelog, setUpdateChangelog] = useState(null);
   const showUpdateButton = hasNavUpdate(updateState);
-  const [savingClips, setSavingClips] = useState([]);
-  const [uploadingClips, setUploadingClips] = useState([]);
-  const [showSavingList, setShowSavingList] = useState(true);
-  const [showUploadingList, setShowUploadingList] = useState(true);
-  const savingPaths = savingClips.filter((item) => item.status === "saving").map((item) => item.path);
-  const uploadingPaths = uploadingClips.filter((item) => item.status === "uploading").map((item) => item.path);
+  const [localNotifications, setLocalNotifications] = useState([]);
+  useRecordingProblems(setLocalNotifications);
+  const savingPaths = localNotifications.filter((item) => item.status === "saving").map((item) => item.path);
+  const uploadingPaths = localNotifications.filter((item) => item.status === "uploading").map((item) => item.path);
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -61,15 +58,16 @@ export default function App() {
     });
   }, [queryClient]);
 
-  function upsertSavingClip(id, nextValues) {
-    setSavingClips((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, ...nextValues } : item))
-    );
+  function addLocalNotification(kind, event, status) {
+    setLocalNotifications((prev) => [
+      ...prev,
+      { id: event.id, kind, name: event.name || "Untitled Clip", path: event.path, status, createdAt: new Date().toISOString() },
+    ]);
   }
 
-  function upsertUploadingClip(id, nextValues) {
-    setUploadingClips((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, ...nextValues } : item))
+  function upsertLocalNotification(kind, id, nextValues) {
+    setLocalNotifications((prev) =>
+      prev.map((item) => (item.kind === kind && item.id === id ? { ...item, ...nextValues, seen: false } : item))
     );
   }
 
@@ -77,17 +75,17 @@ export default function App() {
     if (!event?.id) return;
 
     if (event.type === "started") {
-      setSavingClips((prev) => [...prev, { id: event.id, name: event.name || "Untitled Clip", path: event.path, status: "saving" }]);
+      addLocalNotification("save", event, "saving");
       return;
     }
 
     if (event.type === "success") {
-      upsertSavingClip(event.id, { status: "saved" });
+      upsertLocalNotification("save", event.id, { status: "saved" });
       return;
     }
 
     if (event.type === "failed") {
-      upsertSavingClip(event.id, { status: "failed", error: event.error });
+      upsertLocalNotification("save", event.id, { status: "failed", error: event.error });
     }
   }
 
@@ -95,22 +93,19 @@ export default function App() {
     if (!event?.id) return;
 
     if (event.type === "started") {
-      setUploadingClips((prev) => [
-        ...prev,
-        { id: event.id, name: event.name || "Untitled Clip", path: event.path, status: "uploading" },
-      ]);
+      addLocalNotification("upload", event, "uploading");
       return;
     }
 
     if (event.type === "success") {
-      upsertUploadingClip(event.id, { status: "uploaded", shareUrl: event.shareUrl });
+      upsertLocalNotification("upload", event.id, { status: "uploaded", shareUrl: event.shareUrl });
       queryClient.invalidateQueries({ queryKey: ["library", "newClips"] });
       queryClient.invalidateQueries({ queryKey: ["library", "clips", "uploadedGames"] });
       return;
     }
 
     if (event.type === "failed") {
-      upsertUploadingClip(event.id, { status: "failed", error: event.error });
+      upsertLocalNotification("upload", event.id, { status: "failed", error: event.error });
     }
   }
 
@@ -182,6 +177,8 @@ export default function App() {
         updateStatus={updateState?.status}
         updateErrorMessage={updateState?.message}
         onUpdateClick={handleUpdateClick}
+        localNotifications={localNotifications}
+        setLocalNotifications={setLocalNotifications}
       />
       <Routes>
         <Route path="/" element={
@@ -225,20 +222,6 @@ export default function App() {
           </ErrorBoundary>
         } />
       </Routes>
-      <div className="clip-widgets">
-        <UploadingClipsWidget
-          clips={uploadingClips}
-          expanded={showUploadingList}
-          onToggleExpanded={() => setShowUploadingList((prev) => !prev)}
-          onDismiss={() => setUploadingClips([])}
-        />
-        <SavingClipsWidget
-          clips={savingClips}
-          expanded={showSavingList}
-          onToggleExpanded={() => setShowSavingList((prev) => !prev)}
-          onDismiss={() => setSavingClips([])}
-        />
-      </div>
       {updateChangelog && (
         <ChangelogModal
           changelog={changelog}

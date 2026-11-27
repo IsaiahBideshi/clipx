@@ -7,7 +7,7 @@ import { loadAccountData } from "../lib/accountApi.js";
 import { listClips, listUploadedGames, getClipShareUrl, getClipTagsError, deleteClip } from "../lib/clipsApi.js";
 import { isTextEntryActive } from '../lib/hotkeys.js';
 import { useBackdropClose, useEscapeKey } from "../lib/modalClose.js";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 import CloseIcon from '@mui/icons-material/Close';
 import EditIcon from '@mui/icons-material/Edit';
@@ -62,6 +62,9 @@ async function fetchLibraryClips(session, filters, offset = 0) {
   }
   if (filters.owner?.id) {
     query.ownerId = filters.owner.id;
+  }
+  if (filters.clipId) {
+    query.clipId = filters.clipId;
   }
   if (filters.tags?.length) {
     query.tagIds = filters.tags.filter((tag) => tag?.id).map((tag) => tag.id).join(",");
@@ -182,6 +185,7 @@ function mergeOptions(...lists) {
 
 export default function Library() {
   const [selectedClip, setSelectedClip] = useState(null);
+  const [failedClipId, setFailedClipId] = useState(null);
   const [editingClip, setEditingClip] = useState(null);
   const [clipToDelete, setClipToDelete] = useState(null);
   const [contextMenu, setContextMenu] = useState(null);
@@ -198,6 +202,7 @@ export default function Library() {
   const { session, loading: loadingSession } = useAuthSession();
 
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const userId = session?.user?.id;
   const clipsQuery = useInfiniteQuery({
     queryKey: libraryClipsKey(userId, filters),
@@ -338,6 +343,26 @@ export default function Library() {
       navigate("/login", { replace: true });
     }
   }, [loadingSession, navigate, session]);
+
+  useEffect(() => {
+    const clipId = searchParams.get("clip");
+    if (!clipId || !session) return;
+
+    setFailedClipId(null);
+    setSearchParams((params) => {
+      params.delete("clip");
+      return params;
+    }, { replace: true });
+    fetchLibraryClips(session, { clipId })
+      .then(({ clips: linked }) => {
+        const clip = linked.find((item) => item.id === clipId);
+        if (clip) setSelectedClip(clip);
+      })
+      .catch((error) => {
+        console.error("Failed to open the linked clip:", error);
+        setFailedClipId(clipId);
+      });
+  }, [searchParams, session]);
 
   function applyFilters() {
     setFilters({
@@ -532,6 +557,12 @@ export default function Library() {
         </div>
         {clipsQuery.isError && (
           <p className="search-error" role="alert">{String(clipsQuery.error?.message ?? clipsQuery.error)}</p>
+        )}
+        {failedClipId && (
+          <p className="search-error" role="alert">
+            Couldn't open the clip.{" "}
+            <Button size="small" onClick={() => setSearchParams({ clip: failedClipId }, { replace: true })}>Try again</Button>
+          </p>
         )}
       </section>
 

@@ -206,6 +206,30 @@ Uploads above ~10 Mbps also get a 1080p, ~8 Mbps stream copy stored next to the 
 
 Public clips have a share page at `/clip/<id>` (`api-handlers/clips/share.js`), which plays the clip in any browser. Its player is `VideoPlayer` bundled by `npm.cmd run build:player` into `public/clip-player/`. Vercel has no build step, so that output is committed and has to be rebuilt after changing `VideoPlayer.jsx`, `player.css` or `playerPrefs.js`.
 
+## In-app notifications
+
+The bell in the navbar (`src/components/NotificationsMenu.jsx`) opens a MUI `Popover` with three kinds of items. They're separate from the in-game clip overlay (see [Notifications](#notifications) under Recording).
+
+- Saves and uploads from this session, kept in `App.jsx` state and never stored. While one is running, the bell shows a spinner ring and is raised above the clip editor's backdrop (`.is-running`, `z-index: 9`; the editor's is 8), so the ring shows while the editor is open. Otherwise it sits under the backdrop like the rest of the navbar.
+- Recording problems, also kept in `App.jsx` state (`useRecordingProblems` in `src/lib/recordingProblems.js`), each linking to the Recording page:
+  - Clipping state errors. A clipping `error` state adds one "Clipping stopped" card (or "Clipping couldn't start" when it wasn't recording yet). When clipping is ready again, a stop turns into "Clipping restarted" and a start failure is removed (`applyClippingState` in `src/lib/notificationItems.js`).
+  - Failed hotkey saves. `notify` in `obsService.js` sends each failed overlay toast to every window as `clipping:problem` too, so it stays in the popup after the toast is gone. A card replaces the one with the same title.
+  - A low clips drive. `checkClipsDrive` reads the clips folder's free space with `fs.statfs` when clipping starts and after each hotkey save. Under 5 GB, it sends one `clipping:problem` warning, and sends another only after the drive has gone back over 5 GB and dropped under again.
+- Rows from the `notifications` table. Only database functions write them (types and the trigger are in [SCHEMA.md](../SCHEMA.md#table-notifications)). Friend notifications come from the `notify_friendship_change` trigger, so they're created however the friendship changes (Profile page, the popup, another device). Clip notifications (`clip_tag`, `friend_clip`) are written inside `create_clip_with_tags` and `update_clip_with_tags`, which compare the clip's visibility and tags before and after a save. A trigger on `clip_tags` can't do it, because every save deletes and reinserts the tags.
+
+How the list stays current:
+
+- `useNotifications` (`src/lib/notifications.js`) loads the newest 50 rows and listens to Realtime `INSERT` and `UPDATE` events on the user's rows. Realtime sends deletes without applying RLS, so it doesn't listen for them. It refetches when the window gets focus and whenever the channel (re)subscribes instead. Friend events (and every (re)subscribe) also refresh the cached friend lists (`refreshFriendQueries` in `src/lib/friendsApi.js`), so Profile and the Library's people filter match the popup instead of offering "Add Friend" to someone whose request is already waiting.
+- Accepting a request changes the accepter's `friend_request` row into `friend_accepted` in the database, so the card turns into "You are now friends with …" whether the request was accepted on the Profile page or in the popup. `src/lib/friendsApi.js` holds the accept and decline calls both use.
+- `clip_tag` and `friend_clip` rows from the same person are shown as one card ("Alex uploaded 4 clips", `groupNotifications`). The card has the newest row's time, links to the Library feed instead of one clip, and dismissing it deletes every row in it. The badge counts cards, not rows.
+- Types the app doesn't know are skipped (`getNotificationContent` in `src/lib/notificationItems.js` returns `null`), so older versions ignore types added later. That's why `type` has no check constraint.
+
+Seen and dismissed:
+
+- The badge counts rows newer than the newest `created_at` the user had when they last opened or closed the popup (server time, so the PC's clock doesn't matter), saved per user as `clipx:notificationsSeenAt:<userId>` in auth storage. Finished saves and uploads count until the popup is opened.
+- Dismissing deletes the row. Clicking a card that links somewhere (its second line names where, e.g. "View in Profile") opens it and dismisses it. Pending friend requests have Accept and Decline instead of a dismiss button and stay until answered; "Clear all" leaves them too.
+- Clip cards link to `#/library?clip=<id>`. The Library removes the parameter, loads that one clip through the library feed's `clipId` filter (`/api/clips?scope=library&clipId=…`, which keeps the feed's visibility rules) and opens it in the preview. A clip the user can no longer see just doesn't open.
+
 ## CI
 
 Pull requests to `master` run `ci.yml` on `windows-latest`: `npm ci`, a `node --check` syntax pass over `api/`, `api-handlers/`, `electron/` and `scripts/`, then `npm test` and `build:react`. Last, it rebuilds the share player and fails if `public/clip-player/` differs from what's committed.

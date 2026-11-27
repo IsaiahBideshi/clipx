@@ -78,6 +78,10 @@ export default async function handler(req, res) {
           query = query.eq('owner_id', req.query.ownerId)
         }
 
+        if (req.query.clipId) {
+          query = query.eq('id', req.query.clipId)
+        }
+
         const tagIds = String(req.query.tagIds || '')
           .split(',')
           .map((id) => id.trim())

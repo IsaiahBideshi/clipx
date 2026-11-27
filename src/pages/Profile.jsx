@@ -8,6 +8,7 @@ import {useNavigate} from "react-router-dom";
 
 import {logout, supabase, signInWithGoogle} from '../lib/supabase.js';
 import { useAuthSession } from "../lib/authSession.js";
+import { acceptFriendRequest, declineFriendRequest } from "../lib/friendsApi.js";
 import { getAccountInitials, loadAccountData, updateAccountEmail, updateAccountPassword, updateAccountProfile } from "../lib/accountApi.js";
 import SearchIcon from '@mui/icons-material/Search';
 import CircularProgress from '@mui/material/CircularProgress';
@@ -364,9 +365,8 @@ export default function Profile() {
 
     if (error) {
       console.error("Error sending friend request:", error);
-    } else {
-      getFriendships();
     }
+    getFriendships();
   }
 
   function handleOpenRemoveConfirm(friendshipId, friendDisplayName) {
@@ -570,22 +570,10 @@ export default function Profile() {
                 <div className="friend friend-row" key={f.user_id === session.user.id ? f.friend_id : f.user_id}>
                   <p>{f.friendName ? f.friendName : "Unknown User"}</p>
                   <div>
-                    <button className="add-friend-btn add-friend-btn--accept" onClick={async () => {
-                        await supabase
-                          .from("friendships")
-                          .update({ status: "accepted" })
-                          .eq("friend_id", session.user.id)
-                          .eq("user_id", f.user_id);
-                      }}>
+                    <button className="add-friend-btn add-friend-btn--accept" onClick={() => acceptFriendRequest(session.user.id, f.user_id)}>
                       Accept
                     </button>
-                    <button className="add-friend-btn add-friend-btn--decline" onClick={async () => {
-                        await supabase
-                          .from("friendships")
-                          .delete()
-                          .eq("friend_id", session.user.id)
-                          .eq("user_id", f.user_id);
-                      }}>
+                    <button className="add-friend-btn add-friend-btn--decline" onClick={() => declineFriendRequest(session.user.id, f.user_id)}>
                       Decline
                     </button>
                   </div>
