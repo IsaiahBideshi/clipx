@@ -1,5 +1,18 @@
 # Changelog
 
+## v1.3.2
+
+- New: Notifications bell in the navigation bar for friend requests, your saves and uploads and friends' uploads.
+- New: Saved clips are shown together with their original via "Show Original" button.
+- New: Rename and delete saved clips from their card or while viewing them.
+- New: Uploading asks whether to also save a copy to your PC. Change answer in Settings.
+- New: Export logs button in Settings to share when something goes wrong.
+- Fix: The clip saved notification shows sooner after you press your hotkey.
+- Fix: App volume sliders on the Recording page now change that app's volume in the full mix too.
+- Fix: Audio in multi-screen clips starts right away.
+- Fix: The new clips button no longer counts each clip twice.
+- Fix: Removed the YouTube account link from Settings, which no longer did anything.
+
 ## v1.3.1
 
 - New: The Library filters suggest you, your friends and the games you've uploaded.
