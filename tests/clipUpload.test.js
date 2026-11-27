@@ -39,6 +39,7 @@ function sendJson(res, status, body) {
 async function startFakeAzure({ holdBlocksUntil = 0, isExpired = () => false } = {}) {
   const events = new EventEmitter();
   const uploads = [];
+  const deletes = [];
   const blockBytes = new Map();
   const held = [];
   let openBlocks = 0;
@@ -54,6 +55,7 @@ async function startFakeAzure({ holdBlocksUntil = 0, isExpired = () => false } =
         return sendJson(res, 401, { error: "Invalid or expired session" });
       }
       if (req.method === "DELETE") {
+        deletes.push(body.name);
         return sendJson(res, 200, { data: null });
       }
       const blobPath = [body.container, ...body.name.split("/")].map(encodeURIComponent).join("/");
@@ -96,6 +98,7 @@ async function startFakeAzure({ holdBlocksUntil = 0, isExpired = () => false } =
     base: `http://127.0.0.1:${server.address().port}`,
     events,
     uploads,
+    deletes,
     get peakBlocks() {
       return peakBlocks;
     },
@@ -166,6 +169,29 @@ test("reports uploaded bytes across the clip and its stream copy", HANG_WATCHDOG
   assert.ok(progress.includes(3 * BLOCK_BYTES));
   assert.equal(progress.at(-1), 3 * BLOCK_BYTES + 500);
   assert.deepEqual(progress, [...progress].sort((a, b) => a - b));
+});
+
+test("deletes what was uploaded when the upload is cancelled", HANG_WATCHDOG, async (t) => {
+  const fake = await startFakeAzure();
+  t.after(fake.close);
+  const videoPath = await writeFile("cancel.mp4", 1000);
+  const streamPath = await writeFile("cancel-stream.mp4", 500);
+  const thumbnailPath = await writeFile("cancel.jpg", 100);
+  const api = { base: fake.base, getToken: async () => "token" };
+  const controller = new AbortController();
+  const streamRender = once(fake.events, "upload").then(() => {
+    controller.abort();
+    return streamPath;
+  });
+
+  await assert.rejects(
+    uploadClipFiles(api, clipOptions({ videoPath, streamRender, thumbnailRender: Promise.resolve(thumbnailPath), signal: controller.signal })),
+    { name: "AbortError" },
+  );
+
+  const [video] = fake.uploads;
+  assert.equal(fake.uploads.length, 1);
+  assert.deepEqual(fake.deletes, [video.name, video.name.replace(/\.mp4$/, ".stream.mp4")]);
 });
 
 test("keeps the thumbnail when the login token is refreshed during the upload", HANG_WATCHDOG, async (t) => {

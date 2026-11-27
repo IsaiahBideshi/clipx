@@ -12,7 +12,7 @@ import { buildMix, getMixTracks } from "../../electron/utils/audioMix.js";
 import { getManifestFile } from "../../electron/utils/clipManifest.js";
 import Button from '@mui/material/Button';
 import { supabase } from "../lib/supabase.js";
-import { getClipTagsError, getClipShareUrl } from "../lib/clipsApi.js";
+import { getClipTagsError, getClipShareUrl, deleteClip } from "../lib/clipsApi.js";
 import { Divider, Menu, MenuItem, Tooltip, Typography } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import EditIcon from '@mui/icons-material/Edit';
@@ -636,7 +636,12 @@ export function UploadMenu({clip, group, mix, screen, screens, target, start, en
 
     const uploadId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
     const displayName = title?.trim() || getEditableClipName(clip?.name) || "Untitled Clip";
-    onUploadQueueEvent?.({ type: "started", id: uploadId, name: displayName, path: clip?.path });
+    let cancelled = false;
+    const cancel = () => {
+      cancelled = true;
+      window.clipx.cancelUpload?.(uploadId);
+    };
+    onUploadQueueEvent?.({ type: "started", id: uploadId, name: displayName, path: clip?.path, cancel });
 
     try {
       const tagsError = getClipTagsError(tags);
@@ -649,6 +654,12 @@ export function UploadMenu({clip, group, mix, screen, screens, target, start, en
 
       const response = await window.clipx.uploadClip({ id: uploadId, clip, start, end, title: displayName, game, tags, userId, mix, screen });
       if (response?.status === 200) {
+        if (cancelled) {
+          await window.clipx.deleteClipBlob({ blobName: response.blobName, thumbnailBlobName: response.thumbnailBlobName })
+            .catch((cleanupError) => console.error("Failed to delete a cancelled upload:", cleanupError));
+          return;
+        }
+
         const { data: clipId, error } = await saveClipRecord({
           id: uploadId,
           name: displayName,
@@ -661,7 +672,13 @@ export function UploadMenu({clip, group, mix, screen, screens, target, start, en
           visibility: visibility,
           userId,
         });
-        
+
+        if (cancelled && clipId) {
+          await deleteClip(session, clipId)
+            .catch((cleanupError) => console.error("Failed to delete a cancelled upload:", cleanupError));
+          return;
+        }
+
         if (error) {
           console.error("Failed to save clip record to database:", error);
           try {
@@ -686,6 +703,7 @@ export function UploadMenu({clip, group, mix, screen, screens, target, start, en
 
       onUploadQueueEvent?.({ type: "failed", id: uploadId, error: response?.error || "Upload failed." });
     } catch (err) {
+      if (cancelled) return;
       console.error("Failed to upload clip:", err);
       const message = String(err?.message || "")
         .replace(/^Error invoking remote method '[^']+':\s*(?:Error:\s*)?/, "")

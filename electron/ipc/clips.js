@@ -2,6 +2,8 @@ import { app, ipcMain } from "electron";
 
 import { getClipData, renameClip, saveClip, uploadClip, deleteClip, deleteClipGroup, keepClipScreen, deleteClipBlob, extractClipTracks, getCachedClipTracks, ClipServiceError } from "../services/clipService.js";
 
+const uploadControllers = new Map();
+
 export function registerClipIpcHandlers() {
   ipcMain.handle("save-clip", async (_event, options) => {
     return await saveClip(options);
@@ -19,11 +21,21 @@ export function registerClipIpcHandlers() {
   });
 
   ipcMain.handle("upload-clip", async (event, options) => {
-    return await uploadClip(app, options, (percent) => {
-      if (!event.sender.isDestroyed()) {
-        event.sender.send("upload-clip:progress", { id: options?.id, percent });
-      }
-    });
+    const controller = new AbortController();
+    uploadControllers.set(options?.id, controller);
+    try {
+      return await uploadClip(app, options, (percent) => {
+        if (!event.sender.isDestroyed()) {
+          event.sender.send("upload-clip:progress", { id: options?.id, percent });
+        }
+      }, controller.signal);
+    } finally {
+      uploadControllers.delete(options?.id);
+    }
+  });
+
+  ipcMain.handle("cancel-upload", (_event, id) => {
+    uploadControllers.get(id)?.abort();
   });
 
   ipcMain.handle("get-clip-data", async (_event, clipPath) => {

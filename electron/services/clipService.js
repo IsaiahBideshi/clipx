@@ -222,7 +222,7 @@ export async function saveClip(options) {
   return 200;
 }
 
-export async function uploadClip(app, options, onProgress = () => {}) {
+export async function uploadClip(app, options, onProgress = () => {}, signal = null) {
   const clip = options?.clip;
   const videoPath = clip?.path;
   const startTime = options?.start;
@@ -250,14 +250,14 @@ export async function uploadClip(app, options, onProgress = () => {}) {
   try {
     const startedAt = Date.now();
     const screen = getScreenSource(videoPath, options.screen);
-    await renderClipSegment(screen?.videoPath || videoPath, startTime, endTime, tempPath, options.mix, screen);
+    await renderClipSegment(screen?.videoPath || videoPath, startTime, endTime, tempPath, options.mix, screen, signal);
 
     const { size } = await fs.promises.stat(tempPath);
     const needsStreamCopy = (size * 8) / (endTime - startTime) > STREAM_COPY_BITRATE * 1.25;
     const totalBytes = size + (needsStreamCopy ? (STREAM_COPY_BITRATE * (endTime - startTime)) / 8 : 0);
     let lastPercent = 0;
     const streamRender = needsStreamCopy
-      ? renderStreamCopy(tempPath, tempStreamPath).then(() => tempStreamPath, (streamError) => {
+      ? renderStreamCopy(tempPath, tempStreamPath, signal).then(() => tempStreamPath, (streamError) => {
         console.error("ClipX: Failed to render stream copy:", streamError);
         return null;
       })
@@ -283,6 +283,7 @@ export async function uploadClip(app, options, onProgress = () => {}) {
           onProgress(percent);
         }
       },
+      signal,
     });
     console.info(`ClipX: Uploaded a clip in ${Date.now() - startedAt} ms (${Math.round(size / 1e6)} MB).`);
     return { status: 200, ...result };

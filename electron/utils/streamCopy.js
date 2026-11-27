@@ -1,4 +1,5 @@
 import ffmpeg from "fluent-ffmpeg";
+import { killOnAbort } from "./clipRender.js";
 
 export const STREAM_COPY_BITRATE = 8_000_000;
 
@@ -6,9 +7,9 @@ export function buildStreamBlobName(blobName) {
   return `${String(blobName).replace(/\.mp4$/, "")}.stream.mp4`;
 }
 
-export async function renderStreamCopy(videoPath, outputPath) {
+export async function renderStreamCopy(videoPath, outputPath, signal = null) {
   await new Promise((resolve, reject) => {
-    ffmpeg(videoPath)
+    killOnAbort(ffmpeg(videoPath), signal)
       .videoFilters("scale=-2:'min(1080,ih)'")
       .outputOptions([
         "-c:v libx264",

@@ -1,9 +1,19 @@
 import ffmpeg from "fluent-ffmpeg";
 import { buildAudioOutputOptions } from "./audioMix.js";
 
-export async function renderClipSegment(videoPath, startTime, endTime, outputPath, mix = null, screen = null) {
+export function killOnAbort(command, signal) {
+  const kill = () => (command.ffmpegProc ? command.kill() : command.once("start", () => command.kill()));
+  if (signal?.aborted) {
+    kill();
+  } else {
+    signal?.addEventListener("abort", kill, { once: true });
+  }
+  return command;
+}
+
+export async function renderClipSegment(videoPath, startTime, endTime, outputPath, mix = null, screen = null, signal = null) {
   await new Promise((resolve, reject) => {
-    const command = ffmpeg(videoPath).setStartTime(startTime);
+    const command = killOnAbort(ffmpeg(videoPath), signal).setStartTime(startTime);
     if (screen) {
       const audioStart = startTime + screen.shift;
       command.input(screen.audioPath);

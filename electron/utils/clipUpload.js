@@ -14,7 +14,7 @@ async function requireAccessToken(api) {
   return token;
 }
 
-async function uploadBlob(api, { name, contentType, filePath, container = CLIPS_CONTAINER, onProgress }) {
+async function uploadBlob(api, { name, contentType, filePath, container = CLIPS_CONTAINER, onProgress, signal }) {
   const sasRes = await fetch(`${api.base}/api/clips`, {
     method: "POST",
     headers: {
@@ -22,6 +22,7 @@ async function uploadBlob(api, { name, contentType, filePath, container = CLIPS_
       Authorization: `Bearer ${await requireAccessToken(api)}`,
     },
     body: JSON.stringify({ name, contentType, container }),
+    signal,
   });
 
   if (!sasRes.ok) {
@@ -38,14 +39,16 @@ async function uploadBlob(api, { name, contentType, filePath, container = CLIPS_
       maxSingleShotSize: UPLOAD_BLOCK_BYTES,
       concurrency: UPLOAD_CONCURRENCY,
       onProgress,
+      abortSignal: signal,
     });
   } catch (error) {
+    signal?.throwIfAborted();
     console.error("ClipX: Azure upload failed:", error);
     throw new Error(`Azure upload failed (${error?.statusCode || error?.code || "network error"})`);
   }
 }
 
-export async function uploadClipFiles(api, { videoPath, streamRender, thumbnailRender, videoName, thumbnailName, userId, onProgress = () => {} }) {
+export async function uploadClipFiles(api, { videoPath, streamRender, thumbnailRender, videoName, thumbnailName, userId, onProgress = () => {}, signal = null }) {
   await requireAccessToken(api);
   if (!userId) {
     throw new Error("Not authenticated. Please log in first.");
@@ -63,16 +66,20 @@ export async function uploadClipFiles(api, { videoPath, streamRender, thumbnailR
       videoBytes = loadedBytes;
       onProgress(loadedBytes);
     },
+    signal,
+  }).catch((error) => {
+    if (!signal?.aborted) throw error;
   });
 
   const streamPath = await streamRender;
-  if (streamPath) {
+  if (streamPath && !signal?.aborted) {
     try {
       await uploadBlob(api, {
         name: buildStreamBlobName(videoBlobName),
         contentType: "video/mp4",
         filePath: streamPath,
         onProgress: ({ loadedBytes }) => onProgress(videoBytes + loadedBytes),
+        signal,
       });
     } catch (streamError) {
       console.error("ClipX: Failed to upload stream copy:", streamError);
@@ -81,7 +88,7 @@ export async function uploadClipFiles(api, { videoPath, streamRender, thumbnailR
 
   let thumbnailBlobName = null;
   const thumbnailPath = await thumbnailRender;
-  if (thumbnailPath) {
+  if (thumbnailPath && !signal?.aborted) {
     try {
       thumbnailBlobName = `${blobPrefix}${randomUUID()}-${thumbnailName}`;
       await uploadBlob(api, {
@@ -89,6 +96,7 @@ export async function uploadClipFiles(api, { videoPath, streamRender, thumbnailR
         contentType: "image/jpeg",
         filePath: thumbnailPath,
         container: THUMBS_CONTAINER,
+        signal,
       });
     } catch (thumbnailError) {
       console.error("ClipX: Failed to upload thumbnail:", thumbnailError);
@@ -99,6 +107,13 @@ export async function uploadClipFiles(api, { videoPath, streamRender, thumbnailR
       }
       thumbnailBlobName = null;
     }
+  }
+
+  if (signal?.aborted) {
+    await deleteClipBlobs(api, { blobName: videoBlobName, thumbnailBlobName }).catch((cleanupError) => {
+      console.error("ClipX: Failed to delete the blobs of a cancelled upload:", cleanupError);
+    });
+    signal.throwIfAborted();
   }
 
   return { blobName: videoBlobName, thumbnailBlobName };
