@@ -112,7 +112,7 @@ export function getSasToken(blobNameOrUrl, permissions = 'r', containerName = CO
       containerName: resolvedContainer,
       blobName,
       permissions: perms,
-      expiresOn: new Date(Date.now() + 3600 * 1000),
+      expiresOn: new Date(Date.now() + (perms.write ? 6 : 1) * 3600 * 1000),
     },
     getCredential()
   ).toString()
