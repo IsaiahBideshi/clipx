@@ -12,7 +12,7 @@ import { STREAM_COPY_BITRATE, renderStreamCopy } from "../utils/streamCopy.js";
 import { uploadClipFiles, deleteClipBlobs } from "../utils/clipUpload.js";
 import { getIndexedClipData, setIndexedClipMetadata, markIndexedClipMissing, getWatchedRootForPath, upsertIndexedClip, getCachedThumbnailPath, getClipGroup, moveSavedClipOriginal, isIndexedClipNew } from "./clipIndexService.js";
 import { CLIP_MANIFEST_NAME, getManifestFile, keepManifestFile, removeManifestFile, renameManifestFile } from "../utils/clipManifest.js";
-import { renderClipSegment } from "../utils/clipRender.js";
+import { renderClipSegment, killOnAbort } from "../utils/clipRender.js";
 import { copyScreenAudio } from "../utils/screenAudio.js";
 import { getSupabaseAccessToken } from "../ipc/authStorage.js";
 
@@ -61,12 +61,12 @@ function getScreenSource(clipPath, screen) {
   return { videoPath: file.path, audioPath: clipPath, shift: Number.isFinite(shift) ? shift : 0 };
 }
 
-async function renderClipThumbnail(videoPath, startTime, endTime, outputPath) {
+async function renderClipThumbnail(videoPath, startTime, endTime, outputPath, signal = null) {
   const clipDuration = endTime - startTime;
   const thumbTimestamp = clipDuration >= 1 ? startTime + 1 : startTime;
 
   await new Promise((resolve, reject) => {
-    ffmpeg(videoPath)
+    killOnAbort(ffmpeg(videoPath), signal)
       .screenshots({
         timestamps: [String(thumbTimestamp)],
         filename: path.basename(outputPath),
@@ -222,7 +222,7 @@ export async function saveClip(options) {
   return 200;
 }
 
-export async function uploadClip(app, options, onProgress = () => {}) {
+export async function uploadClip(app, options, onProgress = () => {}, signal = null) {
   const clip = options?.clip;
   const videoPath = clip?.path;
   const startTime = options?.start;
@@ -250,19 +250,19 @@ export async function uploadClip(app, options, onProgress = () => {}) {
   try {
     const startedAt = Date.now();
     const screen = getScreenSource(videoPath, options.screen);
-    await renderClipSegment(screen?.videoPath || videoPath, startTime, endTime, tempPath, options.mix, screen);
+    await renderClipSegment(screen?.videoPath || videoPath, startTime, endTime, tempPath, options.mix, screen, signal);
 
     const { size } = await fs.promises.stat(tempPath);
     const needsStreamCopy = (size * 8) / (endTime - startTime) > STREAM_COPY_BITRATE * 1.25;
     const totalBytes = size + (needsStreamCopy ? (STREAM_COPY_BITRATE * (endTime - startTime)) / 8 : 0);
     let lastPercent = 0;
     const streamRender = needsStreamCopy
-      ? renderStreamCopy(tempPath, tempStreamPath).then(() => tempStreamPath, (streamError) => {
+      ? renderStreamCopy(tempPath, tempStreamPath, signal).then(() => tempStreamPath, (streamError) => {
         console.error("ClipX: Failed to render stream copy:", streamError);
         return null;
       })
       : Promise.resolve(null);
-    const thumbnailRender = renderClipThumbnail(screen?.videoPath || videoPath, startTime, endTime, tempThumbPath)
+    const thumbnailRender = renderClipThumbnail(screen?.videoPath || videoPath, startTime, endTime, tempThumbPath, signal)
       .then(() => tempThumbPath, (thumbnailError) => {
         console.error("ClipX: Failed to render thumbnail:", thumbnailError);
         return null;
@@ -283,6 +283,7 @@ export async function uploadClip(app, options, onProgress = () => {}) {
           onProgress(percent);
         }
       },
+      signal,
     });
     console.info(`ClipX: Uploaded a clip in ${Date.now() - startedAt} ms (${Math.round(size / 1e6)} MB).`);
     return { status: 200, ...result };

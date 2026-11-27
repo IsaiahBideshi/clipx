@@ -50,6 +50,7 @@ contextBridge.exposeInMainWorld("clipx", {
   exportLogs: () => ipcRenderer.invoke("logs:export"),
   saveClip: (clipInfo) => ipcRenderer.invoke("save-clip", clipInfo),
   uploadClip: (clipInfo) => ipcRenderer.invoke("upload-clip", clipInfo),
+  cancelUpload: (id) => ipcRenderer.invoke("cancel-upload", id),
   onUploadProgress: (callback) => {
     if (typeof callback !== "function") {
       return () => {};

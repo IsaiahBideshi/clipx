@@ -21,6 +21,7 @@ export default function NotificationsMenu({ session, localItems, setLocalItems }
   const navigate = useNavigate();
   const [anchor, setAnchor] = useState(null);
   const [copiedId, setCopiedId] = useState(null);
+  const [confirmCancelKey, setConfirmCancelKey] = useState(null);
   const copiedTimeoutRef = useRef(null);
   const { notifications, unseenCount, markSeen, dismiss, dismissAll, respond } = useNotifications(session);
 
@@ -47,6 +48,7 @@ export default function NotificationsMenu({ session, localItems, setLocalItems }
 
   function handleClose() {
     setAnchor(null);
+    setConfirmCancelKey(null);
     markAllSeen();
   }
 
@@ -163,6 +165,7 @@ export default function NotificationsMenu({ session, localItems, setLocalItems }
       const text = item.shareUrl ? "Uploaded!" : "Uploaded. Only public clips get a share link.";
       detail = <span className="notification-detail" title={text}>{text}</span>;
     }
+    const confirmingCancel = item.status === "uploading" && confirmCancelKey === item.key;
 
     return (
       <li key={item.key} className="notification-item">
@@ -174,8 +177,12 @@ export default function NotificationsMenu({ session, localItems, setLocalItems }
           </span>
           <span className="notification-body">
             <span className="notification-text notification-name">
-              {isRunning(item) && (item.kind === "save" ? "Saving " : "Uploading ")}
-              <strong>{item.name}</strong>
+              {confirmingCancel ? "Cancel Upload?" : (
+                <>
+                  {isRunning(item) && (item.kind === "save" ? "Saving " : "Uploading ")}
+                  <strong>{item.name}</strong>
+                </>
+              )}
             </span>
             {isRunning(item) && item.progress != null && (
               <span className="notification-progress-row">
@@ -187,6 +194,46 @@ export default function NotificationsMenu({ session, localItems, setLocalItems }
             {!isRunning(item) && detail}
           </span>
         </div>
+        {item.status === "uploading" && item.cancel && (
+          <div className="notification-actions">
+            {confirmingCancel ? (
+              <>
+                <button
+                  type="button"
+                  className="notification-icon-button accept"
+                  aria-label="Cancel upload"
+                  title="Cancel upload"
+                  onClick={() => {
+                    item.cancel();
+                    dismissLocal(item.key);
+                  }}
+                >
+                  <CheckIcon />
+                </button>
+                <button
+                  type="button"
+                  className="notification-icon-button decline"
+                  aria-label="Keep uploading"
+                  title="Keep uploading"
+                  autoFocus
+                  onClick={() => setConfirmCancelKey(null)}
+                >
+                  <CloseIcon />
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                className="notification-icon-button"
+                aria-label="Cancel upload"
+                title="Cancel upload"
+                onClick={() => setConfirmCancelKey(item.key)}
+              >
+                <CloseIcon />
+              </button>
+            )}
+          </div>
+        )}
         {!isRunning(item) && (
           <div className="notification-actions">
             {item.status === "uploaded" && item.shareUrl && (

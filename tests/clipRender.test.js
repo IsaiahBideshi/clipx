@@ -43,6 +43,15 @@ test("saving a trim copies the video instead of re-encoding it", async () => {
   assert.deepEqual(await getStreams(outputPath), ["Video mpeg4", "Audio aac"]);
 });
 
+test("cancelling stops the render even before ffmpeg has started", async () => {
+  const controller = new AbortController();
+  controller.abort();
+  await assert.rejects(
+    renderClipSegment(clipPath, 1, 3, path.join(dir, "cancelled.mp4"), null, null, controller.signal),
+    /killed/,
+  );
+});
+
 test("saving a custom audio mix still copies the video", async () => {
   const outputPath = path.join(dir, "mix.mp4");
   await renderClipSegment(clipPath, 1, 3, outputPath, [
