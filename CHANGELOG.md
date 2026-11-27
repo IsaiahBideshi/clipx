@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.3.3
+
+- New: Cancel an upload in notifications.
+- New: Upload notifications show progress as a percent.
+- Fix: Uploading issues.
+
 ## v1.3.2
 
 - New: Notifications bell in the navigation bar for friend requests, your saves and uploads and friends' uploads.
