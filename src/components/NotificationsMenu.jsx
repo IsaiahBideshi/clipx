@@ -177,7 +177,14 @@ export default function NotificationsMenu({ session, localItems, setLocalItems }
               {isRunning(item) && (item.kind === "save" ? "Saving " : "Uploading ")}
               <strong>{item.name}</strong>
             </span>
-            {isRunning(item) ? <span className="notification-progress" /> : detail}
+            {isRunning(item) && item.progress != null && (
+              <span className="notification-progress-row">
+                <span className="notification-progress determinate" style={{ "--progress": `${item.progress}%` }} />
+                <span className="notification-detail">{item.progress}%</span>
+              </span>
+            )}
+            {isRunning(item) && item.progress == null && <span className="notification-progress" />}
+            {!isRunning(item) && detail}
           </span>
         </div>
         {!isRunning(item) && (

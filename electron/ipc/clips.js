@@ -18,8 +18,12 @@ export function registerClipIpcHandlers() {
     }
   });
 
-  ipcMain.handle("upload-clip", async (_event, options) => {
-    return await uploadClip(app, options);
+  ipcMain.handle("upload-clip", async (event, options) => {
+    return await uploadClip(app, options, (percent) => {
+      if (!event.sender.isDestroyed()) {
+        event.sender.send("upload-clip:progress", { id: options?.id, percent });
+      }
+    });
   });
 
   ipcMain.handle("get-clip-data", async (_event, clipPath) => {

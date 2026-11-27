@@ -647,7 +647,7 @@ export function UploadMenu({clip, group, mix, screen, screens, target, start, en
 
       if (saveCopy) saveClip(clip, start, end, displayName, game, tags);
 
-      const response = await window.clipx.uploadClip({ clip, start, end, title: displayName, game, tags, userId, mix, screen });
+      const response = await window.clipx.uploadClip({ id: uploadId, clip, start, end, title: displayName, game, tags, userId, mix, screen });
       if (response?.status === 200) {
         const { data: clipId, error } = await saveClipRecord({
           id: uploadId,

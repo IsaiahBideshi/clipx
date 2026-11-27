@@ -149,6 +149,25 @@ test("uploads the clip without waiting for the stream copy to render", HANG_WATC
   ]);
 });
 
+test("reports uploaded bytes across the clip and its stream copy", HANG_WATCHDOG, async (t) => {
+  const fake = await startFakeAzure();
+  t.after(fake.close);
+  const videoPath = await writeFile("progress.mp4", 3 * BLOCK_BYTES);
+  const streamPath = await writeFile("progress-stream.mp4", 500);
+  const api = { base: fake.base, getToken: async () => "token" };
+  const progress = [];
+
+  await uploadClipFiles(api, clipOptions({
+    videoPath,
+    streamRender: Promise.resolve(streamPath),
+    onProgress: (bytes) => progress.push(bytes),
+  }));
+
+  assert.ok(progress.includes(3 * BLOCK_BYTES));
+  assert.equal(progress.at(-1), 3 * BLOCK_BYTES + 500);
+  assert.deepEqual(progress, [...progress].sort((a, b) => a - b));
+});
+
 test("keeps the thumbnail when the login token is refreshed during the upload", HANG_WATCHDOG, async (t) => {
   const expired = new Set();
   const fake = await startFakeAzure({ isExpired: (authorization) => expired.has(authorization) });
