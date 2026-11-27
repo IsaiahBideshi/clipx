@@ -14,7 +14,7 @@ async function requireAccessToken(api) {
   return token;
 }
 
-async function uploadBlob(api, { name, contentType, filePath, container = CLIPS_CONTAINER }) {
+async function uploadBlob(api, { name, contentType, filePath, container = CLIPS_CONTAINER, onProgress }) {
   const sasRes = await fetch(`${api.base}/api/clips`, {
     method: "POST",
     headers: {
@@ -37,6 +37,7 @@ async function uploadBlob(api, { name, contentType, filePath, container = CLIPS_
       blockSize: UPLOAD_BLOCK_BYTES,
       maxSingleShotSize: UPLOAD_BLOCK_BYTES,
       concurrency: UPLOAD_CONCURRENCY,
+      onProgress,
     });
   } catch (error) {
     console.error("ClipX: Azure upload failed:", error);
@@ -44,7 +45,7 @@ async function uploadBlob(api, { name, contentType, filePath, container = CLIPS_
   }
 }
 
-export async function uploadClipFiles(api, { videoPath, streamRender, thumbnailRender, videoName, thumbnailName, userId }) {
+export async function uploadClipFiles(api, { videoPath, streamRender, thumbnailRender, videoName, thumbnailName, userId, onProgress = () => {} }) {
   await requireAccessToken(api);
   if (!userId) {
     throw new Error("Not authenticated. Please log in first.");
@@ -53,10 +54,15 @@ export async function uploadClipFiles(api, { videoPath, streamRender, thumbnailR
   const blobPrefix = `${userId}/`;
   const videoBlobName = `${blobPrefix}${randomUUID()}-${videoName}`;
 
+  let videoBytes = 0;
   await uploadBlob(api, {
     name: videoBlobName,
     contentType: "video/mp4",
     filePath: videoPath,
+    onProgress: ({ loadedBytes }) => {
+      videoBytes = loadedBytes;
+      onProgress(loadedBytes);
+    },
   });
 
   const streamPath = await streamRender;
@@ -66,6 +72,7 @@ export async function uploadClipFiles(api, { videoPath, streamRender, thumbnailR
         name: buildStreamBlobName(videoBlobName),
         contentType: "video/mp4",
         filePath: streamPath,
+        onProgress: ({ loadedBytes }) => onProgress(videoBytes + loadedBytes),
       });
     } catch (streamError) {
       console.error("ClipX: Failed to upload stream copy:", streamError);

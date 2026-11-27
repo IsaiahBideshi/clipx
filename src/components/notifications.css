@@ -300,6 +300,23 @@ button.notification-main:focus-visible {
   animation: notification-progress 1.2s ease-in-out infinite;
 }
 
+.notification-progress-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.notification-progress.determinate {
+  flex: 1 1 auto;
+  margin-top: 0;
+}
+
+.notification-progress.determinate::after {
+  width: var(--progress);
+  animation: none;
+  transition: width 0.3s ease;
+}
+
 .notification-spinner {
   width: 14px;
   height: 14px;

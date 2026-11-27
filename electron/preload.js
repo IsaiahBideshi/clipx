@@ -50,6 +50,22 @@ contextBridge.exposeInMainWorld("clipx", {
   exportLogs: () => ipcRenderer.invoke("logs:export"),
   saveClip: (clipInfo) => ipcRenderer.invoke("save-clip", clipInfo),
   uploadClip: (clipInfo) => ipcRenderer.invoke("upload-clip", clipInfo),
+  onUploadProgress: (callback) => {
+    if (typeof callback !== "function") {
+      return () => {};
+    }
+
+    const listener = (_event, payload) => {
+      try {
+        callback(payload);
+      } catch (error) {
+        console.error("ClipX: Upload progress callback failed:", error);
+      }
+    };
+
+    ipcRenderer.on("upload-clip:progress", listener);
+    return () => ipcRenderer.removeListener("upload-clip:progress", listener);
+  },
   deleteClipBlob: (options) => ipcRenderer.invoke("delete-clip-blob", options),
   renameClip: (clipPath, newName) => ipcRenderer.invoke("rename-clip", clipPath, newName),
   deleteClip: (clipPath) => ipcRenderer.invoke("delete-clip", clipPath),

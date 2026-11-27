@@ -58,6 +58,14 @@ export default function App() {
     });
   }, [queryClient]);
 
+  useEffect(() => {
+    return window.clipx?.onUploadProgress?.(({ id, percent }) => {
+      setLocalNotifications((prev) =>
+        prev.map((item) => (item.kind === "upload" && item.id === id && item.status === "uploading" ? { ...item, progress: percent } : item))
+      );
+    });
+  }, []);
+
   function addLocalNotification(kind, event, status) {
     setLocalNotifications((prev) => [
       ...prev,
