@@ -12,7 +12,7 @@ import { STREAM_COPY_BITRATE, renderStreamCopy } from "../utils/streamCopy.js";
 import { uploadClipFiles, deleteClipBlobs } from "../utils/clipUpload.js";
 import { getIndexedClipData, setIndexedClipMetadata, markIndexedClipMissing, getWatchedRootForPath, upsertIndexedClip, getCachedThumbnailPath, getClipGroup, moveSavedClipOriginal, isIndexedClipNew } from "./clipIndexService.js";
 import { CLIP_MANIFEST_NAME, getManifestFile, keepManifestFile, removeManifestFile, renameManifestFile } from "../utils/clipManifest.js";
-import { buildAudioOutputOptions } from "../utils/audioMix.js";
+import { renderClipSegment } from "../utils/clipRender.js";
 import { copyScreenAudio } from "../utils/screenAudio.js";
 import { getSupabaseAccessToken } from "../ipc/authStorage.js";
 
@@ -59,28 +59,6 @@ function getScreenSource(clipPath, screen) {
 
   const shift = Number(screen.shift);
   return { videoPath: file.path, audioPath: clipPath, shift: Number.isFinite(shift) ? shift : 0 };
-}
-
-async function renderClipSegment(videoPath, startTime, endTime, outputPath, mix = null, screen = null) {
-  await new Promise((resolve, reject) => {
-    const command = ffmpeg(videoPath).setStartTime(startTime);
-    if (screen) {
-      const audioStart = startTime + screen.shift;
-      command.input(screen.audioPath);
-      if (audioStart >= 0) {
-        command.seekInput(audioStart);
-      } else {
-        command.inputOptions(["-itsoffset", String(-audioStart)]);
-      }
-    }
-    command
-      .setDuration(endTime - startTime)
-      .output(outputPath)
-      .outputOptions([...buildAudioOutputOptions(mix, screen ? 1 : 0), "-movflags +faststart"])
-      .on("end", resolve)
-      .on("error", reject)
-      .run();
-  });
 }
 
 async function renderClipThumbnail(videoPath, startTime, endTime, outputPath) {
