@@ -11,7 +11,7 @@ import { getHomeView, getScreenViews } from "../lib/screenLayout.js";
 import { buildMix, getMixTracks } from "../../electron/utils/audioMix.js";
 import { getManifestFile } from "../../electron/utils/clipManifest.js";
 import Button from '@mui/material/Button';
-import { supabase } from "../lib/supabase.js";
+import { supabase, getSession } from "../lib/supabase.js";
 import { getClipTagsError, getClipShareUrl, deleteClip } from "../lib/clipsApi.js";
 import { Divider, Menu, MenuItem, Tooltip, Typography } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
@@ -674,8 +674,19 @@ export function UploadMenu({clip, group, mix, screen, screens, target, start, en
         });
 
         if (cancelled && clipId) {
-          await deleteClip(session, clipId)
-            .catch((cleanupError) => console.error("Failed to delete a cancelled upload:", cleanupError));
+          const deleted = await getSession()
+            .then((currentSession) => deleteClip(currentSession, clipId))
+            .catch((cleanupError) => ({ error: cleanupError }));
+          if (deleted?.error) {
+            console.error("Failed to delete a cancelled upload:", deleted.error);
+            onUploadQueueEvent?.({
+              type: "cancelFailed",
+              id: uploadId,
+              name: displayName,
+              path: clip?.path,
+              error: "Couldn't cancel, it was already uploaded. You can delete it from your Library.",
+            });
+          }
           return;
         }
 

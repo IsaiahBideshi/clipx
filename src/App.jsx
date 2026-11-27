@@ -69,7 +69,7 @@ export default function App() {
   function addLocalNotification(kind, event, status) {
     setLocalNotifications((prev) => [
       ...prev,
-      { id: event.id, kind, name: event.name || "Untitled Clip", path: event.path, status, cancel: event.cancel, createdAt: new Date().toISOString() },
+      { id: event.id, kind, name: event.name || "Untitled Clip", path: event.path, status, cancel: event.cancel, error: event.error, createdAt: new Date().toISOString() },
     ]);
   }
 
@@ -102,6 +102,11 @@ export default function App() {
 
     if (event.type === "started") {
       addLocalNotification("upload", event, "uploading");
+      return;
+    }
+
+    if (event.type === "cancelFailed") {
+      addLocalNotification("upload", event, "failed");
       return;
     }
 
