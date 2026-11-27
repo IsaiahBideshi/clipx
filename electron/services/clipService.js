@@ -29,6 +29,8 @@ const CLIPS_DATA_FILE = "clipsData.json";
 const API_BASE = (process.env.VITE_DATABASE_URL || "https://clipx.bideshi.tech").replace(/\/+$/, "");
 const AZURE_CLIPS_CONTAINER = "clips";
 const AZURE_THUMBS_CONTAINER = "clip-thumbnails";
+const UPLOAD_BLOCK_BYTES = 8 * 1024 * 1024;
+const UPLOAD_CONCURRENCY = 8;
 
 function stripVideoExtension(fileName) {
   return String(fileName || "").replace(/\.(mp4|webm|mov)$/i, "");
@@ -266,46 +268,45 @@ export async function uploadClip(app, options) {
   const tempThumbPath = path.join(tempDir, `${tempStamp}-${buildThumbnailOutputName(clipTitle)}`);
   const tempStreamPath = path.join(tempDir, `${tempStamp}-stream-${buildClipOutputName(clipTitle)}`);
 
+  const renders = [];
   try {
+    const startedAt = Date.now();
     const screen = getScreenSource(videoPath, options.screen);
     await renderClipSegment(screen?.videoPath || videoPath, startTime, endTime, tempPath, options.mix, screen);
 
-    let streamPath = null;
-    try {
-      const stat = await fs.promises.stat(tempPath);
-      const bitrate = (stat.size * 8) / (endTime - startTime);
-      if (bitrate > STREAM_COPY_BITRATE * 1.25) {
-        await renderStreamCopy(tempPath, tempStreamPath);
-        streamPath = tempStreamPath;
-      }
-    } catch (streamError) {
-      console.error("ClipX: Failed to render stream copy:", streamError);
-    }
-
-    let thumbnailPath = null;
-    try {
-      await renderClipThumbnail(screen?.videoPath || videoPath, startTime, endTime, tempThumbPath);
-      thumbnailPath = tempThumbPath;
-    } catch (thumbnailError) {
-      console.error("ClipX: Failed to render thumbnail:", thumbnailError);
-    }
+    const { size } = await fs.promises.stat(tempPath);
+    const streamRender = (size * 8) / (endTime - startTime) > STREAM_COPY_BITRATE * 1.25
+      ? renderStreamCopy(tempPath, tempStreamPath).then(() => tempStreamPath, (streamError) => {
+        console.error("ClipX: Failed to render stream copy:", streamError);
+        return null;
+      })
+      : Promise.resolve(null);
+    const thumbnailRender = renderClipThumbnail(screen?.videoPath || videoPath, startTime, endTime, tempThumbPath)
+      .then(() => tempThumbPath, (thumbnailError) => {
+        console.error("ClipX: Failed to render thumbnail:", thumbnailError);
+        return null;
+      });
+    renders.push(streamRender, thumbnailRender);
 
     const result = await uploadClipToAzureBlobStorage({
       videoPath: tempPath,
-      streamPath,
-      thumbnailPath,
+      streamRender,
+      thumbnailRender,
       title: clipTitle,
       userId,
     });
+    console.info(`ClipX: Uploaded a clip in ${Date.now() - startedAt} ms (${Math.round(size / 1e6)} MB).`);
     return { status: 200, ...result };
 
   } finally {
-    for (const filePath of [tempPath, tempThumbPath, tempStreamPath]) {
-      try {
-        await fs.promises.unlink(filePath);
-      } catch (_error) {
+    void Promise.all(renders).then(async () => {
+      for (const filePath of [tempPath, tempThumbPath, tempStreamPath]) {
+        try {
+          await fs.promises.unlink(filePath);
+        } catch (_error) {
+        }
       }
-    }
+    });
   }
 }
 
@@ -333,20 +334,21 @@ async function uploadBlobToAzure({ name, contentType, filePath, container = AZUR
   }
 
   const { data } = await sasRes.json();
-  const fileBuffer = await fs.promises.readFile(filePath);
-
-  const uploadRes = await fetch(data.url, {
-    method: "PUT",
-    headers: { "x-ms-blob-type": "BlockBlob", "Content-Type": contentType },
-    body: fileBuffer,
-  });
-
-  if (!uploadRes.ok) {
-    throw new Error(`Azure upload failed (${uploadRes.status})`);
+  const { BlockBlobClient } = await import("@azure/storage-blob");
+  try {
+    await new BlockBlobClient(data.url).uploadFile(filePath, {
+      blobHTTPHeaders: { blobContentType: contentType },
+      blockSize: UPLOAD_BLOCK_BYTES,
+      maxSingleShotSize: UPLOAD_BLOCK_BYTES,
+      concurrency: UPLOAD_CONCURRENCY,
+    });
+  } catch (error) {
+    console.error("ClipX: Azure upload failed:", error);
+    throw new Error(`Azure upload failed (${error?.statusCode || error?.code || "network error"})`);
   }
 }
 
-async function uploadClipToAzureBlobStorage({ videoPath, streamPath, thumbnailPath, title, userId }) {
+async function uploadClipToAzureBlobStorage({ videoPath, streamRender, thumbnailRender, title, userId }) {
   await requireAccessToken();
   if (!userId) {
     throw new Error("Not authenticated. Please log in first.");
@@ -361,6 +363,7 @@ async function uploadClipToAzureBlobStorage({ videoPath, streamPath, thumbnailPa
     filePath: videoPath,
   });
 
+  const streamPath = await streamRender;
   if (streamPath) {
     try {
       await uploadBlobToAzure({
@@ -374,6 +377,7 @@ async function uploadClipToAzureBlobStorage({ videoPath, streamPath, thumbnailPa
   }
 
   let thumbnailBlobName = null;
+  const thumbnailPath = await thumbnailRender;
   if (thumbnailPath) {
     try {
       thumbnailBlobName = `${blobPrefix}${randomUUID()}-${buildThumbnailOutputName(title)}`;
